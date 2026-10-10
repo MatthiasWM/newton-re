@@ -19,7 +19,8 @@
 #include "Newton.h"
 #endif
 
-typedef unsigned int	ULong32;
+// (ULong32 is host_compat.h's uint32_t - an unsigned long, not an int, with
+//  the ESP32's C library, where a second typedef as unsigned int conflicts)
 
 class Pushpopper
 {

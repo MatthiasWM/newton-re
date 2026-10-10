@@ -307,6 +307,22 @@ T-Deck Pro; every figure below is the spike's own output.
   about 2 mm: the OS 2.x's checkboxes and scroll arrows (10-13 px, 2-2.5
   mm here) can be hit, not easily; a calibration offset helps; the edges
   need a margin; and a finger cannot write.
+- **The tree compiles for the ESP32-S3**: every file of a 32-bit build
+  compiled again with ESP-IDF's GCC 12.2 (`tools/tdeck/xtensa_compile.py`
+  over the ARM build's compile commands: C++17 with exceptions, `-Os`,
+  `-fwrapv`, `-fsigned-char`, `-falign-functions=4`, `-mlongcalls`) -
+  **674 of 678 files**, 3.46 MB of code and data before linking (32-bit
+  ARM's: 4.0 MB). The four left are the host's own platform code, which
+  a device port replaces: `os600/kernel/host/TaskRuntime.cpp` (Linux
+  threads), `hal/host/System.cpp` (`pthread_getattr_np`),
+  `hal/host/HostSockets.cpp` (BSD sockets - lwIP's instead),
+  `host/newton.cpp` (`dlfcn.h`). On the way GCC found two things clang
+  had let pass, both fixed: `ULong32` typedef'd a second time as
+  `unsigned int` in three files (in the ESP32's C library `uint32_t` is
+  an `unsigned long`, so the two conflict), and a member with a
+  constructor inside an anonymous union (`MemObjRequest`'s
+  `fPersistentEntry`, now its bytes). Nothing is linked yet: this says
+  the code compiles, not that it runs.
 - **Builds**: PlatformIO installs ESP-IDF 5.1 and its toolchains once
   (about 1.5 GB); after that the spike rebuilds in about 20 s.
 
@@ -329,9 +345,9 @@ the spike showed"). It should answer:
 - **the memory**: PSRAM and flash-mapped read speed through the cache
   for a pointer-chasing walk over a few megabytes (the interpreter's
   pattern), against internal SRAM;
-- **the toolchain**: ESP-IDF's Xtensa compiler on a sample of the tree
-  (C++17, exceptions, `-fwrapv`, `-falign-functions=4`) and the code size
-  it gives.
+- **the toolchain**: ESP-IDF's Xtensa compiler on the tree (C++17,
+  exceptions, `-fwrapv`, `-falign-functions=4`) and the code size it
+  gives - done: 674 of 678 files, 3.46 MB (above).
 
 Then:
 

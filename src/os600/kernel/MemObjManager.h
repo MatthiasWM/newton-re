@@ -233,7 +233,10 @@ union MemObjRequest
 		{
 			struct { Boolean fIsManager; Boolean fFound; } fDomainName;	// +0x0c, +0x0d
 			MemObjEntry	fEntry;											// +0x0c
-			PersistentDBEntry fPersistentEntry;
+			// (a PersistentDBEntry's room, as bytes: the class has a constructor
+			//  - its TSingleQContainer's - which GCC refuses inside an anonymous
+			//  union, though clang allows it; nothing reads it by this name)
+			UByte		fPersistentEntry[sizeof(PersistentDBEntry)];
 		};
 	};
 	DomainInfo		fDomainInfo;	// from +0x00

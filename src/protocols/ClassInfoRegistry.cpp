@@ -21,7 +21,7 @@
 extern const ExceptionName exAbort;
 extern const ExceptionName exBusError;
 
-typedef unsigned int	ULong32;		// the ROM's word, for the hash arithmetic
+// (ULong32, the ROM's word for the hash arithmetic, is host_compat.h's uint32_t)
 
 
 PROTOCOL_IMPL_SOURCE_MACRO(TClassInfoRegistryImpl)		// ROM 0x0005b74c Sizeof__22TClassInfoRegistryImplSFv

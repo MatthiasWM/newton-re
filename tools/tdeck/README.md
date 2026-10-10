@@ -91,3 +91,20 @@ it, don't edit it.
 line holding TEXT), echoing and writing to a file, reopening the port when
 the board resets; `--reset` resets the board first through the USB
 serial/JTAG port's RTS line, so the capture starts at boot.
+
+## xtensa_compile.py - the tree with the ESP32-S3's compiler
+
+    cmake -S src -B tmp/build-arm -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ...   # (src/cmake/zig-arm-linux.cmake)
+    python tools/tdeck/xtensa_compile.py tmp/build-arm/compile_commands.json [--only DIR,...] [--jobs N] [--opt -Os]
+
+Every file of a 32-bit CMake build (tests left out) compiled again with
+ESP-IDF's GCC for the ESP32-S3 (PlatformIO's `toolchain-xtensa-esp32s3`),
+keeping the build's `-I`, `-D` and `-include` and adding the flags the tree
+needs (C++17 with exceptions, `-fwrapv`, `-fsigned-char`,
+`-falign-functions=4`) and ESP-IDF's (`-mlongcalls`, function and data
+sections).  Nothing is linked.  **Output**: `tmp/tdeck/xtensa/report.txt`
+- how many files compiled, by area; the failures grouped by their first
+error (a missing header by its name); the compiled code and data by area -
+with the objects and each failure's full messages beside it.  About 30 s
+for the whole tree.
+
