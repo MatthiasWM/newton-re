@@ -9,6 +9,26 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-10: the T-Deck Pro, continued - spike, Xtensa, budget, baked image
+
+On the owner's T-Deck Pro (a V1.0, quad PSRAM): a PlatformIO/ESP-IDF
+spike (`tools/tdeck/spike`) drove the panel from the UC8253 datasheet
+(full refresh 3.08 s, fastest OTP waveform 0.65 s; the image shown is
+DTM1's - sending it to DTM2 showed the previous frame, which cost an
+evening's blank screens; never deep-sleep it, there is no reset line),
+measured touch (panel pixels, within ~2 mm) and memory (a cache miss ~1 us
+from PSRAM, ~2 us from flash - the largest risk), and read the keyboard
+with the owner's own layout.  `tools/tdeck/xtensa_compile.py` compiled
+674 of 678 files with ESP-IDF's GCC (two GCC-only fixes: duplicate
+`ULong32` typedefs, a constructor in an anonymous union).  `newton
+--kernel-heap`/`--task-stack` and `NEWTON_MEMORY_REPORT` sized and
+measured a device budget: a 2 MB kernel heap with a 512 KB NewtonScript
+heap passes both walkthroughs (`tools/tdeck/devicerun.sh`).  The baked
+object image (`newton --bake-objects`, mapped read-only by `--objects`)
+puts the ROM's objects in a file mapped where it was baked: 5.4 MB at 32
+bits in place of 9.4 MB of RAM, and both walkthroughs pass on it - so
+nothing writes to a ROM object.
+
 ## 2026-10-10: a small device investigated - the T-Deck Pro (branch tdeck-pro-investigation)
 
 The owner asked whether the reconstruction could run on something as

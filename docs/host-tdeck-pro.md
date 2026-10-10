@@ -365,6 +365,44 @@ tens of KB - and the ROM's objects either left in flash or (all 4.4 MB,
 or the most used of them) copied into the PSRAM. All of it in 8 MB, with
 room over.
 
+## The baked object image (2026-10-10)
+
+`newton --bake-objects <image> [--bake-base <address>]` imports the object
+file as a boot does, but lays everything the import makes out in one
+region reserved at the address given - the host's objects, their sorted
+index, the magic pointers, the lexicons and the other blocks, the moved
+objects' table - with a header in front, and writes the region out as it
+lies (`frames/ROMImport.h` `BakeBuiltObjectsFile`; the importer's
+allocations go through a hook, `gImportAlloc`). `newton --objects
+<image>` maps the file read-only at that address (`host/HostMapping.h`:
+`MapViewOfFileEx`, `mmap`) and points the importer's globals into it; the
+constants the C++ names are looked up as after an import. Nothing is
+read, converted or held: on a device the image is a flash partition,
+mapped where it was baked.
+
+- **It is the host's own layout** (pointer size, object header, object
+  alignment, byte order), so it is baked by a build of the kind that maps
+  it; the header records the layout and the object file's builder stamp,
+  and a mismatch is refused with a message. For the ESP32-S3: a 32-bit
+  little-endian build (the i386 one) has the same layout, baked with
+  `--bake-base` set to the address the device maps the partition at.
+- **Nothing writes to a ROM object**: both walkthroughs and their
+  restarts pass with the image mapped read-only (a write would fault) -
+  on the desktop (64-bit; ctest `host.NewtonBakedObjects`, with the bake
+  as its fixture `host.NewtonBakedObjects.bake`) and on the 32-bit build
+  with the device budget (`tools/tdeck/devicerun.sh ... --objects
+  <image> --kernel-heap 2 --heap 524288 --flash-size 4 --task-stack 32`:
+  4 of 4, 0 failed).
+- **What it saves**: the image is 5.4 MB at 32 bits (7.2 MB at 64), in
+  place of 9.4 MB of RAM (the object file kept and its converted copy).
+  On the 32-bit device run the RAM left is the 2 MB kernel heap and
+  1.2 MB of frames imported from the **built-in packages** (the ROM
+  extension's, installed at boot) - which could be baked the same way;
+  not done yet.
+- On the way: `TImportedObjectArea::Dispose` freed the area's aligned
+  pointer, not the one `malloc` gave (harmless while `malloc`'s pointers
+  are already aligned); it now keeps and frees the latter.
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the
@@ -398,9 +436,10 @@ Then:
    pass both walkthroughs; what remains in RAM that the device must not
    hold is the ROM's objects (9.4 MB) and the flash image - the next two
    steps.
-3. **The baked object image**: `romsrc` → the device's layout (little-
-   endian, 32-bit, references resolved to the address it will be mapped
-   at), with a tool and a test, as every generated thing here has.
+3. **The baked object image** - done (above): `newton --bake-objects`,
+   mapped read-only by `--objects`; both walkthroughs pass on it, 32-bit
+   and 64-bit. Left: the built-in packages' frames (1.2 MB of RAM at 32
+   bits) baked the same way.
 4. **An ESP-IDF skeleton**: the task runtime, timers and the store on
    FreeRTOS; boot to the NewtonScript prompt over the USB serial port, no
    screen.

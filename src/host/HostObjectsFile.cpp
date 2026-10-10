@@ -115,7 +115,20 @@ HostObjectsFileMatches(const char* path)
 	if (f == NULL)
 		return true;		// (not readable: the caller says so)
 	char signature[8];
-	bool objects = fread(signature, 1, 8, f) == 8 && memcmp(signature, "NewtObjs", 8) == 0;
+	bool read8 = fread(signature, 1, 8, f) == 8;
+	bool objects = read8 && memcmp(signature, "NewtObjs", 8) == 0;
+	if (read8 && memcmp(signature, "NewtBake", 8) == 0)
+	{
+		// a baked image (frames/ROMImport.h): the stamp of the object file
+		// it was baked from, in its prefix
+		char prefix[256];
+		fseek(f, 0, SEEK_SET);
+		size_t got = fread(prefix, 1, sizeof(prefix), f);
+		fclose(f);
+		ULong length;
+		const char* stamp = BakedObjectsStamp(prefix, (ULong) got, &length);
+		return stamp != NULL && length == strlen(kObjectsStamp) && memcmp(stamp, kObjectsStamp, length) == 0;
+	}
 	if (!objects)
 	{
 		fclose(f);

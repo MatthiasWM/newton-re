@@ -185,6 +185,31 @@ ROMImageBase(ULong* size)
 }
 
 static NewtonErr	ImportObjectArea(const unsigned char* area, ULong base, ULong size, const unsigned char* magic, long mpCount);
+static void			SetROMConstants(Ref* mpTable, long mpCount);
+
+// a bake in progress: what the import would point into the object file is
+// copied into the bake's region instead (BakeBuiltObjectsFile)
+static Boolean		gBaking = false;
+
+static void*
+ImportZeroed(size_t size)
+{
+	void* p = gImportAlloc(size > 0 ? size : 1);
+	if (p != nil)
+		memset(p, 0, size > 0 ? size : 1);
+	return p;
+}
+
+static const unsigned char*
+ImportKept(const unsigned char* bytes, size_t size)
+{
+	if (!gBaking)
+		return bytes;
+	unsigned char* copy = (unsigned char*) gImportAlloc(size > 0 ? size : 1);
+	if (copy != nil)
+		memcpy(copy, bytes, size);
+	return copy;
+}
 
 NewtonErr
 ImportROMObjects(const void* image, ULong imageSize)
@@ -222,12 +247,22 @@ ImportObjectArea(const unsigned char* area, ULong base, ULong size, const unsign
 
 	// the tables and constants (the ROM's addresses: moved, when the area was
 	// laid out afresh)
-	gROMSymbolTableRef = gROMObjectArea.TranslateRef(MovedRef(kROMSymbolTable));
-	Ref* mpTable = (Ref*) malloc(mpCount * sizeof(Ref));
+	Ref* mpTable = (Ref*) gImportAlloc(mpCount * sizeof(Ref));
 	if (mpTable == nil)
 		return kError_No_Memory;
 	for (long j = 0; j < mpCount; j++)
 		mpTable[j] = gROMObjectArea.TranslateRef(GetBigEndianWord(magic + j * kARMWord));
+	SetROMConstants(mpTable, mpCount);
+	return noErr;
+}
+
+
+// The magic pointers and the constants the C++ names, from the imported
+// area (an import's, or a baked image's mapped).
+static void
+SetROMConstants(Ref* mpTable, long mpCount)
+{
+	gROMSymbolTableRef = gROMObjectArea.TranslateRef(MovedRef(kROMSymbolTable));
 	gMagicPointerTables[0] = mpTable;
 	gMagicPointerTableCounts[0] = mpCount;
 	for (long j = 0; j < gROMConstantCount; j++)
@@ -235,7 +270,6 @@ ImportObjectArea(const unsigned char* area, ULong base, ULong size, const unsign
 	for (long j = 0; j < gRSSymbolCount; j++)
 		*gRSSymbolEntries[j].fRef = gROMObjectArea.TranslateRef(MovedRef(gRSSymbolEntries[j].fROMRef));
 	gROMBuiltinFunctions = Rbuiltinfunctions;
-	return noErr;
 }
 
 
@@ -270,7 +304,7 @@ ImportBuiltObjects(const void* data, ULong size)
 	{
 		long count = GetBigEndianWord(p + at);
 		at += kARMWord;
-		gBuiltBlocks = (BuiltBlock*) calloc(count > 0 ? count : 1, sizeof(BuiltBlock));
+		gBuiltBlocks = (BuiltBlock*) ImportZeroed((count > 0 ? count : 1) * sizeof(BuiltBlock));
 		if (gBuiltBlocks == nil)
 			return kError_No_Memory;
 		for (long i = 0; i < count && at + 2 * kARMWord <= size; i++)
@@ -280,7 +314,9 @@ ImportBuiltObjects(const void* data, ULong size)
 				return kError_Bad_Parameters;
 			gBuiltBlocks[i].fAddress = GetBigEndianWord(p + at);
 			gBuiltBlocks[i].fLength = length;
-			gBuiltBlocks[i].fData = p + at + 2 * kARMWord;
+			gBuiltBlocks[i].fData = ImportKept(p + at + 2 * kARMWord, length);
+			if (gBuiltBlocks[i].fData == nil)
+				return kError_No_Memory;
 			gBuiltBlockCount = i + 1;
 			at += 2 * kARMWord + ((length + 3) & ~3);
 		}
@@ -291,8 +327,10 @@ ImportBuiltObjects(const void* data, ULong size)
 		long count = GetBigEndianWord(p + at);
 		if (at + kARMWord + count * 8 > size)
 			return kError_Bad_Parameters;
-		gMoved = p + at + kARMWord;
+		gMoved = ImportKept(p + at + kARMWord, count * 8);
 		gMovedCount = count;
+		if (gMoved == nil)
+			return kError_No_Memory;
 	}
 	return ImportObjectArea(p + 28, base, areaSize, p + 28 + areaSize, mpCount);
 }
@@ -331,21 +369,29 @@ BuiltObjectsStamp(const void* data, ULong size, ULong* length)
 }
 
 
-// (ROMObjectsMemory: the object file kept, and the area ObjectAreaImport made)
+// (ROMObjectsMemory: the object file kept, the area ObjectAreaImport made,
+//  a baked image mapped)
 static ULong	gImportedFileBytes = 0;
+static ULong	gMappedBytes = 0;
 extern ULong	gImportedAreaBytes;
 
 void
-ROMObjectsMemory(ULong* fileBytes, ULong* areaBytes)
+ROMObjectsMemory(ULong* fileBytes, ULong* areaBytes, ULong* mappedBytes)
 {
 	*fileBytes = gImportedFileBytes;
 	*areaBytes = gImportedAreaBytes;
+	*mappedBytes = gMappedBytes;
 }
 
+
+static NewtonErr	ImportBakedObjectsFromFile(const char* path);
+static Boolean		IsBakedImage(const char* path);
 
 NewtonErr
 ImportBuiltObjectsFromFile(const char* path)
 {
+	if (IsBakedImage(path))
+		return ImportBakedObjectsFromFile(path);
 	FILE* f = fopen(path, "rb");
 	if (f == nil)
 		return kError_Bad_Parameters;
@@ -430,6 +476,8 @@ SpliceROMExtension(const char* imagePath, unsigned char* image, long imageSize)
 NewtonErr
 ImportROMObjectsFromFile(const char* path)
 {
+	if (IsBakedImage(path))
+		return ImportBakedObjectsFromFile(path);
 	FILE* f = fopen(path, "rb");
 	if (f == nil)
 		return kError_Bad_Parameters;
@@ -467,4 +515,244 @@ ImportROMObjectsFromFile(const char* path)
 	// else the image is kept: the objects point into it, and so do the
 	// ROM extension's packages (ROMImageBase)
 	return err;
+}
+
+
+/*------------------------------------------------------------------------------
+	T h e   b a k e d   o b j e c t   i m a g e
+
+	One region, mapped at the address it was made at: this header, then
+	everything an object file's import makes, as the import made it (the
+	area and its index, the magic pointers, the lexicons and other blocks,
+	the moved objects).  The prefix is the same on every host - it says
+	whose layout the rest is - and the header's pointers are the host's.
+------------------------------------------------------------------------------*/
+
+struct BakedPrefix
+{
+	char		fMagic[8];			// "NewtBake"
+	uint32_t	fVersion;			// 1
+	uint32_t	fLayout;			// BakedLayout(): this host's pointer size, object header, alignment and byte order
+	uint64_t	fMapBase;			// where it is mapped
+	uint64_t	fSize;				// its bytes (the file's)
+	uint32_t	fStampLength;		// the object file's builder stamp (BuiltObjectsStamp)
+	char		fStamp[60];
+};
+
+struct BakedHeader
+{
+	BakedPrefix	fPrefix;
+	char*		fAreaStart;
+	char*		fArea;
+	char*		fAreaEnd;
+	ImportedObjectEntry*	fObjects;
+	long		fCount;
+	ULong32		fBase;
+	ULong32		fSize;
+	Ref*		fMagicPointers;
+	long		fMagicPointerCount;
+	BuiltBlock*	fBlocks;
+	long		fBlockCount;
+	const unsigned char*	fMoved;
+	long		fMovedCount;
+};
+
+static HostReserveAtProc	gReserveAt = nil;
+static HostMapFileAtProc	gMapFileAt = nil;
+
+
+void
+SetHostMappers(HostReserveAtProc reserve, HostMapFileAtProc mapFile)
+{
+	gReserveAt = reserve;
+	gMapFileAt = mapFile;
+}
+
+
+uintptr_t
+DefaultBakedObjectsBase(void)
+{
+	// (somewhere a host leaves free: high on a 64-bit one, at 1.25 GB on a
+	//  32-bit one - a device names its own, the address its flash is mapped at)
+	return sizeof(void*) == 8 ? (uintptr_t) 0x20000000000ULL : (uintptr_t) 0x50000000UL;
+}
+
+
+static uint32_t
+BakedLayout(void)
+{
+	const uint16_t one = 1;
+	uint32_t littleEndian = *(const uint8_t*) &one;
+	return (uint32_t) sizeof(Ref) | (uint32_t) sizeof(ObjHeader) << 8 | (uint32_t) kObjAlign << 16
+		 | (uint32_t) sizeof(BakedHeader) << 20 | littleEndian << 31;
+}
+
+
+static Boolean
+IsBakedImage(const char* path)
+{
+	FILE* f = fopen(path, "rb");
+	if (f == nil)
+		return false;
+	char magic[8];
+	bool baked = fread(magic, 1, 8, f) == 8 && memcmp(magic, "NewtBake", 8) == 0;
+	fclose(f);
+	return baked;
+}
+
+
+// the bake's region, handed out from the front
+static char*	gArena = nil;
+static char*	gArenaNext = nil;
+static char*	gArenaEnd = nil;
+
+static void*
+ArenaAlloc(size_t size)
+{
+	char* p = (char*) (((uintptr_t) gArenaNext + 7) & ~(uintptr_t) 7);
+	if (p + size > gArenaEnd)
+		return nil;
+	gArenaNext = p + size;
+	return p;
+}
+
+
+NewtonErr
+BakeBuiltObjectsFile(const char* objectsPath, const char* imagePath, uintptr_t base, size_t reserve)
+{
+	if (gReserveAt == nil)
+		return kError_Bad_Parameters;
+	if (base == 0)
+		base = DefaultBakedObjectsBase();
+	// the object file, read whole (nothing of it is kept: what the import
+	// would point into is copied into the region)
+	FILE* f = fopen(objectsPath, "rb");
+	if (f == nil)
+		return kError_Bad_Parameters;
+	fseek(f, 0, SEEK_END);
+	long size = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	unsigned char* data = (unsigned char*) malloc(size > 0 ? size : 1);
+	bool read = data != nil && fread(data, 1, size, f) == (size_t) size;
+	fclose(f);
+	if (!read || size < 8 || memcmp(data, "NewtObjs", 8) != 0)
+	{
+		free(data);
+		return kError_Bad_Parameters;
+	}
+	gArena = (char*) gReserveAt(base, reserve);
+	if (gArena == nil)
+	{
+		free(data);
+		return kError_No_Memory;
+	}
+	gArenaNext = gArena;
+	gArenaEnd = gArena + reserve;
+	BakedHeader* header = (BakedHeader*) ArenaAlloc(sizeof(BakedHeader));
+	memset(header, 0, sizeof(BakedHeader));
+
+	gImportAlloc = ArenaAlloc;
+	gBaking = true;
+	NewtonErr err = ImportBuiltObjects(data, (ULong) size);
+	gBaking = false;
+	gImportAlloc = malloc;
+	if (err == noErr && !ROMObjectsImported())
+		err = kError_Bad_Parameters;
+	if (err == noErr)
+	{
+		BakedPrefix* prefix = &header->fPrefix;
+		memcpy(prefix->fMagic, "NewtBake", 8);
+		prefix->fVersion = 1;
+		prefix->fLayout = BakedLayout();
+		prefix->fMapBase = (uint64_t) base;
+		prefix->fSize = (uint64_t) (gArenaNext - gArena);
+		ULong length;
+		const char* stamp = BuiltObjectsStamp(data, (ULong) size, &length);
+		if (stamp != nil && length <= sizeof(prefix->fStamp))
+		{
+			prefix->fStampLength = length;
+			memcpy(prefix->fStamp, stamp, length);
+		}
+		header->fAreaStart = gROMObjectArea.fAreaStart;
+		header->fArea = gROMObjectArea.fArea;
+		header->fAreaEnd = gROMObjectArea.fAreaEnd;
+		header->fObjects = gROMObjectArea.fObjects;
+		header->fCount = gROMObjectArea.fCount;
+		header->fBase = gROMObjectArea.fBase;
+		header->fSize = gROMObjectArea.fSize;
+		header->fMagicPointers = gMagicPointerTables[0];
+		header->fMagicPointerCount = gMagicPointerTableCounts[0];
+		header->fBlocks = gBuiltBlocks;
+		header->fBlockCount = gBuiltBlockCount;
+		header->fMoved = gMoved;
+		header->fMovedCount = gMovedCount;
+		FILE* out = fopen(imagePath, "wb");
+		if (out == nil || fwrite(gArena, 1, (size_t) prefix->fSize, out) != (size_t) prefix->fSize)
+			err = kError_Bad_Parameters;
+		if (out != nil)
+			fclose(out);
+	}
+	free(data);
+	return err;
+}
+
+
+const char*
+BakedObjectsStamp(const void* data, ULong size, ULong* length)
+{
+	const BakedPrefix* prefix = (const BakedPrefix*) data;
+	*length = 0;
+	if (size < sizeof(BakedPrefix) || memcmp(prefix->fMagic, "NewtBake", 8) != 0
+	 || prefix->fStampLength > sizeof(prefix->fStamp))
+		return nil;
+	*length = prefix->fStampLength;
+	return prefix->fStamp;
+}
+
+
+// A baked image mapped where it was made, and the ROM's objects set from it.
+static NewtonErr
+ImportBakedObjectsFromFile(const char* path)
+{
+	if (gROMObjectArea.fArea != nil)
+		return noErr;
+	FILE* f = fopen(path, "rb");
+	if (f == nil)
+		return kError_Bad_Parameters;
+	BakedPrefix prefix;
+	bool read = fread(&prefix, 1, sizeof(prefix), f) == sizeof(prefix);
+	fclose(f);
+	if (!read || memcmp(prefix.fMagic, "NewtBake", 8) != 0 || prefix.fVersion != 1)
+		return kError_Bad_Parameters;
+	if (prefix.fLayout != BakedLayout())
+	{
+		fprintf(stderr, "[frames] %s was baked by a host of another layout (%#x, this one %#x): bake it again with this build\n",
+				path, (unsigned) prefix.fLayout, (unsigned) BakedLayout());
+		return kError_Bad_Parameters;
+	}
+	if (gMapFileAt == nil || (uintptr_t) prefix.fMapBase != prefix.fMapBase)
+		return kError_Bad_Parameters;
+	const BakedHeader* h = (const BakedHeader*) gMapFileAt(path, (uintptr_t) prefix.fMapBase, (size_t) prefix.fSize);
+	if (h == nil)
+	{
+		fprintf(stderr, "[frames] %s could not be mapped at %#llx, where it was baked\n", path, (unsigned long long) prefix.fMapBase);
+		return kError_No_Memory;
+	}
+	gROMObjectArea.fAreaStart = h->fAreaStart;
+	gROMObjectArea.fArea = h->fArea;
+	gROMObjectArea.fAreaEnd = h->fAreaEnd;
+	gROMObjectArea.fObjects = h->fObjects;
+	gROMObjectArea.fCount = h->fCount;
+	gROMObjectArea.fBase = h->fBase;
+	gROMObjectArea.fSize = h->fSize;
+	gROMObjectArea.fBytes = nil;
+	gROMObjectArea.fOutside = nil;
+	gROMObjectArea.fOwned = false;
+	gBuiltBlocks = h->fBlocks;
+	gBuiltBlockCount = h->fBlockCount;
+	gMoved = h->fMoved;
+	gMovedCount = h->fMovedCount;
+	gMappedBytes = (ULong) prefix.fSize;
+	SetROMConstants(h->fMagicPointers, h->fMagicPointerCount);
+	return noErr;
 }

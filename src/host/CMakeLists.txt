@@ -133,7 +133,7 @@ else()
 endif()
 # the host's fonts (HostFontRaster.h): GDI on Windows, none elsewhere yet
 # (win32/HostFontRaster.cpp's #else)
-add_library(host_window STATIC ${host_window_source} ${host_audio_source} HostPenReplay.cpp win32/HostFontRaster.cpp)
+add_library(host_window STATIC ${host_window_source} ${host_audio_source} HostPenReplay.cpp win32/HostFontRaster.cpp HostMapping.cpp)
 target_include_directories(host_window PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 if(NEWTON_HOST_WINDOW STREQUAL "remarkable")
     target_link_libraries(host_window PUBLIC rt pthread dl)
@@ -2381,6 +2381,27 @@ set_tests_properties(host.NewtonWalkthrough.restart PROPERTIES TIMEOUT 180
                      FIXTURES_REQUIRED host_walkthrough_store DEPENDS host.NewtonWalkthrough
                      PASS_REGULAR_EXPRESSION "walkthrough: restart done, 0 failed"
                      FAIL_REGULAR_EXPRESSION "FAILED|waited in vain")
+
+# the same walk on the ROM's objects baked into an image and mapped
+# read-only where it was baked, as a small device maps it from flash
+# (frames/ROMImport.h, docs/host-tdeck-pro.md "The baked object image"):
+# the bake, then the walk on it - which also shows that nothing in it
+# writes to a ROM object (the mapping is read-only)
+add_test(NAME host.NewtonBakedObjects.bake
+         COMMAND newton --bake-objects ${CMAKE_CURRENT_BINARY_DIR}/romsrc-objects.baked
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+set_tests_properties(host.NewtonBakedObjects.bake PROPERTIES TIMEOUT 120 FIXTURES_SETUP host_baked_objects
+                     PASS_REGULAR_EXPRESSION "baked into .*, to be mapped at")
+add_test(NAME host.NewtonBakedObjects
+         COMMAND newton --objects ${CMAKE_CURRENT_BINARY_DIR}/romsrc-objects.baked --display 320x480 --erase
+                 --store ${CMAKE_CURRENT_BINARY_DIR}/walkthrough-baked.store --headless 300
+                 --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/walkthrough.ns
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+set_tests_properties(host.NewtonBakedObjects PROPERTIES TIMEOUT 360
+                     FIXTURES_REQUIRED host_baked_objects DEPENDS host.NewtonBakedObjects.bake
+                     ENVIRONMENT "NEWTON_MEMORY_REPORT=1"
+                     PASS_REGULAR_EXPRESSION "walkthrough: done, 0 failed"
+                     FAIL_REGULAR_EXPRESSION "FAILED|waited in vain|could not be mapped|fell over|mapped, not held, 0 KB")
 
 # the same walk booted on the ROM image (--rom): a regression guard for the
 # --rom path, which the default boot's tests no longer take (the walk's own

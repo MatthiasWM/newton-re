@@ -125,15 +125,15 @@ static void
 ReportMemory(void)
 {
 	SampleHeap();
-	ULong fileBytes, areaBytes;
-	ROMObjectsMemory(&fileBytes, &areaBytes);
+	ULong fileBytes, areaBytes, mappedBytes;
+	ROMObjectsMemory(&fileBytes, &areaBytes, &mappedBytes);
 	fprintf(stderr, "[host] memory: the kernel heap %lu KB - at most %lu KB in use, reaching %lu KB into it "
 			"(the NewtonScript heap, %lu KB, inside it); the ROM's objects %lu KB (the object file %lu KB, "
-			"the converted area and its index %lu KB)\n",
+			"the converted area and its index %lu KB; a baked image mapped, not held, %lu KB)\n",
 			(unsigned long) (HostKernelHeapSize() >> 10), (unsigned long) (gPeakInUse >> 10),
 			(unsigned long) (gPeakTop >> 10), (unsigned long) (gObjectHeapSize >> 10),
 			(unsigned long) ((fileBytes + areaBytes) >> 10), (unsigned long) (fileBytes >> 10),
-			(unsigned long) (areaBytes >> 10));
+			(unsigned long) (areaBytes >> 10), (unsigned long) (mappedBytes >> 10));
 }
 
 
