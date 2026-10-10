@@ -207,10 +207,17 @@ targets(void)
 		for (int y = kAt[t][1]; y < kAt[t][1] + 16; y++)
 			for (int x = kAt[t][0] / 8; x < (kAt[t][0] + 16) / 8; x++)
 				frame[y * EPD_ROW_BYTES + x] = 0x00;
+	int black = 0;
+	for (int k = 0; k < EPD_BYTES; k++)
+		black += frame[k] == 0x00;
+	printf("spike: the target frame at %p, %d black bytes (expect 160); the Newton screen at %p\n",
+		   (void*) frame, black, (const void*) newton_screen);
 	if (!epd_init())
 		return;
-	printf("spike: targets at (8,8) (216,8) (216,296) (8,296) (112,152), 16 x 16: %lld us\n",
-		   (long long) epd_fast(white, frame, 0x7F));
+	// whatever the last run left cleared, then the targets
+	epd_full(white, white);
+	printf("spike: the targets: %lld us\n", (long long) epd_full(white, frame));
+	printf("spike: targets at (8,8) (216,8) (216,296) (8,296) (112,152), 16 x 16\n");
 	epd_sleep();
 }
 
@@ -393,7 +400,7 @@ app_main(void)
 	if (kPanelTimings)
 		panel();
 	targets();
-	input(90);
+	input(100000);			// (until the board is reset: the capture decides how long)
 	printf("spike: done\n");
 	for (;;)
 		vTaskDelay(pdMS_TO_TICKS(1000));

@@ -8,6 +8,7 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -23,9 +24,10 @@
 #define PSR		0x00	// panel setting: RES[1:0] REG KW/R UD SHL SHD_N RST_N, then VCMZ TS_AUTO TIEG NORG VCM_LUTZ
 #define POF		0x02	// power off
 #define PON		0x04	// power on
-#define DTM1	0x10	// the old frame (KW mode)
+#define DTM1	0x10	// the image shown (the datasheet's "B/W or OLD" - in this KW mode it is the B/W
+						// image: what is sent here is what the refresh shows, found on the owner's board)
 #define DRF		0x12	// display refresh
-#define DTM2	0x13	// the new frame
+#define DTM2	0x13	// the other ("Red or NEW") - the frame before, for the waveform
 #define TRES	0x61	// resolution: HRES[7:3], VRES[8], VRES[7:0]
 #define PTL		0x90	// partial window: HRST, HRED, VRST (2), VRED (2), PT_SCAN
 #define PTIN	0x91
@@ -47,12 +49,19 @@ send(uint8_t command, const uint8_t* data, size_t length)
 	t.tx_buffer = &command;
 	spi_device_polling_transmit(gSpi, &t);
 	gpio_set_level(PIN_DC, 1);
+	// (every byte through a bounce buffer DMA can read: the frames come from
+	//  flash and from RAM, and a frame in RAM handed to DMA as it was came
+	//  out blank - while it is found out why)
+	static uint8_t* bounce = NULL;
+	if (bounce == NULL)
+		bounce = heap_caps_malloc(4000, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
 	while (length > 0)
 	{
 		size_t n = length > 4000 ? 4000 : length;
+		memcpy(bounce, data, n);
 		memset(&t, 0, sizeof(t));
 		t.length = n * 8;
-		t.tx_buffer = data;
+		t.tx_buffer = bounce;
 		spi_device_polling_transmit(gSpi, &t);
 		data += n;
 		length -= n;
@@ -133,8 +142,8 @@ int64_t
 epd_full(const uint8_t* old_frame, const uint8_t* new_frame)
 {
 	send1(CCSET, 0x00);
-	send(DTM1, old_frame, EPD_BYTES);
-	send(DTM2, new_frame, EPD_BYTES);
+	send(DTM1, new_frame, EPD_BYTES);
+	send(DTM2, old_frame, EPD_BYTES);
 	return refresh();
 }
 
@@ -143,8 +152,8 @@ epd_fast(const uint8_t* old_frame, const uint8_t* new_frame, uint8_t ts_set)
 {
 	send1(CCSET, 0x02);
 	send1(TSSET, ts_set);
-	send(DTM1, old_frame, EPD_BYTES);
-	send(DTM2, new_frame, EPD_BYTES);
+	send(DTM1, new_frame, EPD_BYTES);
+	send(DTM2, old_frame, EPD_BYTES);
 	int64_t t = refresh();
 	send1(CCSET, 0x00);
 	return t;
@@ -170,7 +179,7 @@ epd_partial(int x, int y, int w, int h, const uint8_t* old_frame, const uint8_t*
 		const uint8_t* frame = pass == 0 ? old_frame : new_frame;
 		for (int r = 0; r < h; r++)
 			memcpy(window + r * rowBytes, frame + (y + r) * EPD_ROW_BYTES + x / 8, rowBytes);
-		send(pass == 0 ? DTM1 : DTM2, window, (size_t) (rowBytes * h));
+		send(pass == 0 ? DTM2 : DTM1, window, (size_t) (rowBytes * h));	// (the new to DTM1: see its definition)
 	}
 	int64_t t = refresh();
 	send(PTOUT, NULL, 0);

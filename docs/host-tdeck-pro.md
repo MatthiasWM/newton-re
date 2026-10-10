@@ -256,6 +256,13 @@ T-Deck Pro; every figure below is the spike's own output.
   refresh saves the flash, not the time. So with the OTP's waveforms the
   quickest update is **0.65 s**; anything faster needs a waveform of our
   own (`REG` = LUT from registers) - not tried.
+- **What the refresh shows is what was sent with DTM1 (0x10)**, not DTM2:
+  the datasheet calls DTM1 "B/W or OLD" and DTM2 "Red or NEW", and sending
+  the new frame to DTM2 showed, every time, the frame sent to DTM1 - the
+  refreshes looked one behind, and a screen drawn from white came out
+  blank. Every run's screens fit that once looked at together; the
+  spike now sends the image to DTM1 and the frame before it to DTM2, and
+  draws what it is asked to.
 - **Never deep-sleep the panel**: the controller leaves DSLP only by a
   hardware reset, and the T-Deck Pro does not wire up its RES#; after
   DSLP it stayed busy until the board lost power. Power it off (POF).
@@ -280,8 +287,26 @@ T-Deck Pro; every figure below is the spike's own output.
 - **The keyboard** works as the owner's lilyphone1 project has it (a 4x10
   matrix on the TCA8418, its layout): keys and their releases arrive as
   events about 10 ms apart.
-- **Touch** answers (CST328, reports as LilyGO's code reads them) -
-  how fine a finger's position is still to be measured.
+- **Touch** (CST328, reports as LilyGO's code reads them) is in the
+  panel's own pixels - no rotation, mirroring or scale - at about 100
+  reports a second while a finger is down. Five 16x16 targets tapped
+  five times each by the owner:
+
+  | target | where the taps were read (mean) | offset |
+  |---|---|---|
+  | (16, 16) top left | (21, 6) | about +5, -10 |
+  | (224, 16) top right | (237, 4) | +13, -12 |
+  | (224, 304) bottom right | (238, 301) | +14, -3 |
+  | (16, 304) bottom left | (20, 308) | +4, +4 |
+  | (120, 160) centre | (127, 168) | +7, +8 |
+
+  Repeated taps fall within a few pixels of each other, with a steady
+  pull of about 7 px (1.5 mm) down and to the right away from the
+  edges; within about 10 px of an edge the position runs into the limit
+  (x 236-239, y 1). A tap is one or two reports. So a finger hits within
+  about 2 mm: the OS 2.x's checkboxes and scroll arrows (10-13 px, 2-2.5
+  mm here) can be hit, not easily; a calibration offset helps; the edges
+  need a margin; and a finger cannot write.
 - **Builds**: PlatformIO installs ESP-IDF 5.1 and its toolchains once
   (about 1.5 GB); after that the spike rebuilds in about 20 s.
 

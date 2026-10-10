@@ -61,6 +61,9 @@ Sources of the facts it relies on:
 - the panel driver (`src/epd.c`): the UltraChip UC8253 datasheet
   (`hardware/UC8253.pdf`) - its command table; written from it, not from
   any library (LilyGO's code is GPL-3.0, so none of it is copied here);
+  one thing the datasheet does not say plainly, found on the board: in
+  this black-and-white mode the image shown is the one sent with DTM1
+  (0x10), the frame before it goes to DTM2 (0x13);
 - the touch report (register 0xD000, seven bytes ending 0xAB, 0xD109 for
   normal mode): read off LilyGO's `examples/touch_hyn_core/arduino/hyn_cst3xx.c`;
 - the keyboard (a 4x10 matrix on a TCA8418, an event `0x80 | row * 10 +
