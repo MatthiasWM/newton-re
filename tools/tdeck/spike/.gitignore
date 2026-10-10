@@ -1,0 +1,4 @@
+# PlatformIO's build and the sdkconfig ESP-IDF writes from sdkconfig.defaults
+.pio/
+sdkconfig.tdeck-pro
+sdkconfig.old

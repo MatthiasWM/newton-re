@@ -35,7 +35,7 @@ question of fit:
 | | MessagePad 2100 | T-Deck Pro |
 |---|---|---|
 | Processor | StrongARM SA-110, 162 MHz, 16 KB I + 16 KB D cache | ESP32-S3: two Xtensa LX7 cores, 240 MHz |
-| Working memory | 4 MB DRAM (`hal/host/System.cpp` `GetRamSize`) | ~512 KB internal SRAM + 8 MB octal PSRAM |
+| Working memory | 4 MB DRAM (`hal/host/System.cpp` `GetRamSize`) | ~512 KB internal SRAM + 8 MB **quad** (QSPI) PSRAM |
 | ROM | 8 MB mask ROM | - |
 | Flash | 4 MB (the internal store, `hal/host/HostFlash.h`) | 16 MB, code and data both mapped through the cache |
 | Card | PC Card slots | microSD |
@@ -47,8 +47,9 @@ question of fit:
 The device facts are from LilyGO's product page and its
 [T-Deck-Pro repository](https://github.com/Xinyuan-LilyGO/T-Deck-Pro)
 (pins, ICs, board revisions V1.0/V1.1/MAX, which need different
-firmware). Not confirmed there: the panel's refresh times (a reseller
-gives about 3 s full, 0.5 s partial) and whether it can show grays; the
+firmware). LilyGO's README calls the PSRAM octal; **on the owner's board
+it is quad** (octal does not start: "PSRAM ID read error"; the owner's own
+board file says `qio_qspi`) - what the device spike found is below. The
 ESP32-S3 maps flash and PSRAM through one 32 MB window, which the 8 MB
 PSRAM and a mapped part of flash share (ESP-IDF's external-RAM guide).
 
@@ -226,6 +227,64 @@ the ARM interpreter for packages' native code, the host's own fonts - none
 can be left out by a CMake option today (the libraries reach each other by
 design); each needs a stub.
 
+## What the device spike showed (the owner's board, 2026-10-10)
+
+`tools/tdeck/spike/` (`tools/tdeck/README.md`), run on the owner's
+T-Deck Pro; every figure below is the spike's own output.
+
+- **The board**: a **V1.0** (neither the DRV2605 at 0x5A nor the XL9555
+  at 0x20), ESP32-S3 revision 0.2, 16 MB flash, **8 MB quad PSRAM** (8,189
+  KB free), 339 KB internal RAM free with 248 KB the largest block. On
+  I2C: touch 0x1A, the IMU 0x28, the keyboard 0x34, the fuel gauge 0x55,
+  the charger 0x6B (the light sensor at 0x23 does not answer).
+- **The panel works from the UC8253 datasheet alone**: the Newton screen
+  (`tools/tdeck/pgm2epd.py` of a 240x320 one-bit desktop boot) is upright,
+  black on white and crisp (the owner's eye). Refresh times, BUSY from
+  `DRF` to its end:
+
+  | Refresh | Time |
+  |---|---|
+  | full (the OTP waveform) | 3.08 s |
+  | forced temperature 0x5A (CCSET TSFIX, TSSET) | 1.01 s |
+  | forced temperature 0x6E | 1.54 s |
+  | **forced temperature 0x7F** | **0.65 s** |
+  | a 64x64 window (PTIN/PTL), the full waveform | 3.07 s |
+  | the window at 0x5A | 1.01 s |
+
+  The fast refreshes looked clean, the window refreshed alone. A window
+  costs as long as the whole screen at the same waveform: partial
+  refresh saves the flash, not the time. So with the OTP's waveforms the
+  quickest update is **0.65 s**; anything faster needs a waveform of our
+  own (`REG` = LUT from registers) - not tried.
+- **Never deep-sleep the panel**: the controller leaves DSLP only by a
+  hardware reset, and the T-Deck Pro does not wire up its RES#; after
+  DSLP it stayed busy until the board lost power. Power it off (POF).
+- **Memory** (built `-O2`; 200,000 dependent reads, each address made
+  from the word read before, xorshift; then a sequential sum):
+
+  | | hits the cache | misses | sequential |
+  |---|---|---|---|
+  | internal SRAM | 58 ns | - | 240 MB/s |
+  | PSRAM (quad, 80 MHz) | 63 ns | **1.0-1.15 µs** | 27.5 MB/s |
+  | flash, mapped | 63 ns | **1.8-2.1 µs** | 15.3 MB/s |
+
+  **A miss costs 250-500 processor cycles.** This is the port's largest
+  performance risk: the interpreter walks objects spread over megabytes
+  (the object heap in PSRAM, the ROM's objects in flash) through a 32 KB
+  data cache. What helps: the hottest data in the 512 KB of internal
+  SRAM (the interpreter's stacks, the symbol table, the most used ROM
+  objects), a 64 KB data cache with 64-byte lines (`CONFIG_ESP32S3_DATA_CACHE_64KB`,
+  `_LINE_64B`), the ROM's objects copied into PSRAM rather than read from
+  flash where they fit (PSRAM misses cost half a flash miss). Only real
+  NewtonScript on the board will say how slow it is in practice.
+- **The keyboard** works as the owner's lilyphone1 project has it (a 4x10
+  matrix on the TCA8418, its layout): keys and their releases arrive as
+  events about 10 ms apart.
+- **Touch** answers (CST328, reports as LilyGO's code reads them) -
+  how fine a finger's position is still to be measured.
+- **Builds**: PlatformIO installs ESP-IDF 5.1 and its toolchains once
+  (about 1.5 GB); after that the spike rebuilds in about 20 s.
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the
@@ -272,11 +331,11 @@ Then:
 
 - **The screen** (above): the largest unknown is how many of the built-in
   applications can be made to fit.
-- **E-paper speed**: half a second a partial refresh suits reading and
-  typing, not scrolling or ink.
-- **Caches**: the ROM's objects and the code both reach the processor
-  through the ESP32-S3's cache (32 or 64 KB), shared with the PSRAM; the
-  interpreter walks objects all over 3 MB of them. The StrongARM had a
-  16 KB data cache too; how the two compare only a measurement on the
-  device will say.
+- **E-paper speed**: 0.65 s an update with the panel's own waveforms (the
+  spike) suits reading and typing, not scrolling or ink; faster needs a
+  waveform of our own.
+- **Caches**: measured - a miss costs about 1 µs from PSRAM and 2 µs from
+  flash (above), and the interpreter walks objects all over megabytes.
+  Internal SRAM for the hottest data and a 64 KB cache are the remedies;
+  NewtonScript on the board is the only real measurement.
 - **Board revisions**: LilyGO's V1.0, V1.1 and MAX need different firmware.
