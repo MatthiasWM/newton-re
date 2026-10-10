@@ -37,7 +37,10 @@ On a Linux host the executable is ELF and keeps its own symbol table, so
 the name is simply looked up there (`.symtab`, the function whose
 [value, value + size) holds the offset - a position-independent
 executable's offsets are its virtual addresses), and demangled through
-`c++filt` when there is one.  The crash line is the same:
+`c++filt` when there is one.  32-bit images (i386, 32-bit ARM, an
+ESP32's Xtensa) are read too, and a program that is not position-
+independent has its symbols taken from its load address.  The crash line
+is the same:
 
     [host] the machine fell over: a signal (0xb) at 0x55d3c4a01234 (image + 0x1a1234)
     python3 tools/host/whichfunction.py build/host/host/newton 0x1a1234
@@ -183,15 +186,35 @@ class ElfSymbols:
     def __init__(self, path):
         with open(path, "rb") as f:
             data = f.read()
-        if data[:4] != b"\x7fELF" or data[4] != 2:
-            raise ValueError("not a 64-bit ELF image")
+        if data[:4] != b"\x7fELF" or data[4] not in (1, 2):
+            raise ValueError("not an ELF image")
         end = "<" if data[5] == 1 else ">"
-        shoff, = struct.unpack_from(end + "Q", data, 0x28)
-        shentsize, shnum, shstrndx = struct.unpack_from(end + "HHH", data, 0x3A)
+        wide = data[4] == 2				# ELFCLASS64; else a 32-bit image (i386, ARM, an ESP32's Xtensa)
+        e_type, = struct.unpack_from(end + "H", data, 0x10)
+        if wide:
+            phoff, shoff = struct.unpack_from(end + "QQ", data, 0x20)
+            phentsize, phnum, shentsize, shnum, shstrndx = struct.unpack_from(end + "HHHHH", data, 0x36)
+        else:
+            phoff, shoff = struct.unpack_from(end + "II", data, 0x1C)
+            phentsize, phnum, shentsize, shnum, shstrndx = struct.unpack_from(end + "HHHHH", data, 0x2A)
+        # a program that is not position-independent (ET_EXEC) has its
+        # symbols at their load addresses, and the crash line's offset is
+        # from its first loaded segment
+        self.base = 0
+        if e_type == 2:
+            loads = []
+            for i in range(phnum):
+                at = phoff + i * phentsize
+                p_type, = struct.unpack_from(end + "I", data, at)
+                p_vaddr, = struct.unpack_from(end + ("Q" if wide else "I"), data, at + (16 if wide else 8))
+                if p_type == 1:					# PT_LOAD
+                    loads.append(p_vaddr)
+            if loads:
+                self.base = min(loads)
         sections = []
         for i in range(shnum):
             name, kind, flags, addr, offset, size, link, info, align, entsize = \
-                struct.unpack_from(end + "IIQQQQIIQQ", data, shoff + i * shentsize)
+                struct.unpack_from(end + ("IIQQQQIIQQ" if wide else "IIIIIIIIII"), data, shoff + i * shentsize)
             sections.append((name, kind, offset, size, link, entsize))
         funcs = []
         for name, kind, offset, size, link, entsize in sections:
@@ -200,12 +223,16 @@ class ElfSymbols:
             strings = sections[link]
             stroff = strings[2]
             for k in range(size // entsize):
-                st_name, st_info, st_other, st_shndx, st_value, st_size = \
-                    struct.unpack_from(end + "IBBHQQ", data, offset + k * entsize)
+                if wide:
+                    st_name, st_info, st_other, st_shndx, st_value, st_size = \
+                        struct.unpack_from(end + "IBBHQQ", data, offset + k * entsize)
+                else:
+                    st_name, st_value, st_size, st_info, st_other, st_shndx = \
+                        struct.unpack_from(end + "IIIBBH", data, offset + k * entsize)
                 if st_info & 0xF != 2 or st_value == 0:	# STT_FUNC
                     continue
                 stop = data.index(b"\0", stroff + st_name)
-                funcs.append((st_value, max(st_size, 1), data[stroff + st_name:stop].decode("latin-1")))
+                funcs.append((st_value - self.base, max(st_size, 1), data[stroff + st_name:stop].decode("latin-1")))
         if not funcs:
             raise ValueError("no symbol table (a stripped executable)")
         funcs.sort()

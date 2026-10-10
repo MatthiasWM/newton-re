@@ -9,6 +9,34 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-10: a small device investigated - the T-Deck Pro (branch tdeck-pro-investigation)
+
+The owner asked whether the reconstruction could run on something as
+small as the original - a LilyGO T-Deck Pro (ESP32-S3, 8 MB PSRAM, 16 MB
+flash, a 240x320 e-paper, a keyboard).  Measured on the development
+machine (`docs/host-tdeck-pro.md`): a 32-bit ARM `-Os` build is 4.7 MB; a
+boot reaches 5.24 MB of the kernel heap, 4 MB of it the object heap with
+120 KB used; the walkthrough runs with a 1 MB object heap; task stacks go
+no deeper than 24 KB at `-Os`.  The store held whole in RAM and the ROM
+objects read and converted into RAM are what a device must do otherwise.
+
+The tree had never been built for 32 bits.  It compiled but for one call
+(`recognition/Areas.cpp`, `nil` for an integer); zig places 32-bit
+programs at 0x10000, below `kROMCodeLimit` (the reMarkable's trap - the
+new toolchain files link at 0x08000000); and an `-Os` build jumped into
+its heap destroying its first port: the ROM's `bic #3` on a destructor's
+address (`CallDestructor`, `TDoubleQContainer`) and native function
+pointers kept as raw Refs both need four-byte-aligned functions, which
+x86 gives at -O0/-O2/-O3 but not -Os - every build now has
+`-falign-functions=4`.  Found with two additions to the crash tools: the
+handler names the instruction on 32-bit Linux and prints the stack's
+return addresses when the fault is a jump outside the program, and
+`whichfunction.py` reads 32-bit and non-PIE ELF.  New: `src/cmake/zig-x86-linux.cmake`,
+`zig-arm-linux.cmake`, `tools/host/stackdepth.sh`, `codesize.py`.
+
+At 240x320 the OS boots and draws, but Setup will not open in portrait
+or rotated; the applications' layouts are the largest unknown.
+
 ## 2026-10-10: the host's own fonts (branch host-fonts, merged)
 
 The owner asked what it would take for the Newton to use the host

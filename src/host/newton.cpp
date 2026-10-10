@@ -630,6 +630,12 @@ ReportTheScript(void)
 
 static void HostCrashedSignal(int signal);
 
+// the stack pointer of the context that fell over (a Unix host's signal
+// handler sets it): when the fault is a jump to somewhere outside the
+// program - a call through a bad pointer - the unwinder stops there, and
+// the return addresses still on the stack are what says who made the call
+static void*	gCrashedSP = nil;
+
 static void
 HostCrashed(const char* what, unsigned long code, void* where)
 {
@@ -659,6 +665,17 @@ HostCrashed(const char* what, unsigned long code, void* where)
 			fprintf(stderr, "\n");
 		}
 	}
+	if (gCrashedSP != nil)
+	{
+		// (the words at the stack pointer that point into the program:
+		//  return addresses, the innermost first)
+		fprintf(stderr, "[host] the words on the stack that point into the program, as image offsets:");
+		const uintptr_t* sp = (const uintptr_t*) gCrashedSP;
+		for (int i = 0; i < 64; i++)
+			if ((char*) sp[i] >= base && (char*) sp[i] < base + 0x10000000 && (char*) sp[i] != (char*) where)
+				fprintf(stderr, " %#lx", (unsigned long) ((char*) sp[i] - base));
+		fprintf(stderr, "\n");
+	}
 	if (gREPout != nil && gInterpreter != nil)
 		gREPout->StackTrace(gInterpreter);
 	fflush(stderr);
@@ -682,10 +699,25 @@ HostCrashedSignalAt(int signal, siginfo_t* info, void* context)
 	void* where = info != nil ? info->si_addr : nil;
 #if defined(__x86_64__) && defined(__linux__)
 	if (context != nil)
+	{
 		where = (void*) ((ucontext_t*) context)->uc_mcontext.gregs[REG_RIP];
+		gCrashedSP = (void*) ((ucontext_t*) context)->uc_mcontext.gregs[REG_RSP];
+	}
 #elif defined(__aarch64__) && defined(__linux__)
 	if (context != nil)
 		where = (void*) ((ucontext_t*) context)->uc_mcontext.pc;
+#elif defined(__i386__) && defined(__linux__)
+	if (context != nil)
+	{
+		where = (void*) ((ucontext_t*) context)->uc_mcontext.gregs[REG_EIP];
+		gCrashedSP = (void*) ((ucontext_t*) context)->uc_mcontext.gregs[REG_ESP];
+	}
+#elif defined(__arm__) && defined(__linux__)
+	if (context != nil)
+	{
+		where = (void*) ((ucontext_t*) context)->uc_mcontext.arm_pc;
+		gCrashedSP = (void*) ((ucontext_t*) context)->uc_mcontext.arm_sp;
+	}
 #elif defined(__APPLE__) && defined(__x86_64__)
 	if (context != nil)
 		where = (void*) ((ucontext_t*) context)->uc_mcontext->__ss.__rip;

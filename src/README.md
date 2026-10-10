@@ -272,8 +272,11 @@ the linker, which stops every link, not only that one.)
 Host builds are 64-bit, so `sizeof` differs from the ROM (`ULong` is even
 64-bit on LP64 Linux). Layouts are documented in the headers and verified in
 Ghidra; nothing in the code may depend on the host's sizes. A 32-bit host
-target (`-DZIG_TARGET=i386-linux-gnu`) is available when layout fidelity
-matters.
+target is available when layout fidelity matters, and is what a small
+device is (`docs/host-tdeck-pro.md`): `src/cmake/zig-x86-linux.cmake` (runs
+under WSL 2 or any x86-64 Linux with the 32-bit C library; both user
+walkthroughs pass on it) and `src/cmake/zig-arm-linux.cmake` (32-bit ARM,
+built but not run).
 
 ## Tracking progress
 

@@ -41,6 +41,15 @@ signal's context and the C stack (glibc's `backtrace()` through the signal
 frame) as image offsets, as on Windows; so do `NEWTON_TRACE_EXCEPTIONS=2`
 and `NEWTON_HEAPCHECK` (`src/host/HostCStack.h`).
 
+32-bit images (i386, 32-bit ARM - and an ESP32's Xtensa, being 32-bit ELF)
+are read as well, and a program that is not position-independent (its
+symbols at load addresses, as the 32-bit cross builds are) is looked up
+from its first loaded segment.  When a fault is a jump to somewhere outside
+the program - a call through a bad pointer, where the unwinder stops - the
+crash handler also prints the words on the stack that point into the
+program (Linux: x86-64, i386, 32-bit ARM); they are return addresses, and
+this tool names them (docs/host-tdeck-pro.md found its crash that way).
+
 **How it works.** The linked executable has no symbol table, and the PDB is
 not worth parsing here, so the name comes from the object files:
 
@@ -518,3 +527,29 @@ With `NEWTON_MALLOC_STATS=<seconds>` in newton's environment the C heap's
 own figures go to its stderr alongside (`[malloc] ... inuse ... free ...`):
 in use growing is a leak, free growing is fragmentation.  How the Linux
 growth was taken apart: `docs/host-lp64.md`, "Memory over time".
+
+## stackdepth.sh - how deep a Linux host's task stacks go
+
+    tools/host/stackdepth.sh <newton> [newton's arguments...]
+
+Runs newton with the arguments, samples every task stack's resident size
+in `/proc/<pid>/smaps` once a second until it exits (each Newton task runs
+on a host thread whose stack is a mapping of its own, 8 MB less the guard
+page - `STACK_KB` names another size), and prints the deepest few, the
+median and the total, with the most threads seen and newton's last
+"done"/FAILED lines (newton's output: `tmp/stackdepth.out`).  Linux only;
+run from the repository's top directory.  What it is for: sizing the task
+stacks of a small device (docs/host-tdeck-pro.md, "Task stacks" - an `-O0`
+build's frames are many times an `-Os` build's, so measure the build that
+matters).
+
+## codesize.py - how big a build is, as a device would carry it
+
+    python tools/host/codesize.py <build dir> [--program host/newton] [--top N]
+
+The program's loaded sections (code, read-only data, exception tables,
+initialised and zeroed data), then what each of the build's static
+libraries contributes in code and data before the linker drops what is
+unused - what leaving a subsystem out would save.  Reads 32- or 64-bit ELF
+and the build's `.a` archives; standard library only.  Made for
+docs/host-tdeck-pro.md over a build made with `src/cmake/zig-arm-linux.cmake`.

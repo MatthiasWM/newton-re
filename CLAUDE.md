@@ -85,7 +85,7 @@ cmake -G Ninja -S src -B build/host -DCMAKE_TOOLCHAIN_FILE=$PWD/src/cmake/zig-to
 - Five ctests want `build/<ROM>/symbols.json`: run `dump_symbols.py` as well as `extract_rom.py` on a fresh checkout.
 - `cmake --build build/host --target newton64` builds the 64-bit flavour in `build/host/ns64` (`-DNEWTON_BUILD_NS64=ON` every time).
 - A CMake `PASS_REGULAR_EXPRESSION` must not contain `;` (CMake splits it into alternatives).
-- Other hosts: the reMarkable Paper Pro (`docs/host-remarkable.md`), macOS planned (`docs/host-macos.md`).
+- Other hosts: the reMarkable Paper Pro (`docs/host-remarkable.md`), macOS planned (`docs/host-macos.md`), the LilyGO T-Deck Pro investigated (`docs/host-tdeck-pro.md`: 32-bit builds `src/cmake/zig-x86-linux.cmake`/`zig-arm-linux.cmake`; every function must be four-byte aligned - `-falign-functions=4`).
 
 ### Running it
 

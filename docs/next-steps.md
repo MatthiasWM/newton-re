@@ -47,6 +47,18 @@ the way are all in `docs/work-log.md`.
 
 Nothing at present.
 
+### A small device: the T-Deck Pro (investigated 2026-10-10, branch `tdeck-pro-investigation`)
+
+`docs/host-tdeck-pro.md`: the code (4.7 MB at `-Os`, 32-bit ARM), the
+memory (about 1.5 MB of kernel heap at rest, a 1 MB object heap enough
+for the walkthrough, task stacks no deeper than 24 KB) and 32-bit
+correctness (both walkthroughs pass on a 32-bit `-Os` build) are not the
+obstacle.  Next, in that page's order: a 32-bit build in the tests; a
+device-sized desktop run; the ROM objects baked into the device's layout
+and mapped from flash; an ESP-IDF skeleton (FreeRTOS task runtime, flash
+store); the panel, touch and keyboard; the applications at 240x320 (the
+largest unknown - Setup will not open at that size).
+
 ### Left of host fonts (merged 2026-10-10, off unless asked for)
 
 The host's own fonts offered beside the ROM's, drawn by the host's
