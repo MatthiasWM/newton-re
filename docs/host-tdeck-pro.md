@@ -228,6 +228,29 @@ design); each needs a stub.
 
 ## Order of work
 
+The owner already has a T-Deck Pro (bought for another project), so the
+device's unknowns can be measured on it early rather than argued about:
+a **device spike** - a small ESP-IDF program, not the OS - comes first,
+as the reMarkable work began with one (`docs/host-remarkable.md`, "What
+the spike showed"). It should answer:
+
+- **the board revision** (V1.0, V1.1 or MAX: the I2C scan LilyGO's own
+  firmware does - DRV2605 at 0x5A, XL9555 at 0x20), which decides the pins;
+- **the panel**: full and partial refresh times over SPI as actually
+  driven, whether the UC8253 can show any grays, and how a 240x320 one-bit
+  frame looks;
+- **the touch panel**: how fine and how steady a finger's position is at
+  the CST328's report rate - whether taps on the Newton's small targets
+  (a checkbox, a scroll arrow) are possible;
+- **the memory**: PSRAM and flash-mapped read speed through the cache
+  for a pointer-chasing walk over a few megabytes (the interpreter's
+  pattern), against internal SRAM;
+- **the toolchain**: ESP-IDF's Xtensa compiler on a sample of the tree
+  (C++17, exceptions, `-fwrapv`, `-falign-functions=4`) and the code size
+  it gives.
+
+Then:
+
 1. **32 bits as a supported host** (done here, enough to boot and walk
    through): keep a 32-bit build in the tests so it stays correct (a
    `ZIG_TARGET=x86-linux-gnu` build run under WSL or a Linux CI runner).
