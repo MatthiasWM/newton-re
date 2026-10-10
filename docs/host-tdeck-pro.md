@@ -326,6 +326,45 @@ T-Deck Pro; every figure below is the spike's own output.
 - **Builds**: PlatformIO installs ESP-IDF 5.1 and its toolchains once
   (about 1.5 GB); after that the spike rebuilds in about 20 s.
 
+## A device-sized run (on the development machine, 2026-10-10)
+
+The 32-bit build (`src/cmake/zig-x86-linux.cmake`, `-Os`, run under WSL 2)
+given a device's budget - `newton --kernel-heap MB --heap bytes
+--flash-size 4 --task-stack KB` - and both user walkthroughs with their
+restarts run on it (`tools/tdeck/devicerun.sh <newton> <options>`, which
+prints each run's result, `NEWTON_MEMORY_REPORT`'s figures and GNU time's
+peak resident set). Every run below: **4 of 4 passed, 0 failed**.
+
+| kernel heap | NewtonScript heap | task stacks | flash | kernel heap used at most | peak resident (process) |
+|---|---|---|---|---|---|
+| 32 MB (default) | 4 MB | 8 MB | 64 MB | 4.8-4.9 MB | 82-88 MB |
+| 3 MB | 1 MB | 32 KB | 4 MB | 1.69-1.79 MB | 20-25 MB |
+| 2 MB | 1 MB | 32 KB | 4 MB | 1.69-1.79 MB | - |
+| **2 MB** | **512 KB** | **32 KB** | **4 MB** | **1.18-1.27 MB** | - |
+
+So the OS itself - everything in the kernel heap but the NewtonScript
+heap - comes to about **0.7 MB** at its peak through a user's first hour,
+and the NewtonScript heap the walkthroughs need fits in 512 KB (the
+MessagePad 2100 had 4 MB of DRAM for both). What a real user's notes and
+packages need is more; the point is that the OS leaves nearly all of the
+device's 8 MB to them.
+
+What the process holds besides, on the desktop, and what the device does
+instead:
+
+| | the desktop (32-bit) | the device |
+|---|---|---|
+| the ROM's objects | **9.4 MB**: the object file kept whole (5.0 MB) and the converted area with its index (4.4 MB; 6.9 MB on a 64-bit host) | a baked image in flash: nothing in RAM, or the hottest objects copied to PSRAM for speed (the spike: a PSRAM miss costs half a flash miss) |
+| the flash store | the whole flash as a `std::vector` (`hal/host/HostFlash.cpp`): 4 MB here, 64 MB by default | a flash partition, read through the cache |
+| the code | the program's pages (5.8 MB file) | in flash, executed in place |
+| task stacks | 21 threads x 32 KB | 21 FreeRTOS tasks x 32 KB, in PSRAM or internal SRAM |
+
+So, on the device: about 2-3 MB of PSRAM for the kernel heap with the
+NewtonScript heap inside it, under 1 MB of task stacks, the screen's few
+tens of KB - and the ROM's objects either left in flash or (all 4.4 MB,
+or the most used of them) copied into the PSRAM. All of it in 8 MB, with
+room over.
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the
@@ -354,10 +393,11 @@ Then:
 1. **32 bits as a supported host** (done here, enough to boot and walk
    through): keep a 32-bit build in the tests so it stays correct (a
    `ZIG_TARGET=x86-linux-gnu` build run under WSL or a Linux CI runner).
-2. **A device-sized desktop run**: heap sizes as the device's (a 1 MB
-   object heap already works), a 4 MB store, 32 KB task stacks, the ROM
-   objects mapped read-only from a baked file - all on the desktop, where
-   the tools are, measured.
+2. **A device-sized desktop run** - done (above): a 2 MB kernel heap with
+   a 512 KB NewtonScript heap in it, a 4 MB store and 32 KB task stacks
+   pass both walkthroughs; what remains in RAM that the device must not
+   hold is the ROM's objects (9.4 MB) and the flash image - the next two
+   steps.
 3. **The baked object image**: `romsrc` → the device's layout (little-
    endian, 32-bit, references resolved to the address it will be mapped
    at), with a tool and a test, as every generated thing here has.

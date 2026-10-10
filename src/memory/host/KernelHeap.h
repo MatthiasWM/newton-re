@@ -18,6 +18,11 @@
 
 void	InitHostKernelHeap(void);		// makes gKernelHeap; before the first task exists
 
+// The kernel heap's size: 32 MB unless set first (newton --kernel-heap; a
+// small device's budget, docs/host-tdeck-pro.md).
+void	HostSetKernelHeapSize(Size size);
+Size	HostKernelHeapSize(void);
+
 // For host tests that use the memory manager without booting the kernel:
 // the memory manager keeps the current heap and MemError in the task
 // globals, so a test stands as a task with globals of its own, the OS

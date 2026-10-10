@@ -331,6 +331,18 @@ BuiltObjectsStamp(const void* data, ULong size, ULong* length)
 }
 
 
+// (ROMObjectsMemory: the object file kept, and the area ObjectAreaImport made)
+static ULong	gImportedFileBytes = 0;
+extern ULong	gImportedAreaBytes;
+
+void
+ROMObjectsMemory(ULong* fileBytes, ULong* areaBytes)
+{
+	*fileBytes = gImportedFileBytes;
+	*areaBytes = gImportedAreaBytes;
+}
+
+
 NewtonErr
 ImportBuiltObjectsFromFile(const char* path)
 {
@@ -352,7 +364,8 @@ ImportBuiltObjectsFromFile(const char* path)
 		err = ImportBuiltObjects(data, size);
 	if (err != noErr || !ROMObjectsImported())
 		free(data);
-	// else kept, as an image is: the imported objects may point into it
+	else
+		gImportedFileBytes = (ULong) size;		// kept, as an image is: the imported objects may point into it
 	return err;
 }
 
@@ -439,6 +452,8 @@ ImportROMObjectsFromFile(const char* path)
 		err = ImportBuiltObjects(image, size);
 		if (err != noErr || !ROMObjectsImported())
 			free(image);
+		else
+			gImportedFileBytes = (ULong) size;
 		return err;
 	}
 	if (err == noErr)
@@ -447,6 +462,8 @@ ImportROMObjectsFromFile(const char* path)
 		err = ImportROMObjects(image, size);
 	if (err != noErr || !ROMObjectsImported())
 		free(image);
+	else
+		gImportedFileBytes = (ULong) size;
 	// else the image is kept: the objects point into it, and so do the
 	// ROM extension's packages (ROMImageBase)
 	return err;

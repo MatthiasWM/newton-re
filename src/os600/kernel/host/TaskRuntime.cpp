@@ -125,6 +125,7 @@ ReapEndedThreads(void)
 #else
 
 const size_t	kTaskStackSize = 8 * 1024 * 1024;		// (Linux's default; macOS's is 512 KB)
+static size_t	gTaskStackSize = kTaskStackSize;		// (HostSetTaskStackSize)
 
 struct TaskThread
 {
@@ -157,7 +158,7 @@ ReapEndedThreads(void)
 	{
 		if (pthread_tryjoin_np(gGraveyard[i].fThread, nullptr) == 0)
 		{
-			munmap(gGraveyard[i].fStack, kTaskStackSize);
+			munmap(gGraveyard[i].fStack, gTaskStackSize);
 			gGraveyard[i] = gGraveyard.back();
 			gGraveyard.pop_back();
 		}
@@ -171,7 +172,7 @@ static void
 StartTaskThread(TTask* task, HostTaskContext* ctx)
 {
 	ReapEndedThreads();
-	void* stack = mmap(nullptr, kTaskStackSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	void* stack = mmap(nullptr, gTaskStackSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (stack == MAP_FAILED)
 	{
 		fprintf(stderr, "[host] no memory for a task's stack\n");
@@ -181,7 +182,7 @@ StartTaskThread(TTask* task, HostTaskContext* ctx)
 	TaskThread* t = new TaskThread{ pthread_t(), stack, task, ctx };
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
-	pthread_attr_setstack(&attr, stack, kTaskStackSize);
+	pthread_attr_setstack(&attr, stack, gTaskStackSize);
 	if (pthread_create(&t->fThread, &attr, TaskThreadEntry, t) != 0)
 	{
 		fprintf(stderr, "[host] a task's thread could not be made\n");
@@ -191,6 +192,21 @@ StartTaskThread(TTask* task, HostTaskContext* ctx)
 }
 
 #endif
+
+
+void
+HostSetTaskStackSize(size_t bytes)
+{
+#ifndef _WIN32
+	// (whole pages, and room for the guard page and a frame or two)
+	size_t page = (size_t) getpagesize();
+	if (bytes < 4 * page)
+		bytes = 4 * page;
+	gTaskStackSize = (bytes + page - 1) & ~(page - 1);
+#else
+	(void) bytes;						// (std::thread: the system's size)
+#endif
+}
 
 
 static HostTaskContext*

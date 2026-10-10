@@ -108,3 +108,17 @@ error (a missing header by its name); the compiled code and data by area -
 with the objects and each failure's full messages beside it.  About 30 s
 for the whole tree.
 
+## devicerun.sh - the walkthroughs on a device's budget
+
+    tools/tdeck/devicerun.sh <newton> [newton's options...]
+    # e.g. under WSL 2, the 32-bit build:
+    tools/tdeck/devicerun.sh tmp/build-x86/host/newton --objects build/host/romsrc-objects.bin         --kernel-heap 2 --heap 524288 --flash-size 4 --task-stack 32
+
+Runs both user walkthroughs (`src/host/demo/walkthrough.ns`,
+`walkthrough2.ns`), each on a new store and then on that store again (the
+restart checks), with the options given and `NEWTON_MEMORY_REPORT` set;
+prints for each its result, the memory report (the kernel heap's peak and
+what the ROM's objects hold) and the peak resident set (GNU time).  Each
+run's whole output is `tmp/devicerun-<n>.log`.  Linux only.
+`--kernel-heap` and `--task-stack` are newton's (src/host/newton.cpp).
+

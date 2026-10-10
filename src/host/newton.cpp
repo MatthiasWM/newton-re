@@ -15,7 +15,7 @@
 
 	newton [--rom image | --objects file] [--heap bytes] [--display WxH[xdepth]] [--colour] [--scale n]
 	       [--script file.ns] [--headless seconds] [--store file] [--erase]
-	       [--flash-size mb] [--flat-flash]
+	       [--flash-size mb] [--flat-flash] [--kernel-heap mb] [--task-stack kb]
 	       [--package file.pkg]... [--card file] [--microphone-tone hz] [--tcp-echo port]
 	       [--serial-port port|none] [--ir-peer listen:port|host:port] [--print-dir dir]
 	       [--ipp-printer uri]
@@ -73,7 +73,15 @@
 	default, the most the ROM's code takes unchanged - or 128;
 	docs/stores/README.md, "Bigger flash"), and --flat-flash makes it a
 	flat file of that many bytes instead (4 MB unless --flash-size says
-	otherwise; at 4 or 8 MB, Einstein's own).  A file that is there keeps its size and
+	otherwise; at 4 or 8 MB, Einstein's own).
+
+	--kernel-heap (megabytes; 32 unless given) and --task-stack (kilobytes,
+	each task thread's stack; 8 MB unless given, Unix hosts only - Windows
+	threads keep the system's size) size what the host gives the OS, with
+	--heap (the NewtonScript heap, inside the kernel heap) and --flash-size,
+	to a small device's budget (docs/host-tdeck-pro.md, "A device-sized
+	run"); NEWTON_MEMORY_REPORT in the environment prints at exit how much
+	of the kernel heap was used (host/HostHeapCheck.h).  A file that is there keeps its size and
 	format; tools/stores/flashimage.py converts between the two.  Set the machine up once and every boot after that
 	comes up on the Notepad.  --erase throws that
 	file away first and starts again at the Setup assistant, which is what
@@ -141,6 +149,7 @@
 #include "HostPackages.h"
 #include "HostOrientation.h"
 #include "HostSettings.h"
+#include "memory/host/KernelHeap.h"
 #include "HostFontProvider.h"
 #include "HostWordEngines.h"
 #include "HostTablet.h"
@@ -259,7 +268,7 @@ Usage(void)
 	fprintf(stderr, "usage: newton [--objects file | --rom image] [--heap bytes] [--display WxH[xdepth]] [--colour] [--scale n]\n"
 					"              [--script file.ns] [--headless seconds] [--limit seconds] [--window-pen]\n"
 					"              [--store file] [--erase]\n"
-					"              [--flash-size mb] [--flat-flash]\n"
+					"              [--flash-size mb] [--flat-flash] [--kernel-heap mb] [--task-stack kb]\n"
 					"              [--package file.pkg]... [--card file] [--microphone-tone hz] [--tcp-echo port]\n"
 					"              [--serial-port port|none] [--ir-peer listen:port|host:port] [--print-dir dir]\n"
 					"              [--ir-lan [port]] [--ir-lan-interface address]\n"
@@ -966,6 +975,20 @@ main(int argc, char** argv)
 		}
 		else if (strcmp(argv[i], "--heap") == 0 && i + 1 < argc)
 			heapSize = strtol(argv[++i], nil, 0);
+		else if (strcmp(argv[i], "--kernel-heap") == 0 && i + 1 < argc)
+		{
+			long mb = strtol(argv[++i], nil, 0);
+			if (mb < 1)
+				return Usage();
+			HostSetKernelHeapSize((Size) mb << 20);
+		}
+		else if (strcmp(argv[i], "--task-stack") == 0 && i + 1 < argc)
+		{
+			long kb = strtol(argv[++i], nil, 0);
+			if (kb < 1)
+				return Usage();
+			HostSetTaskStackSize((size_t) kb << 10);
+		}
 		else if (strcmp(argv[i], "--display") == 0 && i + 1 < argc)
 		{
 			char* rest;

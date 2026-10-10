@@ -23,6 +23,13 @@
 				the free list and every block at each walk (a lot of
 				output).  Not the ROM's; nothing is installed without the
 				variable.
+
+				NEWTON_MEMORY_REPORT (any value) samples the same heap every
+				64 allocations and, when newton exits, prints the kernel
+				heap's size, the most of it in use at once and how far into
+				it a block in use reached, and what the ROM's objects hold
+				in host memory - the figures a small device's budget is set
+				by (docs/host-tdeck-pro.md, "A device-sized run").
 */
 
 #ifndef __HOSTHEAPCHECK_H

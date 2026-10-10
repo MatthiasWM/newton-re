@@ -54,6 +54,11 @@ NewtonErr	ImportBuiltObjectsFromFile(const char* path);
 const char*	BuiltObjectsStamp(const void* data, ULong size, ULong* length);
 
 Boolean		ROMObjectsImported(void);
+// What the import keeps in host memory: the object file read whole (an
+// object file's import; nought for a ROM image's) and the converted area
+// with its index - what a small device would map from flash instead
+// (docs/host-tdeck-pro.md).
+void		ROMObjectsMemory(ULong* fileBytes, ULong* areaBytes);
 long		ROMObjectCount(void);
 void		ROMObjectAreaBounds(char** start, char** end);	// where the imported ROM objects lie (both nil: none) - Uriah's gUriahROM
 Ref			TranslateROMRef(ULong32 ref);		// a ROM ref as a host ref (nil: a pointer that is not a ROM object's)

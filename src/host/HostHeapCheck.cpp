@@ -12,6 +12,10 @@
 #include <stdlib.h>
 
 #include "HostCStack.h"
+#include "ROMImport.h"
+#include "memory/host/KernelHeap.h"
+
+extern long gObjectHeapSize;
 
 static SkiaHeap*	gCheckedHeap = nil;
 static long			gEvery = 1;
@@ -89,9 +93,59 @@ WalkHeap(SkiaHeap* heap, const char* where, Boolean justAllocated)
 }
 
 
+/*------------------------------------------------------------------------------
+	NEWTON_MEMORY_REPORT: the kernel heap's peak, and what the ROM's objects
+	hold, printed when newton exits (HostHeapCheck.h)
+------------------------------------------------------------------------------*/
+
+static SkiaHeap*	gSampledHeap = nil;
+static long			gSampleCount = 0;
+static ULong		gPeakInUse = 0;			// the most bytes in blocks in use at once
+static ULong		gPeakTop = 0;			// the furthest into the heap a block in use has reached
+
+static void
+SampleHeap(void)
+{
+	SkiaBlock* b = gSampledHeap->HeaderBlock();
+	SkiaBlock* end = gSampledHeap->Sentinel();
+	ULong inUse = 0, top = 0;
+	for (; b < end; b = b->Following())
+		if (!b->IsFree())
+		{
+			inUse += b->fSize;
+			top = (ULong) ((char*) b + b->fSize - gSampledHeap->fStart);
+		}
+	if (inUse > gPeakInUse)
+		gPeakInUse = inUse;
+	if (top > gPeakTop)
+		gPeakTop = top;
+}
+
+static void
+ReportMemory(void)
+{
+	SampleHeap();
+	ULong fileBytes, areaBytes;
+	ROMObjectsMemory(&fileBytes, &areaBytes);
+	fprintf(stderr, "[host] memory: the kernel heap %lu KB - at most %lu KB in use, reaching %lu KB into it "
+			"(the NewtonScript heap, %lu KB, inside it); the ROM's objects %lu KB (the object file %lu KB, "
+			"the converted area and its index %lu KB)\n",
+			(unsigned long) (HostKernelHeapSize() >> 10), (unsigned long) (gPeakInUse >> 10),
+			(unsigned long) (gPeakTop >> 10), (unsigned long) (gObjectHeapSize >> 10),
+			(unsigned long) ((fileBytes + areaBytes) >> 10), (unsigned long) (fileBytes >> 10),
+			(unsigned long) (areaBytes >> 10));
+}
+
+
 static void
 AfterAlloc(void)
 {
+	if (gSampledHeap != nil && !gInCheck && (++gSampleCount & 63) == 0)
+	{
+		gInCheck = true;
+		SampleHeap();
+		gInCheck = false;
+	}
 	if (gInCheck || gCheckedHeap == nil)
 		return;
 	if (++gCount % gEvery != 0)
@@ -122,6 +176,12 @@ BeforeDispose(void* p)
 void
 HostHeapCheckInstall(void)
 {
+	if (getenv("NEWTON_MEMORY_REPORT") != nil)
+	{
+		gSampledHeap = (SkiaHeap*) GetCurrentHeap();
+		gSampledHeap->fAfterAllocHook = AfterAlloc;
+		atexit(ReportMemory);
+	}
 	const char* setting = getenv("NEWTON_HEAPCHECK");
 	if (setting == nil)
 		return;

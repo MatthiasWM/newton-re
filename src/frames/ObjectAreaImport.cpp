@@ -17,6 +17,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+// what the imports have made, in bytes (frames/ROMImport.h ROMObjectsMemory)
+ULong	gImportedAreaBytes = 0;
+
 TImportedObjectArea::TImportedObjectArea()
 {
 	fArea = nil;
@@ -143,6 +146,7 @@ TImportedObjectArea::Import(const unsigned char* bytes, ULong32 base, ULong32 si
 	// the host area: outside the object heap (and the kernel heap)
 	char* area = (char*) malloc(total + kObjAlign);
 	ImportedObjectEntry* entries = (ImportedObjectEntry*) malloc(count * sizeof(ImportedObjectEntry));
+	gImportedAreaBytes += (ULong) (total + kObjAlign + count * sizeof(ImportedObjectEntry));
 	if (area == nil || entries == nil)
 	{
 		free(area);
