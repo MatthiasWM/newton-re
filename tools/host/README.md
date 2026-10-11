@@ -553,3 +553,38 @@ libraries contributes in code and data before the linker drops what is
 unused - what leaving a subsystem out would save.  Reads 32- or 64-bit ELF
 and the build's `.a` archives; standard library only.  Made for
 docs/host-tdeck-pro.md over a build made with `src/cmake/zig-arm-linux.cmake`.
+
+## wsl32.sh - the 32-bit build, built and tested under WSL
+
+    wsl -e bash tools/host/wsl32.sh [tools] [sync] [configure] [build] [test] [-- ctest options]
+
+The reconstruction as a 32-bit x86 Linux program
+(`src/cmake/zig-x86-linux.cmake` - ILP32, the layout of the ESP32-S3
+host) built and its whole ctest suite run, so that a 32-bit build stays
+correct.  With no steps it does all five: **tools** puts zig (the version
+the release workflow uses, its tarball's SHA-256 checked) into
+`tmp/wsl-zig` and cmake and ninja (pip) into `tmp/wsl-pip`; **sync**
+copies the checkout to `~/newton-x86/tree` on WSL's own file system;
+**configure** makes `~/newton-x86/build` with the zig toolchain (once);
+**build** runs ninja (its log `~/newton-x86/build.log`); **test** runs
+ctest (`~/newton-x86/ctest.log`) and prints the summary, exiting non-zero
+when a test failed.  `wsl32.sh build test -- -R sound` rebuilds and runs
+some.
+
+**Inputs:** the checkout the script is in; any x86-64 Linux with Python 3,
+curl, rsync and the 32-bit C library (`/usr/lib32`: Ubuntu's
+`libc6-i386`, which WSL's Ubuntu has).  No root.  `NEWTON_WSL32_DIR`
+moves the work directory, `NEWTON_ROM_BUILD` names the ROM extraction
+(default the checkout's `build/MP2x00US`, or the main checkout's from a
+worktree), `CMAKE_BUILD_TYPE` the build type (default none, as
+`build/host`), `JOBS` ctest's parallelism.
+
+Configured on Linux the 32-bit build runs its own programs
+(`NEWTON_TARGET_RUNS_HERE`, set by the toolchain file): its newtonscript
+builds the object file and every test runs as on any other host.  The
+build has no X11, ALSA or OpenSSL (none for 32 bits under WSL), so newton
+is headless and silent and the ipps tests are not registered.  zig turns
+on its undefined-behaviour checks in a build without a type, so a
+`memcpy` from nil and the like stop the program with the C stack - which
+found two of the bugs below.  What it found is in `docs/host-lp64.md`,
+"The 32-bit build under WSL".

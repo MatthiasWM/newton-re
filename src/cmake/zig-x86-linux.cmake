@@ -8,13 +8,19 @@
 #   cmake --build <dir> --target newton
 #   <dir>/host/newton --objects <a build's romsrc-objects.bin> ...
 # The object file is the same on every host, so the build machine's own
-# (build/host/romsrc-objects.bin) serves.
+# (build/host/romsrc-objects.bin) serves.  Configured on x86-64 Linux the
+# build runs its own programs - newtonscript for the object file, and the
+# tests: tools/host/wsl32.sh builds and tests it under WSL 2
+# (docs/host-lp64.md, "The 32-bit build under WSL").
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR i386)
 if(NOT DEFINED ZIG_GLIBC)
     set(ZIG_GLIBC 2.31)
 endif()
 set(ZIG_TARGET x86-linux-gnu.${ZIG_GLIBC})
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|i.86)$")
+    set(NEWTON_TARGET_RUNS_HERE ON)
+endif()
 include(${CMAKE_CURRENT_LIST_DIR}/zig-toolchain.cmake)
 set(CMAKE_C_FLAGS_INIT "-fsigned-char")
 set(CMAKE_CXX_FLAGS_INIT "-fsigned-char")

@@ -667,9 +667,10 @@ the spike showed"). It should answer:
 
 Then:
 
-1. **32 bits as a supported host** (done here, enough to boot and walk
-   through): keep a 32-bit build in the tests so it stays correct (a
-   `ZIG_TARGET=x86-linux-gnu` build run under WSL or a Linux CI runner).
+1. **32 bits as a supported host** - done: the whole ctest suite passes
+   on the 32-bit x86 build, built and run under WSL by
+   `tools/host/wsl32.sh` (`docs/host-lp64.md`, "The 32-bit build under
+   WSL", for what it found).
 2. **A device-sized desktop run** - done (above): a 2 MB kernel heap with
    a 512 KB NewtonScript heap in it, a 4 MB store and 32 KB task stacks
    pass both walkthroughs; what remains in RAM that the device must not

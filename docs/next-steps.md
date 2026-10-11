@@ -65,10 +65,11 @@ Newton on the e-paper, partial refreshes over what changed; set-up found
 with a webcam on the board, `tools/tdeck/camshot.py`/`panelprobe.py`).
 **The store on the board's flash** (the `store` partition, kept between
 starts); **a 3 s start** (from a minute: C++ exception tables sorted, two
-quadratic lookups made hashed - tools/tdeck/profile.py).  Next: the
+quadratic lookups made hashed - tools/tdeck/profile.py); **a 32-bit build
+in the tests** (`tools/host/wsl32.sh`: the x86 build under WSL, all 425
+pass).  Next: the
 store's writes batched (word by word now); NewtonScript's speed (the
-object heap in PSRAM); the built-in packages' frames baked; a 32-bit build
-in the tests; the applications at 240x320 (some ask to rotate); later the
+object heap in PSRAM); the built-in packages' frames baked; the applications at 240x320 (some ask to rotate); later the
 panel's own waveforms for speed and grays (docs/host-tdeck-pro.md, "Order
 of work").
 

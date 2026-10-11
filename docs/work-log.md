@@ -9,6 +9,23 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-11: A 32-bit build in the tests
+
+`tools/host/wsl32.sh` builds the 32-bit x86 flavour
+(`src/cmake/zig-x86-linux.cmake`, the ESP32-S3's ILP32 layout) inside WSL
+with zig put into `tmp/`, and runs the whole ctest suite on it; the
+toolchain file tells the build it runs its own programs there
+(`NEWTON_TARGET_RUNS_HERE`).  All 425 pass, after: `ResampleFiltered`'s
+interpolation shifted unsigned where the ROM's `asr` is signed (right at
+64 bits only by accident - sound.ResampleFiltered, sound.PlaySound);
+`memcpy` from nil in `MakeString` and `THostStore::SetObjectSize` (zig's
+undefined-behaviour checks); test_Ink's decoder with `fBitCount` unset;
+host.NewtonHostSettings losing TCP 3679 to the other newtons ctest runs
+at once (Linux has no Windows-style `SO_REUSEADDR`); the ipps tests
+registered only with a TLS library.  The comms failures seen by hand were
+programs run without `tools/dock/mnp.py`, their desktop end.
+(`docs/host-lp64.md`, "The 32-bit build under WSL".)
+
 ## 2026-10-11: The T-Deck Pro starts in 3 s
 
 The OS up 3.2 s after the boot starts, from 61.7 s.  A sampling profiler

@@ -56,6 +56,14 @@ else()
         target_link_libraries(print_host_tls PUBLIC OpenSSL::SSL OpenSSL::Crypto)
     endif()
 endif()
+# (without a TLS library HostTLSNew answers nil and there is no ipps: the
+# tests of it are not registered - the 32-bit x86 build under WSL has none)
+if(WIN32 OR OpenSSL_FOUND)
+    set(NEWTON_HOST_TLS ON CACHE INTERNAL "the host has TLS for ipps://")
+else()
+    set(NEWTON_HOST_TLS OFF CACHE INTERNAL "the host has TLS for ipps://")
+    message(STATUS "no TLS library: no ipps:// (print.HostTLS and host.NewtonIPPS* are not registered)")
+endif()
 
 # The host's DNS-SD browse for IPP printers (host/dnssd/HostDNSSD.h): the
 # platform's own service browsing (dnsapi's DnsServiceBrowse on Windows,

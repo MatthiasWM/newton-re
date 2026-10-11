@@ -25,12 +25,15 @@ find_package(Python3 COMPONENTS Interpreter)
 # (a cross build - an aarch64 newton for a reMarkable built on Windows,
 # docs/host-remarkable.md - cannot run its own newtonscript, so the object
 # file is compiled by one built for this machine: -DNEWTON_HOST_NEWTONSCRIPT;
-# the file is the same bytes whichever host built it)
+# the file is the same bytes whichever host built it; a cross build whose
+# programs the build machine runs itself - 32-bit x86 on x86-64 Linux,
+# src/cmake/zig-x86-linux.cmake - sets NEWTON_TARGET_RUNS_HERE and uses
+# its own)
 set(NEWTON_HOST_NEWTONSCRIPT "" CACHE FILEPATH "a cross build: a newtonscript that runs on the build machine, to build the object file with")
 set(romsrc_newtonscript $<TARGET_FILE:newtonscript>)
 set(romsrc_newtonscript_depends newtonscript)
 set(romsrc_can_build TRUE)
-if(CMAKE_CROSSCOMPILING)
+if(CMAKE_CROSSCOMPILING AND NOT NEWTON_TARGET_RUNS_HERE)
     if(NEWTON_HOST_NEWTONSCRIPT)
         set(romsrc_newtonscript ${NEWTON_HOST_NEWTONSCRIPT})
         set(romsrc_newtonscript_depends ${NEWTON_HOST_NEWTONSCRIPT})
@@ -722,7 +725,7 @@ endif()
 # a restart printing without asking; the printer's certificate changed,
 # the warning declined and the job cancelled; changed again, accepted and
 # the new certificate pinned; and printing with it without asking
-if(Python3_FOUND)
+if(Python3_FOUND AND NEWTON_HOST_TLS)
     set(ipps_dir ${CMAKE_CURRENT_BINARY_DIR}/ipps)
     add_test(NAME host.NewtonIPPS.clean COMMAND ${CMAKE_COMMAND} -E rm -rf ${ipps_dir})
     add_test(NAME host.NewtonIPPS.mkdir COMMAND ${CMAKE_COMMAND} -E make_directory ${ipps_dir})
@@ -915,11 +918,14 @@ set_tests_properties(host.NewtonRotation PROPERTIES TIMEOUT 180
 
 # the Host preferences panel (HostSettings.h, demo/hostsettings.ns): .set
 # turns beaming over the network on from Prefs with no restart and keeps it,
-# .kept boots the same store with it on and turns it off
+# .kept boots the same store with it on and turns it off.  (Docking on a
+# port of its own: every newton listens on 3679, and on Linux only the
+# first of the newtons ctest runs at once gets it - Windows' SO_REUSEADDR
+# lets each bind it - so .kept would find docking off at boot.)
 add_test(NAME host.NewtonHostSettings.clean COMMAND ${CMAKE_COMMAND} -E rm -f ${CMAKE_CURRENT_BINARY_DIR}/hostsettings.store)
 set_tests_properties(host.NewtonHostSettings.clean PROPERTIES FIXTURES_SETUP hostsettingsclean)
 foreach(run set kept)
-    add_test(NAME host.NewtonHostSettings.${run} COMMAND newton --display 320x480 --headless 200
+    add_test(NAME host.NewtonHostSettings.${run} COMMAND newton --display 320x480 --headless 200 --serial-port 0
              --store ${CMAKE_CURRENT_BINARY_DIR}/hostsettings.store
              --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/hostsettings.ns WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
 endforeach()

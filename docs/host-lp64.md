@@ -349,7 +349,8 @@ and ninja from pip, into the repository's `tmp/`):
     cmake -G Ninja -S ~/newton-lp64/tree/src -B ~/newton-lp64/build         -DCMAKE_CXX_COMPILER=clang++ -DNEWTON_ROM_BUILD=<checkout>/build/MP2x00US
     ninja -C ~/newton-lp64/build && ctest --test-dir ~/newton-lp64/build -j16
 
-(`ninja` from the wheel may need `chmod +x`.)  ALSA, for sound, the same
+(`ninja` from the wheel may need `chmod +x`.)  The 32-bit build is done
+the same way by `tools/host/wsl32.sh` (below).  ALSA, for sound, the same
 way: `apt-get download libasound2-dev`, `dpkg -x` it, and configure with
 `-DALSA_INCLUDE_DIR=<dir>/usr/include
 -DALSA_LIBRARY=/usr/lib/x86_64-linux-gnu/libasound.so.2` (the runtime library
@@ -365,3 +366,43 @@ unpacked the same way: `apt-get download gdb` and its libraries,
 `dpkg -x` each into a directory, and run it with `LD_LIBRARY_PATH`
 pointing there; WSL's `ptrace_scope` keeps it from attaching to a running
 newton, so start newton under it and interrupt it with `pkill -INT`.
+
+## The 32-bit build under WSL
+
+The 32-bit x86 build (`src/cmake/zig-x86-linux.cmake`, ILP32 - the layout
+of the ESP32-S3, `docs/host-tdeck-pro.md`) is built and tested by
+`tools/host/wsl32.sh` (`tools/host/README.md`): zig put into `tmp/` and
+the build configured inside WSL, where its programs run, rather than
+cross-compiled from Windows, whose ctest file names Windows paths.  All
+425 tests pass on it (2026-10-11: zig 0.16.0, WSL 2's Ubuntu 22.04, no
+build type - so zig's undefined-behaviour checks on).  What it found:
+
+- **`ResampleFiltered` interpolated its filter wrongly at 32 bits**
+  (sound.ResampleFiltered, sound.PlaySound).  The ROM multiplies the
+  fraction by the difference of two table entries and shifts the product
+  *signed* (`mul`, `add r1, r2, r1, asr #16`); the reconstruction cast both
+  to `ULong` and shifted unsigned.  With a 64-bit `ULong` the high junk of a
+  negative difference fell off when the sum was narrowed to `Fixed`, so
+  the 64-bit hosts were right by accident; at 32 bits it added 65536 to
+  each falling coefficient.  Now a wrapping 32-bit product (`ULong32`)
+  shifted as `Long32`, as the ARM does.  (Not x87 floating point, which
+  had been suspected: there is no floating point in it.)
+- **`memcpy` from nil with a count of 0** - `MakeString(nil, 0)` (a typed
+  key's empty replacement, views.Views and the Newt's Cape tests) and
+  `THostStore::SetObjectSize` growing an empty object.  Harmless in
+  practice but undefined, and zig's checks stop on it; both now copy only
+  when there is something to copy.
+- **A test reading an unset field**: test_Ink's bit reader left
+  `fBitCount` as the stack had it, and the 32-bit stack held 0.
+- **Every newton listens on TCP 3679 at boot**; on Windows `SO_REUSEADDR`
+  lets each of the newtons ctest runs at once bind it, on Linux only the
+  first gets it, so host.NewtonHostSettings.kept found docking off at boot
+  whenever another newton test was running.  Those runs dock on a port of
+  their own (`--serial-port 0`).
+- **No TLS library, no ipps tests**: `print.HostTLS` and
+  `host.NewtonIPPS*` are registered only when the build has one
+  (`NEWTON_HOST_TLS`: Windows, or OpenSSL found).
+
+comms.MNP and comms.EzEndpointPipe, which failed when their programs were
+run by hand, pass under ctest: ctest runs them under `tools/dock/mnp.py`,
+the desktop end of the link, and alone they have nobody to connect to.

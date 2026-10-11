@@ -396,7 +396,8 @@ THostStore::SetObjectSize(PSSId id, long size)
 				else
 				{
 					long keep = size < object->fSize ? size : object->fSize;
-					memcpy(bytes, object->fData, keep);
+					if (keep > 0)		// (fData is nil while the object is empty)
+						memcpy(bytes, object->fData, keep);
 					if (size > keep)
 						memset(bytes + keep, 0, size - keep);
 				}

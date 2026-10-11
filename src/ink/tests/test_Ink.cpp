@@ -226,6 +226,8 @@ TestBitReader()
 	const UByte bits[] = { 0x4d, 0x80, 0xff };		// 0100 1101, ...
 	CICDecoder decoder;
 	decoder.fData = bits;
+	decoder.fBitCount = 8 * sizeof(bits);	// (left unset it is whatever the stack held:
+	decoder.fError = 0;						// a 32-bit build read none of the bits)
 	decoder.fBitPos = 0;
 	decoder.fStrokeBits = 0;
 	decoder.fTotalBits = 0;
