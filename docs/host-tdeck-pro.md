@@ -403,6 +403,62 @@ mapped where it was baked.
   pointer, not the one `malloc` gave (harmless while `malloc`'s pointers
   are already aligned); it now keeps and frees the latter.
 
+## The ESP-IDF skeleton: milestone A (2026-10-11)
+
+`src/host/esp32` (its README says how to build, bake and flash it) is an
+ESP-IDF application, built with PlatformIO, that runs **NewtonScript on
+the T-Deck Pro**: the ROM's objects mapped from flash as a baked image
+(baked by the 32-bit x86 build for the address the board maps the
+partition at), the object system, every area's natives, and the
+NewtonScript prompt on the USB serial port. The OS's tasks are not
+started yet - that is milestone B.
+
+- **The tree as it is**: one component of 650 of the tree's sources with
+  the desktop's flags, listed by `tools/tdeck/idf_sources.py` from a
+  32-bit build's compile commands. Left out: tests, `src/host/` (but for
+  `HostNatives.cpp`), and the host's task runtime and sockets; added: a
+  board side and a Newton side (their headers do not mix) and the task
+  runtime's entry points for one task. **The program links with 13
+  symbols supplied** - nothing else in the tree had to change for the
+  board but:
+  - `hal/host/System.cpp`: an `ESP_PLATFORM` branch (the stack's bounds
+    from FreeRTOS);
+  - two includes made to name their directory (`TaskRuntime.cpp`'s
+    `RealTimeClock.h`, `HostFlashDriver.cpp`'s `Flash.h`): three header
+    names exist in two directories each, and PlatformIO puts include
+    directories in alphabetical order rather than the build's;
+  - the baked image's layout check measures the header to its last field
+    (32-bit x86 and Xtensa pad its end differently).
+- **What the build had to get round** (all in the component's
+  CMakeLists): PlatformIO names an object by its source's file name alone
+  (five pairs of files share one: `forwarded/` compiles each through a
+  file of its own name); it sorts and splits flags (`-include` joined to
+  its path, the source directory made absolute); the tree's include
+  directories go in as `-iquote`, so that `src/intl/Locale.h` is not found
+  for the C library's `<locale.h>` on a case-insensitive file system.
+- **On the board**: the program is 2.76 MB; with the REP running 128 KB of
+  internal RAM and 5 MB of PSRAM are free. The baked objects take 11 ms to
+  bring up (mapped, not read), the object system 0.7 s, the natives 1.1 s.
+- **NewtonScript's speed** (`DeviceMilliseconds()`, against the 32-bit
+  `-Os` desktop build on the development machine, timed 100 times larger
+  and divided):
+
+  | | the T-Deck | desktop (32-bit) | ratio |
+  |---|---|---|---|
+  | a 100,000-pass integer loop | 437 ms | 3.7 ms | ~120x |
+  | 2,000 strings made (`NumberStr`, `&`) and stored | 979 ms | 1.9 ms | ~500x |
+  | 2,000 integers made and `Sort`ed | 49 ms | 0.6 ms | ~80x |
+
+  A 240 MHz Xtensa core is some tens of times slower than the desktop's;
+  the loop and the sort are about that. The allocating test is several
+  times worse: the NewtonScript heap is in PSRAM, where a cache miss costs
+  a microsecond, and a 1 MB heap is collected far more often than the
+  desktop's 4 MB. That is where tuning starts (the object heap's hottest
+  parts in internal SRAM, the allocator's and the collector's walks).
+- **Flashing**: esptool's stub sometimes stops answering after the
+  program has run ("No serial data received"); taking power off the board
+  clears it. `upload_speed = 115200` (no baud change) is set.
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the
@@ -440,9 +496,11 @@ Then:
    mapped read-only by `--objects`; both walkthroughs pass on it, 32-bit
    and 64-bit. Left: the built-in packages' frames (1.2 MB of RAM at 32
    bits) baked the same way.
-4. **An ESP-IDF skeleton**: the task runtime, timers and the store on
-   FreeRTOS; boot to the NewtonScript prompt over the USB serial port, no
-   screen.
+4. **An ESP-IDF skeleton** - milestone A done (above): NewtonScript on
+   the board with the baked objects. Milestone B: the task runtime
+   (FreeRTOS tasks, the baton a semaphore), the timers and the store (the
+   `store` partition) - the OS booted to the same prompt; and NewtonScript's
+   speed worked on.
 5. **The panel, the touch screen, the keyboard.**
 6. **The applications at 240x320** (or the scaled screen) - the part
    whose size is least known.

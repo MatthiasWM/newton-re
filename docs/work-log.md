@@ -9,6 +9,22 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-11: NewtonScript on the T-Deck Pro (milestone A)
+
+`src/host/esp32`: an ESP-IDF application built with PlatformIO - 650 of the
+tree's sources in one component (`tools/tdeck/idf_sources.py`), a board
+side and a Newton side, the task runtime's entry points for one task - runs
+NewtonScript on the owner's T-Deck Pro with the ROM's objects mapped from
+flash as a baked image (11 ms to bring up) and the prompt on the USB
+serial port.  13 symbols had to be supplied; the tree changed only in
+`hal/host/System.cpp` (an ESP-IDF branch), two includes made to name their
+directory, and the baked layout check (Xtensa pads the header's end).  The
+build had PlatformIO's quirks to get round: objects named by file name
+alone, flags sorted and split, include order lost.  Measured: a loop
+~120x, string-making ~500x, a sort ~80x the 32-bit desktop build's time.
+Flashing: esptool's stub sometimes stops answering after the program has
+run, cleared by taking power off the board.
+
 ## 2026-10-10: the T-Deck Pro, continued - spike, Xtensa, budget, baked image
 
 On the owner's T-Deck Pro (a V1.0, quad PSRAM): a PlatformIO/ESP-IDF

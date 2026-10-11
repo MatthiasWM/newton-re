@@ -55,11 +55,13 @@ on the owner's board (`tools/tdeck/spike`: the panel, touch, keyboard,
 memory speed); the tree compiled for the ESP32-S3 (674 of 678 files);
 a device-sized run (2 MB kernel heap, 512 KB NewtonScript heap, 32 KB
 stacks: both walkthroughs pass); the baked object image (`newton
---bake-objects`, mapped read-only).  Next, in that page's order: the
-built-in packages' frames baked too; a 32-bit build in the tests; an
-ESP-IDF skeleton (FreeRTOS task runtime, flash store, the baked image in
-a partition) booting to the NewtonScript prompt; then the panel, touch and
-keyboard; the applications at 240x320 (Setup will not open at that size).
+--bake-objects`, mapped read-only); **NewtonScript on the board**
+(`src/host/esp32`, milestone A: the baked objects mapped from flash, the
+REP on USB; 100-500x the desktop's time, the allocating code worst).
+Next: milestone B - the FreeRTOS task runtime, timers and the store, the
+OS booted to the prompt; NewtonScript's speed (the object heap in PSRAM);
+the built-in packages' frames baked; a 32-bit build in the tests; then the
+panel, touch and keyboard; the applications at 240x320.
 
 ### Left of host fonts (merged 2026-10-10, off unless asked for)
 

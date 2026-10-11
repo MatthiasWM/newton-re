@@ -85,12 +85,16 @@ it, don't edit it.
 ## serialcapture.py - what the board prints
 
     ~/.platformio/penv/Scripts/python tools/tdeck/serialcapture.py <port> <seconds> \
-        [--out tmp/tdeck/serial.log] [--until TEXT] [--reset]
+        [--out tmp/tdeck/serial.log] [--until TEXT] [--reset] [--send LINE]... [--after TEXT]
 
 `pio device monitor` is interactive; this captures for a while (until a
 line holding TEXT), echoing and writing to a file, reopening the port when
 the board resets; `--reset` resets the board first through the USB
-serial/JTAG port's RTS line, so the capture starts at boot.
+serial/JTAG port's RTS line, so the capture starts at boot.  `--send`
+types lines to the board once a line holding `--after` ("Welcome to
+NewtonScript" unless given) has come, each when the board has been quiet
+for a moment - how the NewtonScript prompt of `src/host/esp32` is driven
+from a script.
 
 ## xtensa_compile.py - the tree with the ESP32-S3's compiler
 
@@ -121,4 +125,19 @@ prints for each its result, the memory report (the kernel heap's peak and
 what the ROM's objects hold) and the peak resident set (GNU time).  Each
 run's whole output is `tmp/devicerun-<n>.log`.  Linux only.
 `--kernel-heap` and `--task-stack` are newton's (src/host/newton.cpp).
+
+## idf_sources.py - the tree's sources for the ESP32-S3 build
+
+    python tools/tdeck/idf_sources.py <a 32-bit build's compile_commands.json> \
+        [-o src/host/esp32/main/newton_sources.cmake]
+
+Writes the list of the tree's sources the ESP-IDF component builds
+(`src/host/esp32`), each with the include directories the desktop build
+gives it, grouped - from a 32-bit build's compile commands (configure
+`src/cmake/zig-arm-linux.cmake` with `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`).
+Left out: tests, generated sources, `src/host/` but for `HostNatives.cpp`,
+and the host's task runtime and sockets.  Sources whose file name another
+shares are compiled through `src/host/esp32/main/forwarded/<dir>_<name>`
+(PlatformIO names objects by file name alone).  Run it again when sources
+are added or taken away; its output is generated, not edited.
 

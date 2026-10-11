@@ -35,7 +35,7 @@
 
 #include "hal/Timer.h"
 #include "hal/RealTimeClock.h"
-#include "RealTimeClock.h"
+#include "os600/kernel/RealTimeClock.h"		// (by its directory: hal has one of that name)
 #include "hal/MMU.h"
 #include "hal/host/Host.h"
 #include "hal/host/HostInterruptSources.h"

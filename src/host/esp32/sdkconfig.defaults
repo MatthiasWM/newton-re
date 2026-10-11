@@ -1,0 +1,33 @@
+# The T-Deck Pro: 16 MB quad flash, 8 MB quad PSRAM (not the octal LilyGO's
+# README says - tools/tdeck/spike found it), the console on the ESP32-S3's
+# own USB serial/JTAG port, 240 MHz.
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+# (malloc reaches the PSRAM; a block bigger than 4 KB goes there, so the
+#  kernel heap does and the internal SRAM is left for stacks and DMA)
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+# the largest data cache, with 64-byte lines: the interpreter walks objects
+# all over megabytes of PSRAM and flash, and a miss costs a microsecond
+# or two (docs/host-tdeck-pro.md, "What the device spike showed")
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+# the reconstruction: C++ exceptions (newton_try is setjmp-based, but the
+# host's task runtime redirects and a few re-expressions throw), RTTI (one
+# typeid), and optimised for speed
+CONFIG_COMPILER_CXX_EXCEPTIONS=y
+CONFIG_COMPILER_CXX_RTTI=y
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+# (a script may keep the processor as long as it likes)
+CONFIG_ESP_TASK_WDT_EN=n
+# the flash in quad I/O, as the chip can (dual I/O, the default, halves a
+# cache miss's reading - and the ROM's objects are read from it)
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y

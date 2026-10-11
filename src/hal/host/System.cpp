@@ -11,6 +11,10 @@
 #include <stdio.h>
 #ifdef _WIN32
 #include <windows.h>
+#elif defined(ESP_PLATFORM)
+#include <unistd.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #else
 #include <pthread.h>
 #include <unistd.h>
@@ -135,6 +139,13 @@ GetCPUMode(void)
 	return 0x10;
 }
 
+#ifdef ESP_PLATFORM
+// the ESP32-S3 host (src/host/esp32): the top of the stack the Newton's
+// task was started on, which FreeRTOS does not answer (its start, the low
+// end, it does)
+extern "C" { const void* gHostDeviceStackTop = nil; }
+#endif
+
 // The host thread's stack, from the operating system.
 extern "C" void
 GetStackBounds(const void** low, const void** high)
@@ -144,6 +155,9 @@ GetStackBounds(const void** low, const void** high)
 	GetCurrentThreadStackLimits(&lowLimit, &highLimit);
 	*low = (const void*) lowLimit;
 	*high = (const void*) highLimit;
+#elif defined(ESP_PLATFORM)
+	*low = (const void*) pxTaskGetStackStart(NULL);
+	*high = gHostDeviceStackTop != nil ? gHostDeviceStackTop : (const char*) *low + 64 * 1024;
 #elif defined(__APPLE__)
 	// (macOS answers the stack's top - its high address - and its size)
 	pthread_t self = pthread_self();

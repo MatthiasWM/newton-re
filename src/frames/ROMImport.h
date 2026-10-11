@@ -82,6 +82,12 @@ uintptr_t	DefaultBakedObjectsBase(void);		// where an image is made and mapped u
 // An object file baked into an image at base (0: the default); the
 // region reserved for the making is reserve bytes.  ==> noErr, or why not.
 NewtonErr	BakeBuiltObjectsFile(const char* objectsPath, const char* imagePath, uintptr_t base, size_t reserve);
+// A baked image already in memory where it was baked (a device's flash
+// partition, mapped): the ROM's objects set from it.  ==> kError_Bad_Parameters
+// when it is not one, is another host's layout, or lies elsewhere than
+// it was baked for (each said on stderr).
+NewtonErr	ImportBakedObjects(const void* image, size_t size);
+
 // A baked image's builder stamp (the object file's it was made from), as
 // BuiltObjectsStamp answers an object file's; nil when data is not one.
 const char*	BakedObjectsStamp(const void* data, ULong size, ULong* length);

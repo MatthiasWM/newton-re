@@ -578,13 +578,17 @@ DefaultBakedObjectsBase(void)
 }
 
 
+// (the header's extent is where its last field ends, not its sizeof: hosts
+//  of one layout pad its end differently - the prefix's 64-bit words make
+//  Xtensa round it to 8 bytes and 32-bit x86 to 4, the fields lying alike)
 static uint32_t
 BakedLayout(void)
 {
 	const uint16_t one = 1;
 	uint32_t littleEndian = *(const uint8_t*) &one;
+	uint32_t extent = (uint32_t) (offsetof(BakedHeader, fMovedCount) + sizeof(long));
 	return (uint32_t) sizeof(Ref) | (uint32_t) sizeof(ObjHeader) << 8 | (uint32_t) kObjAlign << 16
-		 | (uint32_t) sizeof(BakedHeader) << 20 | littleEndian << 31;
+		 | extent << 20 | littleEndian << 31;
 }
 
 
@@ -732,11 +736,37 @@ ImportBakedObjectsFromFile(const char* path)
 	}
 	if (gMapFileAt == nil || (uintptr_t) prefix.fMapBase != prefix.fMapBase)
 		return kError_Bad_Parameters;
-	const BakedHeader* h = (const BakedHeader*) gMapFileAt(path, (uintptr_t) prefix.fMapBase, (size_t) prefix.fSize);
-	if (h == nil)
+	const void* image = gMapFileAt(path, (uintptr_t) prefix.fMapBase, (size_t) prefix.fSize);
+	if (image == nil)
 	{
 		fprintf(stderr, "[frames] %s could not be mapped at %#llx, where it was baked\n", path, (unsigned long long) prefix.fMapBase);
 		return kError_No_Memory;
+	}
+	return ImportBakedObjects(image, (size_t) prefix.fSize);
+}
+
+
+NewtonErr
+ImportBakedObjects(const void* image, size_t size)
+{
+	if (gROMObjectArea.fArea != nil)
+		return noErr;
+	const BakedHeader* h = (const BakedHeader*) image;
+	const BakedPrefix& prefix = h->fPrefix;
+	if (size < sizeof(BakedHeader) || memcmp(prefix.fMagic, "NewtBake", 8) != 0 || prefix.fVersion != 1
+	 || prefix.fSize > size)
+		return kError_Bad_Parameters;
+	if (prefix.fLayout != BakedLayout())
+	{
+		fprintf(stderr, "[frames] the baked image is another host's layout (%#x, this one %#x): bake it again with this build\n",
+				(unsigned) prefix.fLayout, (unsigned) BakedLayout());
+		return kError_Bad_Parameters;
+	}
+	if ((uintptr_t) image != (uintptr_t) prefix.fMapBase)
+	{
+		fprintf(stderr, "[frames] the baked image is at %p but was baked for %#llx: bake it again with --bake-base %p\n",
+				image, (unsigned long long) prefix.fMapBase, image);
+		return kError_Bad_Parameters;
 	}
 	gROMObjectArea.fAreaStart = h->fAreaStart;
 	gROMObjectArea.fArea = h->fArea;
