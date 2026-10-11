@@ -163,6 +163,7 @@ set(NEWTON_SOURCES
     host/HostPackages.cpp
     host/HostStores.cpp
     host/HostViews.cpp
+    host/HostWifi.cpp
     ink/CICCodeBook.cpp
     ink/CICConvert.cpp
     ink/CICDecoder.cpp
@@ -1314,6 +1315,7 @@ set(NEWTON_GROUP_21_SOURCES
     host/HostNatives.cpp
     host/HostStores.cpp
     host/HostViews.cpp
+    host/HostWifi.cpp
 )
 set(NEWTON_GROUP_21_INCLUDES
     host

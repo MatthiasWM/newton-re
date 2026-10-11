@@ -24,6 +24,7 @@ line evaluated in the newt world.
 | `main/tdeck_panel.cpp` | the panel (a task on core 0): the display's grays watched and sent to the UC8253 once a change settles - a partial refresh (0.65 s) over the rectangle that changed, a full one (3 s, flashing) for a new page and to clean up after 30 s still; how the controller has to be driven, and how that was found, is its header's; settings changed while it runs: `DevicePanelSet(name, value)` |
 | `main/tdeck_input.cpp` | the CST328 touch panel and the TCA8418 keyboard (a task on core 0, a hundred times a second) into the window shims every host's window calls (`HostWindowPenDown/Move/Up`, `HostWindowKey`, host/HostKeyboard.cpp); the owner's keyboard layout (Shift, Sym's symbols, Alt's navigation keys or the Command key) |
 | `main/tdeck_store.cpp` | the Newton's internal flash on the `store` partition: mapped read-only and read in place by hal/host/HostFlash.h (its backing - no copy in RAM), each word written and each erase done by a writer task whose stack is in internal RAM (a task with a PSRAM stack must not write the flash), the mapping's cache refreshed after; erased whole the first time (NVS `storeVersion`); a self-test of write, lanes erase and sector erase at each start |
+| `main/tdeck_wifi.cpp` | the WiFi: networks remembered in NVS (up to 8), the strongest remembered one in range joined (and again 30 s after it is lost or none is found), scans on request - the provider of host/HostWifi.h, which Internet Setup's Host network setup has a Wi-Fi line and slip for (comms/host/HostLink.ns); a task of its own with an internal stack does the work (NVS writes the flash) |
 | `main/tdeck_profile.cpp` | a sampling profiler of core 1 (the Newton's tasks), from the board's start: `DeviceProfileDump()` prints it for tools/tdeck/profile.py |
 | `main/newtonmain.cpp` | the Newton's side (the DDK's headers only): the kernel heap (3 MB, in PSRAM) with a 1 MB NewtonScript heap, the baked objects, the newt world configured (240x320x1, the store in RAM) and the OS booted; the kernel services task hands each console line to the newt world as a `'host/'eval` event, whose handler evaluates it and prints the result; `DeviceMilliseconds()`, `DeviceMemory()`, `DevicePanelSet(name, value)` and `DeviceStore()` ([words written to the store partition, erases]) for NewtonScript; every NewtonScript throw printed with its script stack (`NEWTON_TRACE_EXCEPTIONS`, set there) |
 
@@ -86,6 +87,59 @@ Everything comes from PlatformIO (`~/.platformio`); on Linux and macOS
    seems damaged, `CONFIG_HEAP_POISONING_COMPREHENSIVE=y` in
    `sdkconfig.defaults` (delete `sdkconfig.tdeck-pro` so that it is read
    again) checks each block's ends when it is freed.
+
+## WiFi (2026-10-11)
+
+Internet Setup's **Host network** setup has a **Wi-Fi** line on the board:
+its slip lists the networks the board sees, takes a password, and Join
+remembers the network chosen (the board joins it now if it is in range,
+and whichever remembered network it finds from then on); Forget forgets
+it.  Once joined, the NIE's TCP and DNS go out through lwIP.  From the
+console: `HostWifiScan()`, `HostWifiKnown()`, `HostWifiRemember(ssid,
+password)`, `HostWifiForget(ssid)`, `HostWifiStatus()` (host/HostWifi.h).
+
+The board starts the host's link for the NIE (comms/host/HostLink.h) in
+its PreMain, as the desktop does - without it Internet Setup finds no
+module and will not open; HostLink.ns is compiled in when CMake configures
+(PlatformIO runs no custom commands).  Internet Setup's editor slip is the
+MP2x00's 320 wide: the Wi-Fi editor keeps to the part of it on the
+240-wide screen.  ESP-IDF's event task has a 4 KB stack: 2304 bytes
+overflowed when an address was got.
+
+Internet Setup asks to turn the screen whenever the app area is under 320
+high (the ROM's Open, romsrc/functions/obj_642059.Open.ns) and then turns
+it to orientation 2 - upright, as the board already is - so on the board
+it asks every time, and OK opens it.  Other applications that will not
+open at 240x320 upright ask to turn the
+screen.  The board follows the Newton turned to landscape - the panel
+draws the display a quarter turn round (hold the board turned clockwise,
+the keyboard on the left), the touch panel turned back - and the Newton
+then asks for its pen to be calibrated for the new way round, as a
+MessagePad does.  On a fresh store the Setup assistant, as the backdrop,
+refuses to turn: go through Setup first.
+
+Room for it: WiFi wants internal RAM, which the tree's static data had
+filled - the six largest statics (HostIPP's buffer, the tablet's ring,
+the colour table, the unistroke templates, DNS-SD's results, the screen's
+expansion table: 200 KB) are `HOST_LARGE_STATIC` (host/host_compat.h:
+PSRAM on the board), with `CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY`
+and the WiFi's and lwIP's buffers in PSRAM.  162 KB of internal RAM is
+free at the start, 53 KB with the OS up (13 KB before).
+
+**The clock**: the board has none that keeps time while it is off, so it
+starts at 1970 (the Newton's 31/12).  Once a network is joined, SNTP
+(`pool.ntp.org`, polled hourly by ESP-IDF) sets the board's clock, and
+each time it does, the Newton's is set from it
+(`TURealTimeAlarm::SetTime`, in GMT; the Newton shows its home city's
+time) and the console prints `newton: the clock set: ...`.
+
+**The board's own console commands**, answered whatever the Newton is
+doing: `!shot` prints what the panel shows (`tools/tdeck/panelshot.py`
+makes a PNG of it), `!prof` the profile, `!time <seconds since 1970,
+GMT>` sets the clock by hand (as a sync from the network does), `!tap <x>
+<y>` puts the finger on the display there for 100 ms (a modal dialog,
+which stops the NewtonScript console, answered from it), `!reset`
+restarts the board.
 
 ## A faster start (2026-10-11)
 

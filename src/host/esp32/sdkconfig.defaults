@@ -36,3 +36,19 @@ CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y
 # a millisecond tick: the Newton's timers and sleeps are finer than 10 ms
 CONFIG_FREERTOS_HZ=1000
+# the WiFi (tdeck_wifi.cpp) in as little internal RAM as it can: its
+# buffers and lwIP's in PSRAM, few static receive buffers, its code and
+# lwIP's left in flash rather than IRAM
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+# statics in PSRAM: the WiFi's and lwIP's, and the tree's large buffers
+# (HOST_LARGE_STATIC, host/host_compat.h)
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=4
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_IRAM_OPT=n
+CONFIG_ESP_WIFI_RX_IRAM_OPT=n
+CONFIG_LWIP_IRAM_OPTIMIZATION=n
+CONFIG_ESP_WIFI_RX_BA_WIN=6
+# ESP-IDF's event task (2304 bytes by default) overflowed when an address
+# was got from the network (its own handlers and ours): 4 KB
+CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096

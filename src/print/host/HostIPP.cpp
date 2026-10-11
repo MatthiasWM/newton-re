@@ -330,7 +330,7 @@ HostIPPParseResponse(const unsigned char* data, size_t size, bool connectionClos
 	if (chunked)
 	{
 		// the chunks put together (an IPP answer is small)
-		static unsigned char body[65536];
+		static unsigned char body[65536] HOST_LARGE_STATIC;
 		size_t have = 0;
 		const unsigned char* p = headEnd;
 		const unsigned char* end = data + size;

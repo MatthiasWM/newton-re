@@ -125,6 +125,14 @@ TouchPoll(void)
 			if (y >= kPanelHeight) y = kPanelHeight - 1;
 		}
 	}
+	if (valid && fingerDown && HostDeviceDisplayTurned())
+	{
+		// (the display turned a quarter on the panel - tdeck_panel.cpp's
+		//  Convert: panel (px, py) shows display (319 - py, px))
+		long dx = kPanelHeight - 1 - y, dy = x;
+		x = dx;
+		y = dy;
+	}
 	if (valid && fingerDown)
 	{
 		lastSeen = now;

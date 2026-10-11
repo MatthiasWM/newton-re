@@ -642,6 +642,45 @@ the samples):
   ROM's native entries and the public jump table by a hash of the name
   (registration was quadratic).
 
+## WiFi (2026-10-11)
+
+The board joins WiFi networks it has been told of, and Internet Setup -
+the NIE's own application - is where they are told of: its Host network
+setup (comms/host/HostLink.ns) has a **Wi-Fi** line whose slip scans,
+takes a password and remembers or forgets a network.
+
+- **Portable**: host/HostWifi.h is a provider interface and its
+  NewtonScript natives (HostWifiScan, HostWifiKnown, HostWifiRemember,
+  HostWifiForget, HostWifiStatus); a desktop has no provider - its own
+  operating system manages its network - and shows no Wi-Fi line, but
+  `NEWTON_FAKE_WIFI=1` gives it a pretend one for the slip's test
+  (demo/wifisetup.ns, ctest `host.NewtonWifiSetup`).
+- **The board** (`src/host/esp32/main/tdeck_wifi.cpp`): ESP-IDF's
+  station; up to 8 networks in NVS; the strongest remembered network in
+  range joined, retried 30 s after it is lost or when none is in range; a
+  task with an internal stack owns it (NVS writes the flash).
+- **Internal RAM**: WiFi needs some, and the tree's statics had used
+  almost all of it - `HOST_LARGE_STATIC` (host/host_compat.h) puts the
+  six largest (200 KB) in PSRAM on the board; the WiFi's and lwIP's
+  buffers are in PSRAM too. Internal RAM free with the OS up: 13 KB
+  before, 53 KB now.
+- **Turning the screen**: Internet Setup will not open at 240x320 upright
+  and asks to turn it; the board now follows the Newton to landscape (the
+  panel draws the display a quarter turn round, the touch panel turns
+  back), and the Newton asks for the pen to be calibrated that way round.
+- **The clock** set from the network: once joined, SNTP (`pool.ntp.org`)
+  sets the board's clock, and the Newton's is set from it each time
+  (`newtonmain.cpp`'s DeviceServices loop, `TURealTimeAlarm::SetTime`).
+  The console's `!time <seconds>` does the same by hand; tried that way
+  (the Newton then read 1:00 PM at 20:00 GMT, Cupertino being its home
+  city).
+- **Joined a real network** (2026-10-12, WPA2): the address got, the
+  clock set by SNTP. On the way: the board had never started the NIE's
+  host link (Internet Setup: "no module packages installed"); the
+  Wi-Fi slip ran off the 240-wide screen (Internet Setup's slip is 320
+  wide); ESP-IDF's event task overflowed its 2304-byte stack when the
+  address came (4 KB now), restarting the board at every join.
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the

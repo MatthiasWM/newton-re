@@ -41,7 +41,9 @@ KEPT_IN_HOST = {"host/HostNatives.cpp", "host/HostViews.cpp", "host/HostStores.c
                 # the keyboard tool's queue and the window's pen and key shims,
                 # which the board's touch panel and keyboard call (with the
                 # package and orientation queues the tool's loop serves)
-                "host/HostKeyboard.cpp", "host/HostPackages.cpp", "host/HostOrientation.cpp"}
+                "host/HostKeyboard.cpp", "host/HostPackages.cpp", "host/HostOrientation.cpp",
+                # the WiFi natives over the board's provider (tdeck_wifi.cpp)
+                "host/HostWifi.cpp"}
 
 
 def main(argv):

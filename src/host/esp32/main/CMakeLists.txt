@@ -11,9 +11,9 @@ endforeach()
 list(APPEND sources ${NEWTON_FORWARDED})
 # (the DDK's own directory as -I too: three of its headers include others
 #  with <...>, and none of its file names is a system header's)
-idf_component_register(SRCS esp32main.cpp newtonmain.cpp tdeck_panel.cpp tdeck_input.cpp tdeck_store.cpp tdeck_profile.cpp ${sources}
+idf_component_register(SRCS esp32main.cpp newtonmain.cpp tdeck_panel.cpp tdeck_input.cpp tdeck_store.cpp tdeck_profile.cpp tdeck_wifi.cpp ${sources}
                        INCLUDE_DIRS . ${NEWTON_SRC}/ddk
-                       REQUIRES driver esp_partition spi_flash esp_timer esp_psram vfs freertos lwip nvs_flash)
+                       REQUIRES driver esp_partition spi_flash esp_timer esp_psram vfs freertos lwip nvs_flash esp_wifi esp_netif esp_event)
 
 # the flags the tree is built with everywhere (src/CMakeLists.txt): the
 # DDK configured for the MessagePad, host_compat.h first, signed overflow
@@ -52,6 +52,18 @@ foreach(n RANGE ${last})
 endforeach()
 list(REMOVE_DUPLICATES all_quoted)
 set_source_files_properties(newtonmain.cpp PROPERTIES COMPILE_OPTIONS "${all_quoted};-iquote${NEWTON_SRC}/host")
+
+# comms/host/HostLink.ns, the host's link for the NIE, compiled in as a
+# string as the desktop build does it (src/comms/CMakeLists.txt) - made
+# when CMake configures, not by a custom command: PlatformIO builds with
+# SCons from CMake's description and runs none (a change to HostLink.ns
+# reconfigures)
+set(INPUT ${NEWTON_SRC}/comms/host/HostLink.ns)
+set(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostLinkSource.cpp)
+set(NAME gHostLinkSource)
+include(${NEWTON_SRC}/cmake/EmbedText.cmake)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
+target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostLinkSource.cpp)
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE forQ=1 NDEBUG)
 target_compile_options(${COMPONENT_LIB} PRIVATE

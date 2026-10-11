@@ -9,6 +9,38 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-12: The T-Deck Pro joins a real network
+
+Internet Setup would not open on the board: its PreMain never started the
+host's link for the NIE (HostLinkStart), so there was no module.  Now it
+does, HostLink.ns compiled in at configure time.  The Wi-Fi slip keeps to
+the visible part of Internet Setup's 320-wide slip; the event task's stack
+is 4 KB (2304 bytes overflowed when an address came, a restart at every
+join); the console's `!tap x y` answers a modal dialog.  The owner's
+network joined, and the clock set from it.
+
+## 2026-10-12: The T-Deck Pro's clock set from the network
+
+Once WiFi is joined, SNTP (`pool.ntp.org`) sets the board's clock
+(`tdeck_wifi.cpp`), and the Newton's is set from it each time
+(`newtonmain.cpp`, `TURealTimeAlarm::SetTime` in GMT).  The console's
+`!time <seconds since 1970>` sets it by hand the same way - how it was
+tested, no network having been joined yet.
+
+## 2026-10-11: WiFi for the T-Deck Pro, set up in Internet Setup
+
+host/HostWifi.h (a provider and its natives) and the board's provider,
+`src/host/esp32/main/tdeck_wifi.cpp` (networks remembered in NVS, the
+strongest remembered one in range joined); Internet Setup's Host network
+setup has a Wi-Fi line and slip (comms/host/HostLink.ns: scan, password,
+Join, Forget) on a host with WiFi - tested on the desktop with
+`NEWTON_FAKE_WIFI` (ctest host.NewtonWifiSetup).  To make room,
+`HOST_LARGE_STATIC` moves the tree's six largest statics to PSRAM on the
+board.  The panel and touch follow the Newton turned to landscape (which
+Internet Setup needs at 240x320).  The board's console answers `!shot`
+(what the panel shows: tools/tdeck/panelshot.py), `!prof` and `!reset`
+itself, whatever the Newton is doing.
+
 ## 2026-10-11: A 32-bit build in the tests
 
 `tools/host/wsl32.sh` builds the 32-bit x86 flavour

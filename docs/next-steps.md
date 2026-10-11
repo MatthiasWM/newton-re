@@ -67,8 +67,11 @@ with a webcam on the board, `tools/tdeck/camshot.py`/`panelprobe.py`).
 starts); **a 3 s start** (from a minute: C++ exception tables sorted, two
 quadratic lookups made hashed - tools/tdeck/profile.py); **a 32-bit build
 in the tests** (`tools/host/wsl32.sh`: the x86 build under WSL, all 425
-pass).  Next: the
-store's writes batched (word by word now); NewtonScript's speed (the
+pass).  **WiFi**,
+set up in Internet Setup's Host network setup (scan, remember, join any
+remembered network in range; not yet tried on a real network); the panel
+following the Newton turned to landscape; the clock set from the network
+(SNTP) once joined, or by hand (`!time`).  Next: the store's writes batched (word by word now); NewtonScript's speed (the
 object heap in PSRAM); the built-in packages' frames baked; the applications at 240x320 (some ask to rotate); later the
 panel's own waveforms for speed and grays (docs/host-tdeck-pro.md, "Order
 of work").

@@ -257,7 +257,7 @@ Distance(const Shape* a, const Shape* b)
 ------------------------------------------------------------------------------*/
 
 // the templates resampled and normalised, made once
-static Shape	gTemplateShapes[kTemplateCount];
+static Shape	gTemplateShapes[kTemplateCount] HOST_LARGE_STATIC;
 static Boolean	gTemplatesMade = false;
 
 static void

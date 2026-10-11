@@ -142,6 +142,16 @@ the crop (read off one camshot.py picture).  It found the panel's
 set-up (src/host/esp32/main/tdeck_panel.cpp; docs/host-tdeck-pro.md):
 28 tried, one right.
 
+## panelshot.py - what the panel shows, without a camera
+
+    python tools/tdeck/panelshot.py tmp/tdeck/session.log [-o tmp/tdeck/panel.png] [--scale 2]
+
+`!shot` typed at the board's console (src/host/esp32/main/esp32main.cpp:
+the board answers it whatever the Newton is doing) prints the frame the
+panel driver last sent, as hex rows; this turns the last one in a log into
+a PNG.  What was sent, not what the glass shows (ghosts are the camera's,
+camshot.py).
+
 ## profile.py - where the board's time goes
 
     python tools/tdeck/profile.py tmp/tdeck/session.log [--top 30] [--by function|file|area] [--phases]

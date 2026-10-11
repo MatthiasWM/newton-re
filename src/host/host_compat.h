@@ -42,4 +42,14 @@ typedef unsigned char Boolean;
 typedef uint32_t	ULong32;
 typedef int32_t		Long32;
 
+// A large static buffer (tens of kilobytes) that need not be in a host's
+// fastest memory: on the ESP32-S3 host (src/host/esp32) it goes to PSRAM,
+// leaving the 512 KB of internal RAM - which the WiFi needs some of - to
+// what must be there; anywhere else it is an ordinary static.
+#if defined(ESP_PLATFORM)
+#define HOST_LARGE_STATIC	__attribute__((section(".ext_ram.bss")))
+#else
+#define HOST_LARGE_STATIC
+#endif
+
 #endif /* __HOST_COMPAT_H */
