@@ -459,6 +459,72 @@ started yet - that is milestone B.
   program has run ("No serial data received"); taking power off the board
   clears it. `upload_speed = 115200` (no baud change) is set.
 
+## The OS booted: milestone B (2026-10-11)
+
+The same application now **boots the OS**: the kernel and its tasks on
+FreeRTOS, the newt world with a 240x320 one-bit display (in memory, not
+on the panel yet) and the store in RAM, with the NewtonScript prompt on the
+USB serial port - each line the console types is handed to the newt world
+as a `'host/'eval` event by the kernel services task, evaluated there and
+its result printed. `2 + 3;` answers 5 in a millisecond;
+`GetRoot().viewBounds` is 240x320.
+
+- **The task runtime on FreeRTOS**: `os600/kernel/host/TaskRuntime.cpp`'s
+  `ESP_PLATFORM` branch makes a Newton task's thread a FreeRTOS task (the
+  board's side makes it: 48 KB stack in PSRAM, control block in internal
+  RAM, all on core 1 at one priority); the runtime's baton - a mutex and a
+  condition variable per task - is unchanged, through ESP-IDF's pthreads.
+  Now built for the board too: `HostViews.cpp` (the newt world's host boot
+  and display) with the card and interconnect natives it registers,
+  `HostStores.cpp` with `FactorySoups.cpp`, and the sockets on lwIP
+  (`HostSockets.cpp`: no interface list, no reverse lookup, no SIGPIPE).
+- **Start**: the kernel and its tasks 10 s, the newt world another 17.5 s,
+  the OS up (`gNewtIsAliveAndWell`: the built-in applications installed)
+  at 62 s. 29 KB of internal RAM and 2.6 MB of PSRAM are left; 285 KB of
+  the internal RAM is the tree's static data. The start is the next thing
+  to make faster.
+
+What the board found that the desktop had not - three of them bugs of the
+reconstruction that x86's conventions hid:
+
+1. **A catch in a FreeRTOS task's outermost function is never reached.**
+   The task runtime's one C++ throw (`TTaskRedirect`, a blocked task sent
+   elsewhere by the kernel) ended in `std::terminate`: its catch had been
+   inlined into the thread's entry function, and the Xtensa unwinder
+   cannot step through a task's first frame. The same catch a call
+   further in works (shown with a probe on both cores, on internal and
+   PSRAM stacks). `Trampoline` is now never inlined.
+2. **The object manager's monitor answered with its own address.**
+   `TObjectManager::MonitorProcGlue` was `void` (the DDK's
+   `MonitorProcPtr` returns nothing) and dropped `MonitorProc`'s result;
+   `MonitorEntryGlue` passes on whatever the proc left in the result
+   register. On the ARM and on x86 that is still `MonitorProc`'s result;
+   with Xtensa's windowed registers it is the glue's first argument, the
+   manager, so every object request failed with an internal-RAM address
+   for an error and the boot rebooted itself (`Reset` on the board prints
+   a backtrace, which found it). The glue now returns the result.
+3. **A config server wrote one byte past itself.** `TNSConfigServer`
+   took its service type's four characters into the ULong at the end of
+   the object with `ConvertFromUnicode(..., 4)`, which writes a fifth
+   byte, the terminator (the ROM's own conversion, which the reconstruction
+   stands in for, does not). The desktop's allocator rounds blocks up and
+   hid it; ESP-IDF's heap - with `CONFIG_HEAP_POISONING_COMPREHENSIVE` -
+   named the block. Now converted through a buffer.
+4. **A FreeRTOS task that deletes itself must not be freed on `eDeleted`.**
+   FreeRTOS answers `eDeleted` as soon as such a task is queued for the
+   idle task, which still reads its control block afterwards; freeing a
+   static task's memory then corrupted the heap. An ended thread now
+   suspends itself, and the next thread started deletes it and frees it.
+
+Also: the baked image is mapped at a fixed 0x3d000000. ESP-IDF maps a
+partition after the program's mappings and the PSRAM's, so the address
+moved with every change in the program's size (`esp32main.cpp`'s
+`MapObjects` fills the space below with the partition's own first pages -
+flash is mapped shared, so the whole partition's mapping is a new one,
+above them). `tools/tdeck/xtensa_compile.py --warn` lists warnings
+matching a pattern; it showed that no function in the tree falls off its
+end (which GCC for Xtensa compiles as unreachable).
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the
@@ -497,10 +563,11 @@ Then:
    and 64-bit. Left: the built-in packages' frames (1.2 MB of RAM at 32
    bits) baked the same way.
 4. **An ESP-IDF skeleton** - milestone A done (above): NewtonScript on
-   the board with the baked objects. Milestone B: the task runtime
-   (FreeRTOS tasks, the baton a semaphore), the timers and the store (the
-   `store` partition) - the OS booted to the same prompt; and NewtonScript's
-   speed worked on.
+   the board with the baked objects. Milestone B done (above): the OS
+   booted on FreeRTOS to a NewtonScript prompt in the newt world. Left:
+   the store in the `store` partition (it is in RAM), the start made
+   faster (a minute), NewtonScript's speed worked on, the internal RAM's
+   static data looked at.
 5. **The panel, the touch screen, the keyboard.**
 6. **The applications at 240x320** (or the scaled screen) - the part
    whose size is least known.

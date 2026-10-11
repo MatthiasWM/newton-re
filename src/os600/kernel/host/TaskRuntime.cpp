@@ -46,6 +46,14 @@
 #ifdef _WIN32
 // (not <windows.h>, whose Sleep and Yield are the Newton's names too)
 extern "C" __declspec(dllimport) void __stdcall ExitThread(unsigned long exitCode);
+#elif defined(ESP_PLATFORM)
+// the ESP32-S3 host (src/host/esp32): a task's thread is a FreeRTOS task,
+// made and ended by the board's side (esp32main.cpp) - FreeRTOS's headers
+// and the Newton's do not mix
+extern "C" {
+	int		HostDeviceStartThread(void (*entry)(void*), void* arg, size_t stackBytes);
+	[[noreturn]] void	HostDeviceEndThread(void);
+}
 #else
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -116,6 +124,45 @@ static void
 StartTaskThread(TTask* task, HostTaskContext* ctx)
 {
 	std::thread(Trampoline, task, ctx).detach();
+}
+
+static void
+ReapEndedThreads(void)
+{ }
+
+#elif defined(ESP_PLATFORM)
+
+// The ESP32-S3: a FreeRTOS task with a stack of gTaskStackSize in PSRAM, on
+// the core the Newton has (the board's side keeps the stacks and gives each
+// back once FreeRTOS has finished with a deleted task).  48 KB: a 32-bit
+// x86 build's deepest task stack was 24 KB (tools/host/stackdepth.sh), and
+// Xtensa's register windows make its frames bigger.
+const size_t	kTaskStackSize = 48 * 1024;
+static size_t	gTaskStackSize = kTaskStackSize;
+
+struct TaskThread
+{
+	TTask*		fTask;
+	HostTaskContext* fContext;
+};
+
+static void
+TaskThreadEntry(void* arg)
+{
+	TaskThread t = *(TaskThread*) arg;
+	delete (TaskThread*) arg;
+	Trampoline(t.fTask, t.fContext);
+}
+
+static void
+StartTaskThread(TTask* task, HostTaskContext* ctx)
+{
+	TaskThread* t = new TaskThread{ task, ctx };
+	if (!HostDeviceStartThread(TaskThreadEntry, t, gTaskStackSize))
+	{
+		fprintf(stderr, "[host] a task's thread could not be made\n");
+		abort();
+	}
 }
 
 static void
@@ -197,7 +244,9 @@ StartTaskThread(TTask* task, HostTaskContext* ctx)
 void
 HostSetTaskStackSize(size_t bytes)
 {
-#ifndef _WIN32
+#if defined(ESP_PLATFORM)
+	gTaskStackSize = bytes < 8 * 1024 ? 8 * 1024 : (bytes + 15) & ~(size_t) 15;
+#elif !defined(_WIN32)
 	// (whole pages, and room for the guard page and a frame or two)
 	size_t page = (size_t) getpagesize();
 	if (bytes < 4 * page)
@@ -239,6 +288,8 @@ EndThisThread(void)
 {
 #ifdef _WIN32
 	ExitThread(0);
+#elif defined(ESP_PLATFORM)
+	HostDeviceEndThread();
 #elif defined(__linux__)
 	{
 		// (on the graveyard first: the next thread made joins it once the
@@ -288,8 +339,11 @@ WaitForBaton(TTask* task, std::unique_lock<std::mutex>& lock)
 
 
 // A task's thread: run whatever the saved pc names, for as long as the kernel
-// keeps redirecting it.
-static void
+// keeps redirecting it.  Never inlined into the thread's entry: on the
+// ESP32-S3 a catch in a FreeRTOS task's outermost function is never reached
+// (the Xtensa unwinder cannot step through that frame, and the throw ends in
+// std::terminate), while one a call further in is - docs/host-tdeck-pro.md.
+static void __attribute__((noinline))
 Trampoline(TTask* task, HostTaskContext* ctx)
 {
 	gMyContext = ctx;

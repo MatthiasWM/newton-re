@@ -9,6 +9,30 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-11: The OS booted on the T-Deck Pro (milestone B)
+
+`src/host/esp32` boots the OS on the owner's T-Deck Pro: the task
+runtime's threads are FreeRTOS tasks (48 KB stacks in PSRAM, on core 1),
+the newt world comes up at 240x320 one-bit with the store in RAM, and the
+kernel services task hands each line typed on the USB console to the newt
+world as a `'host/'eval` event, whose result is printed - `2 + 3;` is 5
+in a millisecond.  Up in 62 s (kernel 10 s, newt world 17.5 s, the rest
+the built-in applications); 29 KB of internal RAM and 2.6 MB of PSRAM
+left.  The baked image is now mapped at a fixed 0x3d000000.
+
+Bugs the board found (`docs/host-tdeck-pro.md`, "The OS booted"):
+- **Reconstruction**: `TObjectManager::MonitorProcGlue` dropped
+  `MonitorProc`'s result (x86 and the ARM kept it in the result register
+  anyway; Xtensa's windowed registers did not - every object request
+  failed); `TNSConfigServer` wrote one byte past its end (the 4-character
+  conversion's terminator) - both fixed, the desktop suite unchanged.
+- **Host runtime**: a catch inlined into a FreeRTOS task's entry function
+  is never reached (`Trampoline` now `noinline`); a self-deleted static
+  task's memory was freed while FreeRTOS's idle task still used it.
+- `hal/host/HostSockets.cpp` builds on lwIP; `Reset` prints a backtrace
+  on the board; `tools/tdeck/xtensa_compile.py --warn` lists warnings
+  matching a pattern (no function falls off its end).
+
 ## 2026-10-11: NewtonScript on the T-Deck Pro (milestone A)
 
 `src/host/esp32`: an ESP-IDF application built with PlatformIO - 650 of the

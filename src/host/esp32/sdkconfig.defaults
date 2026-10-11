@@ -31,3 +31,8 @@ CONFIG_ESP_TASK_WDT_EN=n
 # cache miss's reading - and the ROM's objects are read from it)
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+# the Newton's tasks' stacks in PSRAM (twenty-odd of 48 KB: the internal RAM
+# has room for a few) - xTaskCreateStatic with a PSRAM stack
+CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y
+# a millisecond tick: the Newton's timers and sleeps are finer than 10 ms
+CONFIG_FREERTOS_HZ=1000

@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_debug_helpers.h"
 #else
 #include <pthread.h>
 #include <unistd.h>
@@ -30,6 +31,10 @@ Reset(void)
 {
 	gHostResetCount++;
 	fprintf(stderr, "[host] machine reset requested\n");
+#ifdef ESP_PLATFORM
+	// (the board: who asked - addr2line on the firmware's ELF names them)
+	esp_backtrace_print(24);
+#endif
 	if (gHostResetHook != nil)
 		gHostResetHook();
 	return 0;

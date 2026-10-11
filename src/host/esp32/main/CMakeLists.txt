@@ -11,9 +11,9 @@ endforeach()
 list(APPEND sources ${NEWTON_FORWARDED})
 # (the DDK's own directory as -I too: three of its headers include others
 #  with <...>, and none of its file names is a system header's)
-idf_component_register(SRCS esp32main.cpp newtonmain.cpp esp32runtime.cpp ${sources}
+idf_component_register(SRCS esp32main.cpp newtonmain.cpp ${sources}
                        INCLUDE_DIRS . ${NEWTON_SRC}/ddk
-                       REQUIRES driver esp_partition spi_flash esp_timer esp_psram vfs freertos)
+                       REQUIRES driver esp_partition spi_flash esp_timer esp_psram vfs freertos lwip)
 
 # the flags the tree is built with everywhere (src/CMakeLists.txt): the
 # DDK configured for the MessagePad, host_compat.h first, signed overflow
@@ -41,9 +41,17 @@ foreach(n RANGE ${last})
     endforeach()
     set_source_files_properties(${files} PROPERTIES COMPILE_OPTIONS "${quoted}")
 endforeach()
-# (the device's own files: the directories of the headers they include)
-set_source_files_properties(newtonmain.cpp esp32runtime.cpp PROPERTIES COMPILE_OPTIONS
-    "-iquote${NEWTON_SRC};-iquote${NEWTON_SRC}/frames;-iquote${NEWTON_SRC}/toolbox;-iquote${NEWTON_SRC}/utility;-iquote${NEWTON_SRC}/protocols;-iquote${NEWTON_SRC}/memory;-iquote${NEWTON_SRC}/os600/user;-iquote${NEWTON_SRC}/os600/kernel;-iquote${NEWTON_SRC}/host")
+# (the device's own Newton-side file: every directory, in the same order
+#  PlatformIO would put them in anyway)
+set(all_quoted)
+math(EXPR last "${NEWTON_GROUP_COUNT} - 1")
+foreach(n RANGE ${last})
+    foreach(d ${NEWTON_GROUP_${n}_INCLUDES})
+        list(APPEND all_quoted -iquote${NEWTON_SRC}/${d})
+    endforeach()
+endforeach()
+list(REMOVE_DUPLICATES all_quoted)
+set_source_files_properties(newtonmain.cpp PROPERTIES COMPILE_OPTIONS "${all_quoted};-iquote${NEWTON_SRC}/host")
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE forQ=1 NDEBUG)
 target_compile_options(${COMPONENT_LIB} PRIVATE

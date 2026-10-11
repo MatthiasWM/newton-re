@@ -12,13 +12,13 @@ less what a device does not build:
 
   - tests, and the sources a build generates (the host's NewtonScript
     panels: HostSettingsSource.cpp and its kind);
-  - src/host/ - the desktop's programs, windows and services - but for
-    HostNatives.cpp (every area's natives registered: portable);
-  - the host's own platform code that does not compile for the ESP32
-    (tools/tdeck/xtensa_compile.py's report): os600/kernel/host/TaskRuntime.cpp
-    (Linux threads) and hal/host/HostSockets.cpp (BSD sockets) - what they
-    provide, the device provides (src/host/esp32/main).  (hal/host/System.cpp
-    has an ESP-IDF branch of its own.)
+  - src/host/ - the desktop's programs, windows and services - but for its
+    portable parts: HostNatives.cpp (every area's natives registered),
+    HostViews.cpp (the newt world's host boot, the display, the toolbox,
+    with HostCards.cpp and HostInterconnect.cpp, whose natives it
+    registers) and HostStores.cpp with FactorySoups.cpp (the stores).
+  (The host's task runtime and hal/host/System.cpp have ESP-IDF branches
+  of their own; the sockets build on ESP-IDF's lwIP.)
 
 Each source keeps the include directories the build gives it, in their
 order (the sources grouped by them): headers of one name live in more than
@@ -32,11 +32,12 @@ import os
 import shlex
 import sys
 
-LEFT_OUT = {
-    "os600/kernel/host/TaskRuntime.cpp",
-    "hal/host/HostSockets.cpp",
-}
-KEPT_IN_HOST = {"host/HostNatives.cpp"}
+LEFT_OUT = set()
+# the portable parts of src/host/: every area's natives, the newt world's
+# host boot and display (HostViews.cpp, with the card and interconnect
+# natives it registers), the stores (HostStores.cpp, FactorySoups.cpp)
+KEPT_IN_HOST = {"host/HostNatives.cpp", "host/HostViews.cpp", "host/HostStores.cpp",
+                "host/FactorySoups.cpp", "host/HostCards.cpp", "host/HostInterconnect.cpp"}
 
 
 def main(argv):

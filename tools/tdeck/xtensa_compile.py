@@ -4,7 +4,7 @@ tree builds as it is, why the rest does not, and how big the code comes to.
 
     python tools/tdeck/xtensa_compile.py <a build's compile_commands.json>
         [--gcc <xtensa-esp32s3-elf-g++>] [--out tmp/tdeck/xtensa]
-        [--only DIR,...] [--jobs N] [--opt -Os]
+        [--only DIR,...] [--jobs N] [--opt -Os] [--warn REGEX]
 
 It takes every file of a CMake build (configure it with
 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON; a 32-bit one - src/cmake/zig-arm-linux.cmake
@@ -21,6 +21,12 @@ the failures grouped by their first error (a missing header named by
 itself, so that what a port must supply is listed once); the compiled
 objects' code and data by directory.  The objects and each failure's full
 messages are kept beside it.  Standard library only (and the compiler).
+
+--warn REGEX compiles without -w (GCC's default warnings, which take in
+-Wreturn-type for C++) and lists every warning whose text matches - e.g.
+--warn "control reaches end|no return statement" finds the functions that
+fall off their end, which GCC for Xtensa compiles as unreachable: the code
+runs on into whatever follows (docs/host-tdeck-pro.md).
 """
 
 import argparse
@@ -66,11 +72,11 @@ def area(path, src):
     return "/".join(parts[:2]) if len(parts) > 2 and parts[0] in ("host", "hal", "os600", "comms", "print") else parts[0]
 
 
-def compile_one(entry, gcc, out, opt, index):
+def compile_one(entry, gcc, out, opt, index, warn=None):
     path = entry["file"]
     is_c = path.endswith(".c")
     compiler = gcc.replace("g++", "gcc") if is_c else gcc
-    flags = [f for f in FLAGS if not (is_c and f in ("-std=gnu++17", "-fexceptions"))]
+    flags = [f for f in FLAGS if not (is_c and f in ("-std=gnu++17", "-fexceptions")) and not (warn and f == "-w")]
     if is_c:
         flags = ["-std=gnu11"] + flags
     obj = os.path.join(out, "obj", f"{index:04d}_{os.path.basename(path)}.o")
@@ -100,6 +106,7 @@ def main(argv):
     parser.add_argument("--only", help="comma-separated src/ directories")
     parser.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
     parser.add_argument("--opt", default="-Os")
+    parser.add_argument("--warn", help="compile without -w and list the warnings matching this regex")
     args = parser.parse_args(argv)
     args.out = os.path.abspath(args.out)			# (each compile runs in its build directory)
 
@@ -117,10 +124,16 @@ def main(argv):
     per_area = collections.defaultdict(lambda: [0, 0])
     failures = collections.defaultdict(list)
     sizes = collections.Counter()
+    warned = set()
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        jobs = [pool.submit(compile_one, e, args.gcc, args.out, args.opt, i) for i, e in enumerate(entries)]
+        jobs = [pool.submit(compile_one, e, args.gcc, args.out, args.opt, i, args.warn) for i, e in enumerate(entries)]
         for n, job in enumerate(concurrent.futures.as_completed(jobs)):
             path, ok, obj, stderr = job.result()
+            if args.warn:
+                for line in stderr.splitlines():
+                    if "warning:" in line and re.search(args.warn, line):
+                        warned.add(os.path.relpath(line.split(": warning:")[0], src).replace("\\", "/")
+                                   + ":" + line.split("warning:", 1)[1].strip())
             a = area(path, src)
             per_area[a][0 if ok else 1] += 1
             if ok:
@@ -153,6 +166,11 @@ def main(argv):
             lines.append(f"         {f}")
         if len(files) > 6:
             lines.append(f"         ... and {len(files) - 6} more")
+    if args.warn:
+        lines.append("")
+        lines.append(f"warnings matching {args.warn!r}: {len(warned)}")
+        for w in sorted(warned):
+            lines.append(f"  {w}")
     report = "\n".join(lines) + "\n"
     open(os.path.join(args.out, "report.txt"), "w").write(report)
     print(report)

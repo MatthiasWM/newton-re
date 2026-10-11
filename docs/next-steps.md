@@ -57,11 +57,13 @@ a device-sized run (2 MB kernel heap, 512 KB NewtonScript heap, 32 KB
 stacks: both walkthroughs pass); the baked object image (`newton
 --bake-objects`, mapped read-only); **NewtonScript on the board**
 (`src/host/esp32`, milestone A: the baked objects mapped from flash, the
-REP on USB; 100-500x the desktop's time, the allocating code worst).
-Next: milestone B - the FreeRTOS task runtime, timers and the store, the
-OS booted to the prompt; NewtonScript's speed (the object heap in PSRAM);
-the built-in packages' frames baked; a 32-bit build in the tests; then the
-panel, touch and keyboard; the applications at 240x320.
+REP on USB; 100-500x the desktop's time, the allocating code worst);
+**the OS booted on the board** (milestone B: the kernel's tasks on
+FreeRTOS, the newt world at 240x320, a NewtonScript prompt evaluated in
+it; up in 62 s).  Next: the store in the `store` partition (it is in
+RAM); the start made faster; NewtonScript's speed (the object heap in
+PSRAM); the built-in packages' frames baked; a 32-bit build in the tests;
+then the panel, touch and keyboard; the applications at 240x320.
 
 ### Left of host fonts (merged 2026-10-10, off unless asked for)
 

@@ -13,11 +13,19 @@
 #include <stddef.h>
 
 // the Newton's side: the baked ROM objects at image (nil: none), then the
-// object system and the NewtonScript REP on stdio
+// OS booted, with a NewtonScript prompt on the console
 void		NewtonMainOnDevice(const void* image, size_t size);
 
 // the board's side
 long long	HostDeviceMicroseconds(void);
 void		HostDeviceMemory(unsigned long* internalFree, unsigned long* psramFree);
+int			HostDeviceReadLine(char* line, size_t size);		// a line the console has typed, if one has come (never waits) ==> whether
+
+// (the task runtime's threads - os600/kernel/host/TaskRuntime.cpp declares
+//  them for itself, extern "C")
+extern "C" {
+	int		HostDeviceStartThread(void (*entry)(void*), void* arg, size_t stackBytes);
+	[[noreturn]] void	HostDeviceEndThread(void);
+}
 
 #endif	/* __ESP32HOST_H */

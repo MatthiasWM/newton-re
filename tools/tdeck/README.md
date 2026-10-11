@@ -99,7 +99,7 @@ from a script.
 ## xtensa_compile.py - the tree with the ESP32-S3's compiler
 
     cmake -S src -B tmp/build-arm -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ...   # (src/cmake/zig-arm-linux.cmake)
-    python tools/tdeck/xtensa_compile.py tmp/build-arm/compile_commands.json [--only DIR,...] [--jobs N] [--opt -Os]
+    python tools/tdeck/xtensa_compile.py tmp/build-arm/compile_commands.json [--only DIR,...] [--jobs N] [--opt=-Os] [--warn REGEX]
 
 Every file of a 32-bit CMake build (tests left out) compiled again with
 ESP-IDF's GCC for the ESP32-S3 (PlatformIO's `toolchain-xtensa-esp32s3`),
@@ -111,6 +111,12 @@ sections).  Nothing is linked.  **Output**: `tmp/tdeck/xtensa/report.txt`
 error (a missing header by its name); the compiled code and data by area -
 with the objects and each failure's full messages beside it.  About 30 s
 for the whole tree.
+
+`--warn REGEX` compiles without `-w` and adds to the report every warning
+whose text matches: `--opt=-O2 --warn "control reaches end|no return
+statement"` finds functions that fall off their end, which GCC for Xtensa
+compiles as unreachable (none, 2026-10-11).  (`--opt=-O2`, with `=`: a
+value that starts with `-` needs it.)
 
 ## devicerun.sh - the walkthroughs on a device's budget
 
