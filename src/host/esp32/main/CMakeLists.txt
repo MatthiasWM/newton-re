@@ -11,7 +11,7 @@ endforeach()
 list(APPEND sources ${NEWTON_FORWARDED})
 # (the DDK's own directory as -I too: three of its headers include others
 #  with <...>, and none of its file names is a system header's)
-idf_component_register(SRCS esp32main.cpp newtonmain.cpp ${sources}
+idf_component_register(SRCS esp32main.cpp newtonmain.cpp tdeck_panel.cpp tdeck_input.cpp ${sources}
                        INCLUDE_DIRS . ${NEWTON_SRC}/ddk
                        REQUIRES driver esp_partition spi_flash esp_timer esp_psram vfs freertos lwip)
 
@@ -58,3 +58,8 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     -include${NEWTON_SRC}/host/host_compat.h
     -fwrapv -fsigned-char -falign-functions=4 -w
     $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++17>)
+
+# malloc(0) answers a block, as the desktops' C libraries do and the tree
+# assumes (newlib's on the ESP32-S3 answers nil: esp32main.cpp's
+# __wrap_malloc)
+target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=malloc")

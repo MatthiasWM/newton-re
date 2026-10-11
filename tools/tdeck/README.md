@@ -94,7 +94,53 @@ serial/JTAG port's RTS line, so the capture starts at boot.  `--send`
 types lines to the board once a line holding `--after` ("Welcome to
 NewtonScript" unless given) has come, each when the board has been quiet
 for a moment - how the NewtonScript prompt of `src/host/esp32` is driven
-from a script.
+from a script; `--after ""` sends at once, to a board already running.
+The port is opened with DTR and RTS low, which does not reset the board
+(opening it otherwise could).
+
+`--send-file FILE`: every line appended to FILE while the capture runs is
+sent too - so one long capture in the background can be typed into from
+outside without opening the port again (the file is emptied at the
+start).  The way the board was worked with:
+
+    timeout 3700 ~/.platformio/penv/Scripts/python tools/tdeck/serialcapture.py COM4 3600 \
+        --after "" --send-file tmp/tdeck/send.txt --quiet-ms 1500 --out tmp/tdeck/session.log &
+    echo 'DevicePanelSet("trace", 1);' >> tmp/tdeck/send.txt
+
+A line the board does not read within two seconds is dropped (said in
+the log) rather than blocking the capture.  Stop the capture (its Python
+process, not only the shell around it) before flashing: it holds the port.
+
+## camshot.py - a photograph of the panel
+
+    python -m venv build/tdeck-venv && build/tdeck-venv/Scripts/python -m pip install opencv-python   # once
+    build/tdeck-venv/Scripts/python tools/tdeck/camshot.py [--camera N] [--crop X,Y,W,H] [--zoom N] \
+        [--after S] [--every S --count N] [--sheet] [--out tmp/tdeck/cam.png] [--list]
+
+The panel cannot be read back (the board only writes to it), so what it
+really shows is photographed by a webcam pointed at it.  `--list` says
+which cameras open (a virtual one, such as OBS's, opens too and shows its
+own picture: on the owner's machine the Logitech BRIO is 0, at 1920 x
+1080); `--crop` keeps the panel's rectangle and `--zoom` enlarges it;
+`--every`/`--count` take a series (a refresh as it happens) and `--sheet`
+lays the series out numbered in one picture.
+
+## panelprobe.py - which way of driving the panel works
+
+    build/tdeck-venv/Scripts/python tools/tdeck/panelprobe.py --send tmp/tdeck/send.txt \
+        --log tmp/tdeck/session.log [--crop X,Y,W,H] [--screen X0,Y0,X1,Y1] \
+        [--set name=v,name=v]... [--keep DIR]
+
+For each `--set` (panel settings, `DevicePanelSet` names) runs the board's
+test pattern (a full refresh to left-black/right-white, a partial one
+flipping the top half of a middle square, a partial one back) through a
+running serialcapture.py, photographs each picture when the board's log
+says its refresh is done, reads the square's four quarters dark or light,
+and prints PASS when the three pictures were right.  `--crop` is the
+panel in the camera's frame, `--screen` the panel's pixels' corners in
+the crop (read off one camshot.py picture).  It found the panel's
+set-up (src/host/esp32/main/tdeck_panel.cpp; docs/host-tdeck-pro.md):
+28 tried, one right.
 
 ## xtensa_compile.py - the tree with the ESP32-S3's compiler
 
@@ -122,7 +168,8 @@ value that starts with `-` needs it.)
 
     tools/tdeck/devicerun.sh <newton> [newton's options...]
     # e.g. under WSL 2, the 32-bit build:
-    tools/tdeck/devicerun.sh tmp/build-x86/host/newton --objects build/host/romsrc-objects.bin         --kernel-heap 2 --heap 524288 --flash-size 4 --task-stack 32
+    tools/tdeck/devicerun.sh tmp/build-x86/host/newton --objects build/host/romsrc-objects.bin \
+        --kernel-heap 2 --heap 524288 --flash-size 4 --task-stack 32
 
 Runs both user walkthroughs (`src/host/demo/walkthrough.ns`,
 `walkthrough2.ns`), each on a new store and then on that store again (the

@@ -30,6 +30,19 @@ static const void*	gImage = NULL;
 static size_t		gImageSize = 0;
 
 
+// malloc(0) a block rather than nil (main/CMakeLists.txt links every malloc
+// through this): the desktops' C libraries answer a block, and code in the
+// tree takes nil for out of memory - an extended Gestalt's first buffer is
+// 0 bytes, and every one answered nil here
+extern "C" void*	__real_malloc(size_t size);
+
+extern "C" void*
+__wrap_malloc(size_t size)
+{
+	return __real_malloc(size > 0 ? size : 1);
+}
+
+
 long long
 HostDeviceMicroseconds(void)
 {
@@ -254,6 +267,10 @@ app_main(void)
 		gImageSize = part->size;
 		printf("newton: the objects partition mapped at %p (%u KB)\n", gImage, (unsigned) (gImageSize >> 10));
 	}
+	// the panel and the input first: their drivers want internal RAM, which
+	// the OS leaves little of
+	HostDevicePanelStart();
+	HostDeviceInputStart();
 	gLines = xQueueCreate(8, kLineSize);
 	xTaskCreatePinnedToCore(ConsoleReader, "console", 4096, NULL, 4, NULL, 0);
 	// the boot runs here, and the run's end is waited for here (the task

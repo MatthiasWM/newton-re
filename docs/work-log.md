@@ -9,6 +9,31 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-11: The T-Deck Pro's panel, touch screen and keyboard
+
+`src/host/esp32/main/tdeck_panel.cpp` shows the Newton's display on the
+e-paper panel (partial refreshes over the changed rectangle, full ones for
+new pages and a clean-up); `tdeck_input.cpp` makes the touch panel the pen
+and the keyboard the keyboard (the owner's layout), through
+host/HostKeyboard.cpp's shims, which the board now builds
+(`HostKeyboardSendKeys` factored out for its services loop).  The panel's
+set-up was found with a webcam on the board (`tools/tdeck/camshot.py`,
+`panelprobe.py`): the maker's way, with the controller reset before every
+refresh (docs/host-tdeck-pro.md, "The panel, the touch screen and the
+keyboard").
+
+Bugs found on the way:
+- **views/Commands.cpp**: a command's pointer parameter came back shifted
+  down by two on a 32-bit host whose heap is above 0x20000000 (tapping a
+  button crashed the ESP32-S3); the Refs kept as addresses are remembered
+  now (test views.Views).
+- **system/SystemNatives.cpp**: `ExtendedGestalt`'s first buffer was
+  `malloc(0)`, nil on newlib - every extended Gestalt answered nil (the
+  Extras drawer threw); and the board wraps `malloc` so that 0 bytes is a
+  block.
+- `tools/tdeck/serialcapture.py`: `--send-file`, `--after ""`, a write
+  timeout, the port opened without resetting the board.
+
 ## 2026-10-11: The OS booted on the T-Deck Pro (milestone B)
 
 `src/host/esp32` boots the OS on the owner's T-Deck Pro: the task

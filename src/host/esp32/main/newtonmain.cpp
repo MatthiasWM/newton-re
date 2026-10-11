@@ -6,11 +6,13 @@
 				ROM's objects from the baked image mapped from flash, the
 				kernel and its tasks on FreeRTOS (the task runtime's
 				ESP-IDF branch), the newt world, a 240x320 one-bit display
-				(not on the panel yet), the store in RAM - with a
-				NewtonScript prompt on the USB console: each line the
-				console types is evaluated in the newt world (a 'host/'eval
-				event), its result printed.  The desktop's newton
-				(host/newton.cpp) is what this follows, headless.
+				shown on the e-paper panel (tdeck_panel.cpp), the touch
+				panel as the pen and the keyboard as the keyboard
+				(tdeck_input.cpp), the store in RAM - with a NewtonScript
+				prompt on the USB console: each line the console types is
+				evaluated in the newt world (a 'host/'eval event), its
+				result printed.  The desktop's newton (host/newton.cpp) is
+				what this follows, its window the board's panel.
 */
 
 #include "Frames.h"
@@ -34,7 +36,11 @@
 #include "os600/kernel/host/TaskRuntime.h"
 #include "host/HostViews.h"
 #include "host/HostStores.h"
+#include "host/HostKeyboard.h"
+#include "hal/host/HostScreen.h"
+#include "Unicode.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "esp32host.h"
@@ -72,6 +78,20 @@ static Ref
 FDeviceMilliseconds(RefArg /*rcvr*/)
 {
 	return MAKEINT((long) ((HostDeviceMicroseconds() / 1000) & 0x1fffffff));
+}
+
+// DevicePanelSet(name, value): a setting of the panel's refreshes
+// (tdeck_panel.cpp) - name a symbol or a string ==> true when there is one
+static Ref
+FDevicePanelSet(RefArg /*rcvr*/, RefArg name, RefArg value)
+{
+	char text[32];
+	if (IsSymbol(name))
+		strncpy(text, SymbolName(name), sizeof(text) - 1);
+	else
+		ConvertFromUnicode(GetCString(name), text, kMacRomanEncoding, sizeof(text) - 1);
+	text[sizeof(text) - 1] = 0;
+	return HostDevicePanelSet(text, RINT(value)) ? TRUEREF : NILREF;
 }
 
 static Ref
@@ -136,9 +156,13 @@ DeviceBoot(void)
 {
 	Step("the newt world starting");
 	HostBootNewtWorld();
+	THostScreenDriver* display = HostDisplay();
+	if (display != nil)
+		HostDevicePanelShow(display->Pixels(), display->Width(), display->Height());
 	InitFIQTimer();
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DeviceMilliseconds")), RefVar(MakeCFunction((void*) FDeviceMilliseconds, 0, nil)));
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DeviceMemory")), RefVar(MakeCFunction((void*) FDeviceMemory, 0, nil)));
+	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DevicePanelSet")), RefVar(MakeCFunction((void*) FDevicePanelSet, 2, nil)));
 	// results printed on the console (the world's REP out translator
 	// otherwise prints nowhere)
 	HostInitREP(stdout, nil);
@@ -148,8 +172,9 @@ DeviceBoot(void)
 }
 
 
-// the kernel services task (gHostKernelServicesTask): the console's lines
-// to the world, a tenth of a second at a time
+// the kernel services task (gHostKernelServicesTask): the keyboard's keys
+// (host/HostKeyboard.cpp's queue, which tdeck_input.cpp fills) and the
+// console's lines to the world, a hundredth of a second at a time
 static void
 DeviceServices(void)
 {
@@ -166,6 +191,7 @@ DeviceServices(void)
 	static char line[512];
 	for (;;)
 	{
+		HostKeyboardSendKeys(&newtPort);
 		if (HostDeviceReadLine(line, sizeof(line)))
 		{
 			TDeviceEvalEvent eval;
@@ -176,7 +202,7 @@ DeviceServices(void)
 			newtPort.SendRPC(&replySize, &eval, sizeof(eval), &eval, sizeof(eval));
 		}
 		else
-			Sleep(100 * kMilliseconds);
+			Sleep(10 * kMilliseconds);
 	}
 }
 
@@ -185,6 +211,10 @@ void
 NewtonMainOnDevice(const void* image, size_t size)
 {
 	gStart = HostDeviceMicroseconds();
+	// every NewtonScript throw printed with its script stack (frames/Objects.cpp
+	// reads it at the first throw): the board has no environment to set it in,
+	// and the console is where a fault on it is found
+	setenv("NEWTON_TRACE_EXCEPTIONS", "1", 1);
 	if (image == nil || ImportBakedObjects(image, size) != noErr)
 		printf("newton: no baked ROM objects - the OS cannot boot without them\n");
 	else

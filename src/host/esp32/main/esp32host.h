@@ -21,11 +21,28 @@ long long	HostDeviceMicroseconds(void);
 void		HostDeviceMemory(unsigned long* internalFree, unsigned long* psramFree);
 int			HostDeviceReadLine(char* line, size_t size);		// a line the console has typed, if one has come (never waits) ==> whether
 
+// the panel (tdeck_panel.cpp): its task started (before the OS boots), then
+// given the display's grays to show (one byte a pixel, 0 white .. 255
+// black, width per row - host/HostWindow.h's form) once there is a display
+void		HostDevicePanelStart(void);
+void		HostDevicePanelShow(const unsigned char* grays, long width, long height);
+bool		HostDevicePanelSet(const char* name, long value);	// a refresh setting changed (tdeck_panel.cpp lists them) ==> whether there is one so named
+// the touch panel and the keyboard (tdeck_input.cpp): read from the start,
+// handed to the window shims below
+void		HostDeviceInputStart(void);
+
 // (the task runtime's threads - os600/kernel/host/TaskRuntime.cpp declares
 //  them for itself, extern "C")
 extern "C" {
 	int		HostDeviceStartThread(void (*entry)(void*), void* arg, size_t stackBytes);
 	[[noreturn]] void	HostDeviceEndThread(void);
+	// the window's shims (host/HostKeyboard.cpp), as every host's window
+	// calls them: the pen in the display's pixels, a key as its Windows
+	// virtual key code - from any thread
+	void	HostWindowPenDown(long x, long y);
+	void	HostWindowPenMove(long x, long y);
+	void	HostWindowPenUp(void);
+	void	HostWindowKey(long virtualKey, int down);
 }
 
 #endif	/* __ESP32HOST_H */

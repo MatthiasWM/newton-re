@@ -60,10 +60,15 @@ stacks: both walkthroughs pass); the baked object image (`newton
 REP on USB; 100-500x the desktop's time, the allocating code worst);
 **the OS booted on the board** (milestone B: the kernel's tasks on
 FreeRTOS, the newt world at 240x320, a NewtonScript prompt evaluated in
-it; up in 62 s).  Next: the store in the `store` partition (it is in
-RAM); the start made faster; NewtonScript's speed (the object heap in
-PSRAM); the built-in packages' frames baked; a 32-bit build in the tests;
-then the panel, touch and keyboard; the applications at 240x320.
+it; up in 62 s); **the panel, touch screen and keyboard** (the
+Newton on the e-paper, partial refreshes over what changed; set-up found
+with a webcam on the board, `tools/tdeck/camshot.py`/`panelprobe.py`).
+Next: the store in the `store` partition (it is in RAM: a new Setup
+assistant every start); the start made faster; NewtonScript's speed (the
+object heap in PSRAM); the built-in packages' frames baked; a 32-bit build
+in the tests; the applications at 240x320 (some ask to rotate); later the
+panel's own waveforms for speed and grays (docs/host-tdeck-pro.md, "Order
+of work").
 
 ### Left of host fonts (merged 2026-10-10, off unless asked for)
 

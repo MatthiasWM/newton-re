@@ -1538,6 +1538,23 @@ TestCommands()
 	EXPECT(IsUndoCommand(cmd));
 	cmd = MakeCommand(aeUndo, gApplication, kNoParameter);
 	EXPECT(CommandReceiver(cmd) == gApplication && EQRef(GetFrameSlotRef(cmd, RSSYMreceiver), RSSYMapplication));
+	// a pointer that does not fit in a Newton integer comes back whole - on a
+	// 32-bit host too, where it is a Newton-sized word (the ESP32-S3's PSRAM
+	// is at 0x3C000000: a click's unit came back shifted down by two); small
+	// and negative numbers stay numbers
+	{
+		Long high = (Long) (uintptr_t) 0x3C7478C0;
+		cmd = MakeCommand(aeClick, root, high);
+		EXPECT(CommandParameter(cmd) == high);
+		CommandSetResult(cmd, high);
+		EXPECT(CommandResult(cmd) == high);
+		CommandSetIndexParameter(cmd, 1, high);
+		EXPECT(CommandIndexParameter(cmd, 1) == high);
+		CommandSetParameter(cmd, -5);
+		EXPECT(CommandParameter(cmd) == -5);
+		CommandSetParameter(cmd, 0x1000);
+		EXPECT(CommandParameter(cmd) == 0x1000);
+	}
 
 	// aeShow/aeHide through the application to a view; the result answers
 	TView* v = ViewOf("ctxC := AddView(GetRoot(), {viewClass: 74, viewFlags: 1 + 0x200, viewBounds: {left: 10, top: 10, right: 30, bottom: 30}, viewFormat: 5, clicks: 0, viewClickScript: func(unit) begin clicks := clicks + 1; if clicks = 2 then 'skip else true end})");

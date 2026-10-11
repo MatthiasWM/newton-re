@@ -525,6 +525,63 @@ above them). `tools/tdeck/xtensa_compile.py --warn` lists warnings
 matching a pattern; it showed that no function in the tree falls off its
 end (which GCC for Xtensa compiles as unreachable).
 
+## The panel, the touch screen and the keyboard (2026-10-11)
+
+`src/host/esp32/main/tdeck_panel.cpp` and `tdeck_input.cpp`: the Newton's
+display on the e-paper panel, the touch panel as its pen and the keyboard
+as its keyboard, through the same shims every host's window uses
+(host/HostKeyboard.cpp). Typing, taps, the calibration screen and the
+Extras drawer work on the owner's board.
+
+**The panel took most of the day**, and what finally worked is the panel
+maker's own way, all of it:
+
+- black and white with the controller's OTP waveforms, PSR `0x1F 0x0D` (the
+  spike had `0x8D`: then the refresh seemed to show DTM1, and an inverted
+  "old" frame seemed to help - both artefacts of the set-up);
+- a full refresh sends the picture to **both** DTM1 and DTM2 (the full
+  waveform darkens a pixel black in either: the previous frame there came
+  out over the new one, inverted popups);
+- a partial refresh sends the old frame to DTM1 and the new to DTM2, CDI
+  `0xD7`, the OTP waveform at the forced temperature `0x79` (0.65 s), **over
+  only the rectangle that changed** (PTIN/PTL - the waveform drives every
+  pixel it covers: over the whole screen, the whole screen blinked);
+- **the controller reset (PSR's RST_N) and set up again before every
+  refresh**, which GxEPD2's driver for this panel does with the comment
+  "needed, reason unknown": without it the first partial refresh after a
+  full one works and the next does nothing - the controller keeps a state
+  of its own across refreshes.
+- A waveform of our own in the LUT registers left the controller busy
+  until the board lost power; it is gone.
+
+It was found by looking: a webcam pointed at the board
+(`tools/tdeck/camshot.py`) photographed a test pattern the board draws
+(`DevicePanelSet("test", 1)`: a full refresh, a partial one flipping half
+a square, a partial one back), and `tools/tdeck/panelprobe.py` read the
+photographs and tried 28 set-ups - only the one above went through all
+three pictures. Before the camera, each try needed the owner's eyes.
+
+**Two more bugs the board found** (the desktop's memory layout or C
+library had hidden them):
+
+1. **A click's unit came back as its address shifted down by two.** A
+   command's parameter is a Newton integer; a host pointer that does not
+   fit is kept as an address Ref, told apart by its width - which a 32-bit
+   host's pointers do not have, and the ESP32-S3's PSRAM (0x3C000000) does
+   not fit in thirty bits (the desktop's 32-bit builds' heaps are lower).
+   Tapping a button crashed the OS. `views/Commands.cpp` now remembers the
+   Refs it kept as addresses (test: views.Views).
+2. **Every extended Gestalt answered nil**: the first buffer is
+   `malloc(0)`, which newlib answers with nil; the Extras drawer's volume
+   slider threw. Fixed there, and `malloc` is wrapped on the board so that
+   `malloc(0)` answers a block everywhere, as the desktops' do.
+
+Debugging on the board: `DevicePanelSet("trace", 1)` logs each refresh;
+every NewtonScript throw is printed with its script stack
+(`NEWTON_TRACE_EXCEPTIONS`, set by newtonmain.cpp); `serialcapture.py
+--send-file` keeps one capture open that can be typed into (opening the
+port again could reset the board).
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the
@@ -568,7 +625,14 @@ Then:
    the store in the `store` partition (it is in RAM), the start made
    faster (a minute), NewtonScript's speed worked on, the internal RAM's
    static data looked at.
-5. **The panel, the touch screen, the keyboard.**
+5. **The panel, the touch screen, the keyboard** - done (above). Left: the
+   flash store, a faster start, the applications at 240x320. Later, for
+   the panel:
+   the owner pointed to a video of an e-paper display driven at 30 frames
+   a second with four levels of gray, by driving each pixel only part of
+   the way, which needs a frame buffer of the panel's state kept in
+   memory (https://www.youtube.com/watch?v=XiZmM6hwwAU) - to be looked at
+   for faster, grayer updates than the OTP's waveforms give.
 6. **The applications at 240x320** (or the scaled screen) - the part
    whose size is least known.
 

@@ -105,6 +105,23 @@ HostKeyCodeForVirtualKey(long vk)
 }
 
 
+// The keys queued so far, each sent as a 'keyb event - an RPC the world
+// replies to with the repeat rates
+void
+HostKeyboardSendKeys(TUPort* newtPort)
+{
+	KeyboardEvent reply(aeKeyUp, 0);
+	ULong replySize = 0;
+	while (gHostKeyHead.load() != gHostKeyTail.load())
+	{
+		HostKey key = gHostKeys[gHostKeyHead.load()];
+		gHostKeyHead.store((gHostKeyHead.load() + 1) % kHostKeyQueueSize);
+		KeyboardEvent event(key.down ? aeKeyDown : aeKeyUp, key.code);
+		newtPort->SendRPC(&replySize, &event, sizeof(event), &reply, sizeof(reply));
+	}
+}
+
+
 // The task: the newt world's port found by name, then every ten
 // milliseconds the queued keys sent as 'keyb events
 // (each an RPC the world replies to with the repeat rates); the run ended
@@ -128,17 +145,9 @@ HostKeyboardToolTask(void)
 		//  until a key is pressed, and the first key connects the keyboard
 		//  as the ROM's DoKeyEvent does - so a fresh note has no caret
 		//  waiting for typing, and writing goes where it is written)
-		KeyboardEvent reply(aeKeyUp, 0);
-		ULong replySize = 0;
 		while (!HostTimeIsUp())
 		{
-			while (gHostKeyHead.load() != gHostKeyTail.load())
-			{
-				HostKey key = gHostKeys[gHostKeyHead.load()];
-				gHostKeyHead.store((gHostKeyHead.load() + 1) % kHostKeyQueueSize);
-				KeyboardEvent event(key.down ? aeKeyDown : aeKeyUp, key.code);
-				newtPort.SendRPC(&replySize, &event, sizeof(event), &reply, sizeof(reply));
-			}
+			HostKeyboardSendKeys(&newtPort);
 			HostSendQueuedPackages();		// (a package dropped onto the window)
 			HostSendAskedOrientation();		// (the device turned: host/HostOrientation.h)
 			Sleep(10 * kMilliseconds);
