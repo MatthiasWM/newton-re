@@ -64,7 +64,8 @@ it; up in 62 s); **the panel, touch screen and keyboard** (the
 Newton on the e-paper, partial refreshes over what changed; set-up found
 with a webcam on the board, `tools/tdeck/camshot.py`/`panelprobe.py`).
 **The store on the board's flash** (the `store` partition, kept between
-starts).  Next: the start made faster (60 s; 170 s the first time); the
+starts); **a 3 s start** (from a minute: C++ exception tables sorted, two
+quadratic lookups made hashed - tools/tdeck/profile.py).  Next: the
 store's writes batched (word by word now); NewtonScript's speed (the
 object heap in PSRAM); the built-in packages' frames baked; a 32-bit build
 in the tests; the applications at 240x320 (some ask to rotate); later the

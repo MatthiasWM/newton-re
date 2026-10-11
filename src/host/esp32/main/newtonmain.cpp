@@ -64,6 +64,7 @@ Step(const char* what)
 {
 	unsigned long internalFree, psramFree;
 	HostDeviceMemory(&internalFree, &psramFree);
+	HostDeviceProfileMark(what);
 	printf("newton: %s at %lld ms (internal RAM free %lu KB, PSRAM free %lu KB)\n",
 		   what, (HostDeviceMicroseconds() - gStart) / 1000, internalFree >> 10, psramFree >> 10);
 }
@@ -92,6 +93,15 @@ static void
 StoreErase(ULong offset, ULong size, ULong lanes)
 {
 	HostDeviceStoreErase((unsigned long) offset, (unsigned long) size, (unsigned long) lanes);
+}
+
+// DeviceProfileDump(): the boot's profile printed (tdeck_profile.cpp,
+// tools/tdeck/profile.py); the profiler stops
+static Ref
+FDeviceProfileDump(RefArg /*rcvr*/)
+{
+	HostDeviceProfileDump();
+	return NILREF;
 }
 
 // DeviceStore(): [the flash words written to the store partition, its erases]
@@ -191,6 +201,7 @@ DeviceBoot(void)
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DeviceMemory")), RefVar(MakeCFunction((void*) FDeviceMemory, 0, nil)));
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DevicePanelSet")), RefVar(MakeCFunction((void*) FDevicePanelSet, 2, nil)));
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DeviceStore")), RefVar(MakeCFunction((void*) FDeviceStore, 0, nil)));
+	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DeviceProfileDump")), RefVar(MakeCFunction((void*) FDeviceProfileDump, 0, nil)));
 	// results printed on the console (the world's REP out translator
 	// otherwise prints nowhere)
 	HostInitREP(stdout, nil);

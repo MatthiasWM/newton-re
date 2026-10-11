@@ -3265,12 +3265,50 @@ ARMTrapContext::ReadCString(uint32_t a, char* buffer, uint32_t size)
 }
 
 
+// The public jump table's entries by name: a hash of each name to a chain of
+// the entries that have it, made at the first registration (each one
+// compared its name with all ~2,900 entries: a third of a second of the
+// ESP32-S3 host's boot, tools/tdeck/profile.py).
+static long*	gJumpHeads = nil;		// a hash's first entry + 1, 0 none
+static long*	gJumpNext = nil;		// an entry's next with the same hash + 1
+static unsigned long	gJumpHeadCount = 0;
+
+static unsigned long
+JumpNameHash(const char* name)
+{
+	unsigned long h = 2166136261u;				// FNV-1a
+	for (; *name != 0; name++)
+		h = (h ^ (unsigned char) *name) * 16777619u;
+	return h & 0xFFFFFFFFu;
+}
+
+static void
+IndexJumpTable(void)
+{
+	gJumpHeadCount = 1;
+	while (gJumpHeadCount < 2 * kPublicJumpTableCount)
+		gJumpHeadCount <<= 1;
+	gJumpHeads = new long[gJumpHeadCount];
+	gJumpNext = new long[kPublicJumpTableCount];
+	for (unsigned long h = 0; h < gJumpHeadCount; h++)
+		gJumpHeads[h] = 0;
+	for (long i = (long) kPublicJumpTableCount - 1; i >= 0; i--)
+	{
+		unsigned long h = JumpNameHash(kPublicJumpTable[i].fName) & (gJumpHeadCount - 1);
+		gJumpNext[i] = gJumpHeads[h];
+		gJumpHeads[h] = i + 1;
+	}
+}
+
+
 bool
 ARMRegisterGlue(const char* name, ARMTrapFn fn)
 {
 	InitGlue();
+	if (gJumpHeads == nil)
+		IndexJumpTable();
 	bool found = false;
-	for (unsigned long i = 0; i < kPublicJumpTableCount; i++)
+	for (long i = gJumpHeads[JumpNameHash(name) & (gJumpHeadCount - 1)] - 1; i >= 0; i = gJumpNext[i] - 1)
 		if (strcmp(kPublicJumpTable[i].fName, name) == 0)
 		{
 			GlueEntry* g = &gGlue[kPublicJumpTable[i].fOffset / 4];

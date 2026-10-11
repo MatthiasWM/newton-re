@@ -63,14 +63,61 @@ IndexNativeBinding(long index)
 }
 
 
+// The ROM's native and method entries by their symbols: a hash of each
+// symbol to a chain of the entries that have it, made at the first
+// registration.  (Each registration compared its symbol with all ~2,000
+// entries: millions of compares as the system starts - two seconds of the
+// ESP32-S3 host's boot, tools/tdeck/profile.py.)
+static long*	gSymbolHeads = nil;		// a hash's first entry + 1, 0 none
+static long*	gSymbolNext = nil;		// an entry's next with the same hash + 1
+static long		gSymbolHeadCount = 0;
+
+static unsigned long
+SymbolHash(const char* symbol)
+{
+	unsigned long h = 2166136261u;				// FNV-1a
+	for (; *symbol != 0; symbol++)
+		h = (h ^ (unsigned char) *symbol) * 16777619u;
+	return h & 0xFFFFFFFFu;
+}
+
+static const ROMNativeEntry&
+EntryAt(long i)
+{
+	return i < gROMNativeCount ? gROMNativeEntries[i] : gROMMethodEntries[i - gROMNativeCount];
+}
+
+static void
+IndexSymbols(void)
+{
+	long count = gROMNativeCount + gROMMethodCount;
+	gSymbolHeadCount = 1;
+	while (gSymbolHeadCount < 2 * count)
+		gSymbolHeadCount <<= 1;
+	gSymbolHeads = new long[gSymbolHeadCount];
+	gSymbolNext = new long[count > 0 ? count : 1];
+	for (long h = 0; h < gSymbolHeadCount; h++)
+		gSymbolHeads[h] = 0;
+	// (backwards, so that each chain is in the table's order)
+	for (long i = count - 1; i >= 0; i--)
+	{
+		unsigned long h = SymbolHash(EntryAt(i).fSymbol) & (unsigned long) (gSymbolHeadCount - 1);
+		gSymbolNext[i] = gSymbolHeads[h];
+		gSymbolHeads[h] = i + 1;
+	}
+}
+
+
 // Bind the host implementation of the ROM function named symbol to the
 // funcPtr of every built-in (or prototype method) that reaches it.
 void
 RegisterNativeFunction(const char* symbol, void* fn, long numArgs)
 {
-	for (long i = 0; i < gROMNativeCount + gROMMethodCount; i++)
+	if (gSymbolHeads == nil)
+		IndexSymbols();
+	for (long i = gSymbolHeads[SymbolHash(symbol) & (unsigned long) (gSymbolHeadCount - 1)] - 1; i >= 0; i = gSymbolNext[i] - 1)
 	{
-		const ROMNativeEntry& entry = i < gROMNativeCount ? gROMNativeEntries[i] : gROMMethodEntries[i - gROMNativeCount];
+		const ROMNativeEntry& entry = EntryAt(i);
 		if (strcmp(entry.fSymbol, symbol) != 0)
 			continue;
 		// The ROM's own function object says how many arguments it is called

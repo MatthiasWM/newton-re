@@ -38,8 +38,59 @@
 // file built from the ROM source tree carries) - on word boundaries, as
 // the signature's comment in ddk/ROMExtension.h says it is meant to be.
 // The header's words are big-endian, as everything in the image is.
+//
+// What a search found is remembered (the answer for each id, a miss too),
+// while the regions are the same ones: a scan of the image is megabytes,
+// and it is asked many times as the system starts - on the ESP32-S3 host,
+// where the image is read from flash, half of the boot's 13 s was this
+// (tools/tdeck/profile.py).
+static const unsigned char*
+SearchRExHeader(ULong rexId, ULong* romAddress, ULong* available);
+
 static const unsigned char*
 FindRExHeader(ULong rexId, ULong* romAddress, ULong* available)
+{
+	struct Found { ULong id; const unsigned char* header; ULong address; ULong available; };
+	static Found		found[8];
+	static long			foundCount = 0;
+	static const void*	foundRegion = nil;
+	static ULong		foundSize = 0;
+	static long			foundRegions = -1;
+	ULong base = 0, size = 0;
+	const void* region0 = ROMRegionCount() > 0 ? ROMRegion(0, &base, &size) : nil;
+	if (region0 != foundRegion || size != foundSize || ROMRegionCount() != foundRegions)
+	{
+		foundCount = 0;
+		foundRegion = region0;
+		foundSize = size;
+		foundRegions = ROMRegionCount();
+	}
+	for (long i = 0; i < foundCount; i++)
+		if (found[i].id == rexId)
+		{
+			if (romAddress != nil)
+				*romAddress = found[i].address;
+			if (available != nil)
+				*available = found[i].available;
+			return found[i].header;
+		}
+	Found f;
+	f.id = rexId;
+	f.address = 0;
+	f.available = 0;
+	f.header = SearchRExHeader(rexId, &f.address, &f.available);
+	if (foundCount < (long) (sizeof(found) / sizeof(found[0])))
+		found[foundCount++] = f;
+	if (romAddress != nil)
+		*romAddress = f.address;
+	if (available != nil)
+		*available = f.available;
+	return f.header;
+}
+
+
+static const unsigned char*
+SearchRExHeader(ULong rexId, ULong* romAddress, ULong* available)
 {
 	for (long region = 0; region < ROMRegionCount(); region++)
 	{

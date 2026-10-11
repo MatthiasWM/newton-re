@@ -614,6 +614,34 @@ after a reset.
   a soup and adding an entry took 2 s. Batching them is the obvious next
   step if it matters.
 
+## A faster start (2026-10-11)
+
+The OS came up a minute after the start; now **3.2 s**. Found with a
+sampling profiler (`src/host/esp32/main/tdeck_profile.cpp`: the
+ESP32-S3's assist-debug block records core 1's program counter, which a
+task on core 0 reads every millisecond; `tools/tdeck/profile.py` names
+the samples):
+
+| | before | after |
+|---|---|---|
+| C++ exception tables searched one entry at a time (`next_fde`, `linear_search_fdes`) | 50 s | - |
+| the ROM extensions' headers searched for in the baked image (`FindRExHeader`) | 7.4 s | 0.2 s |
+| native-function names compared with every entry (`RegisterNativeFunction`, `strcmp`) | 2.6 s | - |
+| the OS up | 61.7 s | 3.2 s |
+
+- **Espressif's libgcc does not sort the exception tables** unless
+  `_Unwind_SetEnableExceptionFdeSorting(1)` is called (to save RAM: 4
+  bytes an entry, ~22,000 entries, made at the first throw in 154 ms);
+  without it every throw counts and searches them all - 22 ms - and the
+  task runtime throws a `TTaskRedirect` at many task switches. A throw now
+  costs 62 µs. This was most of the "120 times slower than the desktop"
+  of milestone B's boot, and NewtonScript's own exceptions benefit as well.
+- `packages/ROMPackages.cpp` remembers each extension header search (a
+  scan of megabytes, read from flash on the board).
+- `frames/NativeFunctions.cpp` and `armcpu/PackageNativeCPU.cpp` index the
+  ROM's native entries and the public jump table by a hash of the name
+  (registration was quadratic).
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the
@@ -658,8 +686,8 @@ Then:
    faster (a minute), NewtonScript's speed worked on, the internal RAM's
    static data looked at.
 5. **The panel, the touch screen, the keyboard** - done (above), and the
-   store on the board's flash. Left: a faster start, the applications at
-   240x320. Later, for
+   store on the board's flash, and a faster start (3 s). Left: the
+   applications at 240x320. Later, for
    the panel:
    the owner pointed to a video of an e-paper display driven at 30 frames
    a second with four levels of gray, by driving each pixel only part of

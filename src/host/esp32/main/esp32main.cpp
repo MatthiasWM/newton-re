@@ -247,6 +247,15 @@ MapObjects(const esp_partition_t* part)
 }
 
 
+// Espressif's libgcc: whether the unwinder may sort the exception tables'
+// entries (a table of 4 bytes an entry, made at the first throw) - off
+// unless asked for, and then every C++ throw counts and searches all
+// ~22,000 entries one by one: 22 ms a throw, and the task runtime throws
+// one at many task switches (TTaskRedirect) - 78% of the boot's minute,
+// tools/tdeck/profile.py found
+extern "C" void	_Unwind_SetEnableExceptionFdeSorting(unsigned char enable);
+
+
 extern "C" void
 app_main(void)
 {
@@ -269,6 +278,8 @@ app_main(void)
 	}
 	// the panel and the input first: their drivers want internal RAM, which
 	// the OS leaves little of
+	_Unwind_SetEnableExceptionFdeSorting(1);
+	HostDeviceProfileStart();
 	HostDevicePanelStart();
 	HostDeviceInputStart();
 	HostDeviceStoreStart();

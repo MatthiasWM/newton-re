@@ -24,6 +24,7 @@ line evaluated in the newt world.
 | `main/tdeck_panel.cpp` | the panel (a task on core 0): the display's grays watched and sent to the UC8253 once a change settles - a partial refresh (0.65 s) over the rectangle that changed, a full one (3 s, flashing) for a new page and to clean up after 30 s still; how the controller has to be driven, and how that was found, is its header's; settings changed while it runs: `DevicePanelSet(name, value)` |
 | `main/tdeck_input.cpp` | the CST328 touch panel and the TCA8418 keyboard (a task on core 0, a hundred times a second) into the window shims every host's window calls (`HostWindowPenDown/Move/Up`, `HostWindowKey`, host/HostKeyboard.cpp); the owner's keyboard layout (Shift, Sym's symbols, Alt's navigation keys or the Command key) |
 | `main/tdeck_store.cpp` | the Newton's internal flash on the `store` partition: mapped read-only and read in place by hal/host/HostFlash.h (its backing - no copy in RAM), each word written and each erase done by a writer task whose stack is in internal RAM (a task with a PSRAM stack must not write the flash), the mapping's cache refreshed after; erased whole the first time (NVS `storeVersion`); a self-test of write, lanes erase and sector erase at each start |
+| `main/tdeck_profile.cpp` | a sampling profiler of core 1 (the Newton's tasks), from the board's start: `DeviceProfileDump()` prints it for tools/tdeck/profile.py |
 | `main/newtonmain.cpp` | the Newton's side (the DDK's headers only): the kernel heap (3 MB, in PSRAM) with a 1 MB NewtonScript heap, the baked objects, the newt world configured (240x320x1, the store in RAM) and the OS booted; the kernel services task hands each console line to the newt world as a `'host/'eval` event, whose handler evaluates it and prints the result; `DeviceMilliseconds()`, `DeviceMemory()`, `DevicePanelSet(name, value)` and `DeviceStore()` ([words written to the store partition, erases]) for NewtonScript; every NewtonScript throw printed with its script stack (`NEWTON_TRACE_EXCEPTIONS`, set there) |
 
 The tree's own platform code has `ESP_PLATFORM` branches where it must:
@@ -86,14 +87,31 @@ Everything comes from PlatformIO (`~/.platformio`); on Linux and macOS
    `sdkconfig.defaults` (delete `sdkconfig.tdeck-pro` so that it is read
    again) checks each block's ends when it is freed.
 
+## A faster start (2026-10-11)
+
+The OS is up **3.2 s** after the boot starts (a minute before): the
+panel shows the Newton about 6 s after power-on (the bootloader, and 1.5 s
+left for a terminal to open the console).  What the profiler found
+(tools/tdeck/profile.py; docs/host-tdeck-pro.md, "A faster start"):
+
+- **C++ throws took 22 ms each** - Espressif's libgcc does not sort the
+  exception tables unless asked (`_Unwind_SetEnableExceptionFdeSorting(1)`,
+  esp32main.cpp), and the task runtime throws at many task switches: 78%
+  of the minute.  Now 62 µs.
+- **The ROM extensions' headers** were searched for in the baked image (in
+  flash) at every call: packages/ROMPackages.cpp remembers the answers.
+- **Native functions and ARM glue were registered by comparing each name
+  with every entry** (~2,000 and ~2,900): frames/NativeFunctions.cpp and
+  armcpu/PackageNativeCPU.cpp index them by a hash of the name.
+
 ## The store (2026-10-11)
 
 The internal store is the ROM's flash store on the Newton's 4 MB internal
 flash, which is the `store` partition (tdeck_store.cpp) - mounted, formatted
 when new, kept between starts, as the desktop's `--store` file is.  The
 first start after the partition is made erases it (11 s) and formats the
-store (the OS up in about 170 s); a later one finds it used before (the OS
-up in about 60 s).  An entry added to a soup reads back after a reset.
+store; a later one finds it used before (with the start made faster, the
+OS up in about 3 s).  An entry added to a soup reads back after a reset.
 Writes are synchronous, word by word, from the Newton's task: about 2 s to
 create a soup and add an entry.
 

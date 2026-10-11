@@ -39,6 +39,12 @@ bool		HostDeviceStoreOpen(unsigned char** bytes, unsigned long* size, bool* exis
 void		HostDeviceStoreWrite(unsigned long offset, const unsigned char* bytes, unsigned long size);
 void		HostDeviceStoreErase(unsigned long offset, unsigned long size, unsigned long lanes);
 void		HostDeviceStoreCounts(unsigned long* writes, unsigned long* erases);
+// the sampling profiler of core 1 (tdeck_profile.cpp): started with the
+// board, a phase's start marked, the samples printed (and the profiler
+// stopped) - tools/tdeck/profile.py reads them
+void		HostDeviceProfileStart(void);
+void		HostDeviceProfileMark(const char* label);
+void		HostDeviceProfileDump(void);
 
 // (the task runtime's threads - os600/kernel/host/TaskRuntime.cpp declares
 //  them for itself, extern "C")

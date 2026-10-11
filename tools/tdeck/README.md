@@ -142,6 +142,23 @@ the crop (read off one camshot.py picture).  It found the panel's
 set-up (src/host/esp32/main/tdeck_panel.cpp; docs/host-tdeck-pro.md):
 28 tried, one right.
 
+## profile.py - where the board's time goes
+
+    python tools/tdeck/profile.py tmp/tdeck/session.log [--top 30] [--by function|file|area] [--phases]
+
+The board samples core 1's program counter every millisecond from the
+start (src/host/esp32/main/tdeck_profile.cpp: the ESP32-S3's assist-debug
+block records a core's pc, which the other core reads); `DeviceProfileDump()`
+at the NewtonScript prompt prints the samples into the console log.  This
+names them with the firmware's ELF (PlatformIO's addr2line) and ranks the
+functions (or files, or `src/` areas), overall and, with `--phases`, for
+each stretch between the boot's steps.  A sample in FreeRTOS's idle task is
+core 1 waiting; one at 0x4000_0000-0x4006_0000 is the chip's mask ROM
+(0x40055448: `strcmp`'s body).  It found the boot's minute: C++ exception
+tables searched linearly (78%), the ROM extensions' headers searched for in
+megabytes of flash at each call (half of what was left), and native
+functions registered by comparing each name with every entry.
+
 ## xtensa_compile.py - the tree with the ESP32-S3's compiler
 
     cmake -S src -B tmp/build-arm -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ...   # (src/cmake/zig-arm-linux.cmake)

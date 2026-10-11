@@ -9,6 +9,18 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-11: The T-Deck Pro starts in 3 s
+
+The OS up 3.2 s after the boot starts, from 61.7 s.  A sampling profiler
+of the Newton's core (`src/host/esp32/main/tdeck_profile.cpp`, the
+ESP32-S3's pc recording read from the other core; `tools/tdeck/profile.py`)
+found: C++ exception tables searched linearly at every throw (Espressif's
+libgcc sorts them only when asked: `_Unwind_SetEnableExceptionFdeSorting`;
+22 ms a throw, now 62 µs - 78% of the boot); `FindRExHeader` scanning the
+image at every call (packages/ROMPackages.cpp remembers); native functions
+and ARM glue registered by comparing each name with every entry
+(frames/NativeFunctions.cpp, armcpu/PackageNativeCPU.cpp: hashed).
+
 ## 2026-10-11: The T-Deck Pro's store on its own flash
 
 The board's `store` partition (4 MB) is the Newton's internal flash: the
