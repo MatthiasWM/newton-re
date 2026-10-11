@@ -39,6 +39,7 @@
 #include "host/HostKeyboard.h"
 #include "hal/host/HostScreen.h"
 #include "Unicode.h"
+#include "hal/host/HostFlash.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -79,6 +80,32 @@ FDeviceMilliseconds(RefArg /*rcvr*/)
 {
 	return MAKEINT((long) ((HostDeviceMicroseconds() / 1000) & 0x1fffffff));
 }
+
+// the internal flash's writes and erases, to the store partition
+static void
+StoreWrite(ULong offset, const unsigned char* bytes, ULong size)
+{
+	HostDeviceStoreWrite((unsigned long) offset, bytes, (unsigned long) size);
+}
+
+static void
+StoreErase(ULong offset, ULong size, ULong lanes)
+{
+	HostDeviceStoreErase((unsigned long) offset, (unsigned long) size, (unsigned long) lanes);
+}
+
+// DeviceStore(): [the flash words written to the store partition, its erases]
+static Ref
+FDeviceStore(RefArg /*rcvr*/)
+{
+	unsigned long writes, erases;
+	HostDeviceStoreCounts(&writes, &erases);
+	RefVar list(MakeArray(2));
+	SetArraySlot(list, 0, RefVar(MAKEINT((long) writes)));
+	SetArraySlot(list, 1, RefVar(MAKEINT((long) erases)));
+	return list;
+}
+
 
 // DevicePanelSet(name, value): a setting of the panel's refreshes
 // (tdeck_panel.cpp) - name a symbol or a string ==> true when there is one
@@ -163,6 +190,7 @@ DeviceBoot(void)
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DeviceMilliseconds")), RefVar(MakeCFunction((void*) FDeviceMilliseconds, 0, nil)));
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DeviceMemory")), RefVar(MakeCFunction((void*) FDeviceMemory, 0, nil)));
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DevicePanelSet")), RefVar(MakeCFunction((void*) FDevicePanelSet, 2, nil)));
+	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DeviceStore")), RefVar(MakeCFunction((void*) FDeviceStore, 0, nil)));
 	// results printed on the console (the world's REP out translator
 	// otherwise prints nowhere)
 	HostInitREP(stdout, nil);
@@ -222,8 +250,30 @@ NewtonMainOnDevice(const void* image, size_t size)
 
 	HostSetKernelHeapSize(kKernelHeapSize);
 	HostUseRealClock(true);
-	HostSetStoreFile(nil);
-	HostSetNewFlash(kFlashSize, false);
+	// the internal flash on the board's store partition (tdeck_store.cpp),
+	// the internal store the ROM's flash store on it, kept between starts;
+	// without the partition, a store in memory
+	static HostFlashBacking backing;
+	unsigned char* flashBytes;
+	unsigned long flashSize;
+	bool existed;
+	if (HostDeviceStoreOpen(&flashBytes, &flashSize, &existed))
+	{
+		backing.bytes = flashBytes;
+		backing.size = (ULong) flashSize;
+		backing.existed = existed;
+		backing.write = StoreWrite;
+		backing.erase = StoreErase;
+		HostFlashSetBacking(&backing);
+		HostSetStoreFile("store partition");		// (any name: the backing is the flash - hal/host/HostFlash.h)
+		HostSetNewFlash(backing.size, true);
+		Step(existed ? "the store partition (used before)" : "the store partition (new)");
+	}
+	else
+	{
+		HostSetStoreFile(nil);
+		HostSetNewFlash(kFlashSize, false);
+	}
 	HostConfigureNewtWorld(nil, kObjectHeapSize, kDisplayWidth, kDisplayHeight, kDisplayDepth);
 	gNewtHostBoot = DeviceBoot;
 	NewtInstallUserMain();

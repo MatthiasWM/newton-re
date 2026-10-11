@@ -1336,6 +1336,11 @@ below) - writes through to it at every word and erase, and registers
 them as physical memory at 0x02000000 and 0x10000000; `AddNewSecPNJT` on the host records the
 section and `VirtualAddressToPointer` (`hal/MMU.h`) finds the bytes behind
 a window. The host's driver ANDs each word in and erases a block at once.
+A host with no room for the banks in memory gives them a *backing*
+instead (`HostFlashSetBacking`): bytes read in place - the ESP32-S3's
+`store` partition, memory-mapped (`src/host/esp32/main/tdeck_store.cpp`) -
+whose writes and erases the backing does (`stores.FlashStore` runs its
+scenario on one too).
 `TBankControlRegister` (the bus width) and `InternalVppOn`/`Off` (the
 programming voltage) are `hal/Flash.h`, remembered or counted only.
 

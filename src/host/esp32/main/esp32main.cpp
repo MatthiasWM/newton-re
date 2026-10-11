@@ -271,6 +271,7 @@ app_main(void)
 	// the OS leaves little of
 	HostDevicePanelStart();
 	HostDeviceInputStart();
+	HostDeviceStoreStart();
 	gLines = xQueueCreate(8, kLineSize);
 	xTaskCreatePinnedToCore(ConsoleReader, "console", 4096, NULL, 4, NULL, 0);
 	// the boot runs here, and the run's end is waited for here (the task

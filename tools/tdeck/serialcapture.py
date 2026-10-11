@@ -85,10 +85,15 @@ def main(argv):
                 time.sleep(0.3)
                 continue
             if not reset_done:
+                # (EN held low by RTS, then let go; each RTS change followed
+                #  by setting DTR as it is - Windows' usbser.sys sends the
+                #  lines' state only when DTR is set, as esptool works round)
                 port.dtr = False
                 port.rts = True
+                port.dtr = port.dtr
                 time.sleep(0.1)
                 port.rts = False
+                port.dtr = port.dtr
                 reset_done = True
         try:
             chunk = port.read(4096)

@@ -9,6 +9,20 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-11: The T-Deck Pro's store on its own flash
+
+The board's `store` partition (4 MB) is the Newton's internal flash: the
+ROM's flash store on it, kept between starts (an entry reads back after a
+reset).  hal/host/HostFlash.h gained a backing - a flash read in place and
+written through callbacks, there being no room for the desktop's copy in
+RAM (test: stores.FlashStore runs its scenario on one);
+`src/host/esp32/main/tdeck_store.cpp` maps the partition, writes and
+erases it from a task with an internal stack, and refreshes the mapping's
+cache itself (ESP-IDF's refresh missed it: written words read back
+erased); host/HostStores.cpp asks HostFlashExisted whether the flash was
+used before.  serialcapture.py's `--reset` works again (RTS changes sent
+with DTR, as esptool does on Windows).
+
 ## 2026-10-11: The T-Deck Pro's panel, touch screen and keyboard
 
 `src/host/esp32/main/tdeck_panel.cpp` shows the Newton's display on the

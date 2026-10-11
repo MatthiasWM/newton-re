@@ -63,8 +63,9 @@ FreeRTOS, the newt world at 240x320, a NewtonScript prompt evaluated in
 it; up in 62 s); **the panel, touch screen and keyboard** (the
 Newton on the e-paper, partial refreshes over what changed; set-up found
 with a webcam on the board, `tools/tdeck/camshot.py`/`panelprobe.py`).
-Next: the store in the `store` partition (it is in RAM: a new Setup
-assistant every start); the start made faster; NewtonScript's speed (the
+**The store on the board's flash** (the `store` partition, kept between
+starts).  Next: the start made faster (60 s; 170 s the first time); the
+store's writes batched (word by word now); NewtonScript's speed (the
 object heap in PSRAM); the built-in packages' frames baked; a 32-bit build
 in the tests; the applications at 240x320 (some ask to rotate); later the
 panel's own waveforms for speed and grays (docs/host-tdeck-pro.md, "Order

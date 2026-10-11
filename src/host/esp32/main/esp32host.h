@@ -30,6 +30,15 @@ bool		HostDevicePanelSet(const char* name, long value);	// a refresh setting cha
 // the touch panel and the keyboard (tdeck_input.cpp): read from the start,
 // handed to the window shims below
 void		HostDeviceInputStart(void);
+// the internal flash on the board's `store` partition (tdeck_store.cpp):
+// started before the OS boots (==> whether there is one), then opened by
+// the Newton's side - its image, read in place, its size, whether it was
+// used before - and written and erased through these (from a Newton task)
+bool		HostDeviceStoreStart(void);
+bool		HostDeviceStoreOpen(unsigned char** bytes, unsigned long* size, bool* existed);
+void		HostDeviceStoreWrite(unsigned long offset, const unsigned char* bytes, unsigned long size);
+void		HostDeviceStoreErase(unsigned long offset, unsigned long size, unsigned long lanes);
+void		HostDeviceStoreCounts(unsigned long* writes, unsigned long* erases);
 
 // (the task runtime's threads - os600/kernel/host/TaskRuntime.cpp declares
 //  them for itself, extern "C")

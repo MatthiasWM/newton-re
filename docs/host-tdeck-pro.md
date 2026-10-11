@@ -582,6 +582,38 @@ every NewtonScript throw is printed with its script stack
 --send-file` keeps one capture open that can be typed into (opening the
 port again could reset the board).
 
+## The store on the board's flash (2026-10-11)
+
+The Newton's internal flash is the board's `store` partition (4 MB at
+0xC00000; the baked objects' partition shrank to 5.9 MB to make room), so
+the internal store - the ROM's TFlashStore, as on the desktop with a
+`--store` file - survives a restart: an entry added to a soup reads back
+after a reset.
+
+- **No copy in RAM**: the desktop holds the flash's 4 MB in memory and
+  writes it through to its file; the board has 2.5 MB of PSRAM free with
+  the OS up. So hal/host/HostFlash.h gained a *backing*
+  (HostFlashSetBacking): a flash whose bytes are read in place - the
+  partition, memory-mapped read-only - and whose writes and erases are
+  the backing's to do. The desktop's flash store test runs its scenario
+  on a backing too (ctest stores.FlashStore).
+- **Writing from the right task**: a task whose stack is in PSRAM - every
+  Newton task's - must not write the flash (the cache, PSRAM's way in, is
+  off while it does), so `tdeck_store.cpp` hands each write and erase to a
+  task of its own with an internal stack, and waits. An erase of some
+  lanes (the Newton's flash is two 16-bit chips side by side) reads, erases
+  and rewrites the 4 KB sectors.
+- **The mapping's cache**: ESP-IDF's refresh after a write did not reach
+  this mapping - a word written read back as erased until the next start,
+  and the new store would not mount (`kSError_ObjectNotFound`). The writer
+  invalidates the cache lines itself; a self-test at each start checks
+  write, rewrite, lanes erase and sector erase through the mapping.
+- **Times**: the first start (the partition erased, 11 s, and the store
+  formatted word by word) brings the OS up in about 170 s; later ones in
+  about 60 s, as before. Writes are synchronous and word by word - creating
+  a soup and adding an entry took 2 s. Batching them is the obvious next
+  step if it matters.
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the
@@ -625,8 +657,9 @@ Then:
    the store in the `store` partition (it is in RAM), the start made
    faster (a minute), NewtonScript's speed worked on, the internal RAM's
    static data looked at.
-5. **The panel, the touch screen, the keyboard** - done (above). Left: the
-   flash store, a faster start, the applications at 240x320. Later, for
+5. **The panel, the touch screen, the keyboard** - done (above), and the
+   store on the board's flash. Left: a faster start, the applications at
+   240x320. Later, for
    the panel:
    the owner pointed to a video of an e-paper display driven at 30 frames
    a second with four levels of gray, by driving each pixel only part of
