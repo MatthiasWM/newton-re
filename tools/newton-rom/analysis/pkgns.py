@@ -6,6 +6,7 @@ Usage:
     python pkgns.py <file.pkg> --disasm <holder or 0xref>...
     python pkgns.py <file.pkg> --refs SYMBOL...
     python pkgns.py <file.pkg> --natives [--native-disasm <holder or 0xref>]
+    python pkgns.py <file.pkg> --where SLOT=INTEGER... | --slots <holder or 0xref>...
 
 A package's frames parts hold its objects as the ROM's object area holds the
 ROM's (big-endian, the ARM layout: a header word of size << 8 | flags, a
@@ -35,6 +36,14 @@ lie, as nsfunctions.py reads the ROM's, and prints:
                binary, numArgs, offset} (NetHopper's);
   --native-disasm  such a function's ARM code (capstone; its calls go to
                the runtime glue at the front of the binary).
+  --where      every frame whose slots hold the integers given
+               (viewJustify=144; all must match), with its slots as --slots
+               prints them;
+  --slots      a frame's slots: each one's name, value, and the offset in the
+               package file of the word holding it and that word's bytes -
+               what a patch to the package names (romsrc/rex/<package>.
+               patches.tsv: an integer is the word value << 2, a frame a ref
+               to follow with --slots).
 
 A magic pointer (@n) is the ROM's and is shown as such.  Needs capstone
 only for --native-disasm (tools/newton-rom/requirements.txt).
@@ -181,6 +190,35 @@ def fnv1a(data: bytes) -> int:
     return h
 
 
+def print_slots(pkg: PackageImage, held, ref: int):
+    """A frame's slots, each with the file offset of its word (a ref is the
+    object's offset in the file plus one; a frame's slots follow its three
+    header words)."""
+    print("%s (%#x):" % (held.get(ref, "%#x" % ref), ref))
+    for i, (tag, value) in enumerate(pkg.frame_slots(ref)):
+        offset = ref - 1 + 12 + 4 * i
+        if value & 3 == 0:
+            shown = str((value - (1 << 32) if value & 0x80000000 else value) >> 2)
+        else:
+            shown = pkg.describe(value)
+        print("  %-24s %-40s word at %#x: %08x" % (tag, shown, offset, value))
+
+
+def frames_where(pkg: PackageImage, wanted):
+    """The frames whose slots hold all the (name, integer) pairs."""
+    out = []
+    for ref in pkg.objects():
+        if pkg.flags(ref) & 3 != 3 or not pkg.is_ptr(pkg.cls(ref)):
+            continue
+        try:
+            pairs = {(t or "").lower(): v for t, v in pkg.frame_slots(ref)}
+        except Exception:
+            continue
+        if all(pairs.get(name.lower()) == (value << 2) & 0xffffffff for name, value in wanted):
+            out.append(ref)
+    return out
+
+
 def find(pkg: PackageImage, held, name: str):
     if name.lower().startswith("0x"):
         return int(name, 16)
@@ -198,6 +236,8 @@ def main(argv=None) -> int:
     ap.add_argument("--refs", action="append", default=[])
     ap.add_argument("--natives", action="store_true")
     ap.add_argument("--native-disasm", action="append", default=[])
+    ap.add_argument("--where", action="append", default=[], metavar="SLOT=INTEGER")
+    ap.add_argument("--slots", action="append", default=[])
     ap.add_argument("--rom", help="a build directory: name the ROM functions NTK glue calls reach")
     args = ap.parse_args(argv)
 
@@ -242,6 +282,16 @@ def main(argv=None) -> int:
                 print("code binary %#x (%s): %d bytes, FNV-1a %#010x (frames/PackageNatives.h's key)"
                       % (binary, pkg.symname(pkg.cls(binary)) or "?", len(data), fnv1a(data)))
             print("%-50s %d args  BinCFunction, code %#x+%#x  (%#x)" % (held.get(ref, "%#x" % ref), n, binary, off, ref))
+    if args.where:
+        wanted = [(w.split("=", 1)[0], int(w.split("=", 1)[1], 0)) for w in args.where]
+        for ref in frames_where(pkg, wanted):
+            print_slots(pkg, held, ref)
+    for name in args.slots:
+        ref = find(pkg, held, name)
+        if ref is None:
+            print("%s: not found" % name)
+            continue
+        print_slots(pkg, held, ref)
     for name in args.native_disasm:
         import pkgdisasm
         if args.rom:

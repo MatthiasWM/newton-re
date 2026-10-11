@@ -9,6 +9,25 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-12: Internet Setup on the T-Deck Pro's small screen
+
+The ROM asked to turn the screen whenever an application wanted more than
+320 high, and turned it upright - which the board already was - so
+Internet Setup asked at every open; not asked now when upright already
+(`romsrc/functions/obj_642059.Open.ns`, DEVIATION).  Internet Setup's edit
+slip was 320 wide: the ROM's floater took away its 304-wide bounds, which
+did not fit 240, and left the template's 320; one word of the package
+(`romsrc/rex/inetstup.patches.tsv`) gives it the walk-through layout's
+bounds, which fit (and are 304 wide on a MessagePad, as before), and three
+make its keyboard the slip's width.  The Typewriter keyboard is the
+screen's width where its small size will not fit.  The board answers the
+keyboard gestalt as an eMate does, so the system takes its keyboard as
+connected and leaves the on-screen keyboards out until asked for.  The
+Wi-Fi editor has a fixed height (its list top-justified, as protoTextList
+sets its own height).  `pkgns.py --where/--slots` find a package's frames
+and the file offsets a patch names; `panelshot.py` copes with a WiFi log
+line spliced into a picture.
+
 ## 2026-10-12: The T-Deck Pro joins a real network
 
 Internet Setup would not open on the board: its PreMain never started the

@@ -674,6 +674,12 @@ takes a password and remembers or forgets a network.
   The console's `!time <seconds>` does the same by hand; tried that way
   (the Newton then read 1:00 PM at 20:00 GMT, Cupertino being its home
   city).
+- **The small screen** (2026-10-12): Internet Setup opens at once (no
+  "turn the screen?" for an upright screen), its slips and their
+  keyboards fit 240 wide, and so does the Typewriter keyboard
+  (src/host/esp32/README.md, "The small screen"); the board's keyboard is
+  built in as an eMate's is (the keyboard gestalt), so the on-screen
+  keyboards are left out until asked for.
 - **Joined a real network** (2026-10-12, WPA2): the address got, the
   clock set by SNTP. On the way: the board had never started the NIE's
   host link (Internet Setup: "no module packages installed"); the

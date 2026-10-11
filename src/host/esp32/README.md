@@ -101,16 +101,30 @@ password)`, `HostWifiForget(ssid)`, `HostWifiStatus()` (host/HostWifi.h).
 The board starts the host's link for the NIE (comms/host/HostLink.h) in
 its PreMain, as the desktop does - without it Internet Setup finds no
 module and will not open; HostLink.ns is compiled in when CMake configures
-(PlatformIO runs no custom commands).  Internet Setup's editor slip is the
-MP2x00's 320 wide: the Wi-Fi editor keeps to the part of it on the
-240-wide screen.  ESP-IDF's event task has a 4 KB stack: 2304 bytes
-overflowed when an address was got.
+(PlatformIO runs no custom commands).  ESP-IDF's event task has a 4 KB
+stack: 2304 bytes overflowed when an address was got.
 
-Internet Setup asks to turn the screen whenever the app area is under 320
-high (the ROM's Open, romsrc/functions/obj_642059.Open.ns) and then turns
-it to orientation 2 - upright, as the board already is - so on the board
-it asks every time, and OK opens it.  Other applications that will not
-open at 240x320 upright ask to turn the
+**The small screen** (2026-10-12; all DEVIATIONs, none changing what a
+MessagePad shows): an application that wants more than 320 high is no
+longer asked to turn the screen when it is upright already - turning it
+to upright changed nothing, and the OK rebuilt the display (and put up
+the button bar's "couldn't hold all the icons") for nothing
+(`romsrc/functions/obj_642059.Open.ns`).  Internet Setup's edit slip
+takes the bounds its walk-through layout has, which fit the screen, and
+its keyboard is the slip's width (`romsrc/rex/inetstup.patches.tsv`); the
+Typewriter keyboard is the screen's width where its small size will not
+fit (`obj_630d25.viewSetupFormScript.ns`) - a keyboard view makes its
+keys to fit its bounds.
+
+**The keyboard is built in**, as an eMate 300's is: the board answers the
+keyboard gestalt (`kGestalt_Extended_Base + 10`, `newtonmain.cpp`'s
+DeviceBoot), so the root view takes a keyboard as connected from the
+start (`KeyboardConnected()` is true) and the system leaves out the
+on-screen keyboards it would put up by itself (Internet Setup's slips)
+- the Typewriter is still there when asked for (a keyboard button, the
+Notes' keyboard icon).
+
+Other applications that will not open at 240x320 upright ask to turn the
 screen.  The board follows the Newton turned to landscape - the panel
 draws the display a quarter turn round (hold the board turned clockwise,
 the keyboard on the left), the touch panel turned back - and the Newton

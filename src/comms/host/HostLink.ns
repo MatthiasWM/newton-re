@@ -111,19 +111,21 @@
 
 	// The Wi-Fi line of the Host network setup, where the host has a WiFi
 	// to manage (host/HostWifi.h: the ESP32-S3 host's) - an editor like
-	// Ethernet's own (its Configuration editor's shape: the slip's whole
-	// inside, the line written by infoFrame's formatFunc from the setup's
-	// wifiNetwork), holding the networks the host sees, a password, and
+	// Ethernet's own (its Configuration editor's shape, but a fixed height
+	// as the NIE's own editors have - the slip is made to fit its editor and,
+	// with no keyboard connected, the keyboard below it, or a keyboard
+	// button where both will not fit; the line written by infoFrame's
+	// formatFunc from the setup's wifiNetwork), holding the networks the host sees, a password, and
 	// Scan, Forget and Join.  Join remembers the network chosen with the
 	// password typed (the host joins it now if it is in range, and any
 	// network it remembers whenever it finds one) and writes its name in
 	// the setup.  Forget makes the host forget the network chosen.
 	wifiEditor: {
 		viewClass: 74,
-		viewBounds: {left: 0, top: 0, right: 0, bottom: 0},
+		viewBounds: {left: 0, top: 0, right: 0, bottom: 200},
 		viewFlags: 1,
 		viewFormat: 0,
-		viewJustify: 240,
+		viewJustify: 48,					// (the slip's width, at its top)
 		noKeyboard: nil,
 		symbol: 'wifiNetwork,
 		path: 'wifiNetwork,
@@ -134,18 +136,6 @@
 			formatFunc: func(values)
 				"Wi-Fi: " & (if values and IsString(values[0]) and StrLen(values[0]) > 0 then values[0] else "none chosen")},
 		wifiSeen: [],						// the last scan's networks
-		// Internet Setup's editor slip is as wide as the MP2x00's screen
-		// (320): on a smaller one (the T-Deck Pro's 240x320) the slip hangs
-		// off its sides and top, and the editor keeps to what is seen of it
-		viewSetupFormScript: func() begin
-			local box := :Parent():GlobalBox();
-			local area := GetAppParams();
-			self.viewBounds := {
-				left: Max(0, area.appAreaGlobalLeft - box.left),
-				top: Max(0, area.appAreaGlobalTop - box.top),
-				right: -Max(0, box.right - (area.appAreaGlobalLeft + area.appAreaWidth)),
-				bottom: -Max(0, box.bottom - (area.appAreaGlobalTop + area.appAreaHeight))};
-		end,
 		viewSetupDoneScript: func() begin
 			:ShowStatus();
 			:Scan();
@@ -216,7 +206,7 @@
 		stepChildren: [
 			{_proto: @218, viewBounds: {left: 4, top: 2, right: -4, bottom: 18}, viewJustify: 48,	// protoStaticText
 			 text: "", viewSetupFormScript: func() begin wifiStatus := self; inherited:?viewSetupFormScript(); end},
-			{_proto: @228, viewBounds: {left: 4, top: 20, right: -4, bottom: -82}, viewJustify: 240,	// protoTextList
+			{_proto: @228, viewBounds: {left: 4, top: 20, right: -4, bottom: 118}, viewJustify: 48,	// protoTextList (at the top: it sets its bottom as top + its lines' height)
 			 useScrollers: true, listItems: [], selection: -1,
 			 viewSetupFormScript: func() begin wifiList := self; inherited:?viewSetupFormScript(); end,
 			 viewSetupDoneScript: func() begin

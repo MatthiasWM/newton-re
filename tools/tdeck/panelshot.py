@@ -19,8 +19,17 @@ import sys
 import zlib
 
 
+def is_hex(text):
+    try:
+        bytes.fromhex(text)
+        return len(text) > 0
+    except ValueError:
+        return False
+
+
 def read_shot(path):
     rows, size, current = None, None, None
+    broken = False			# a row's "shot " with a log line of ESP-IDF's (WiFi's) spliced in after it: its hex on the next line
     with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.strip()
@@ -30,7 +39,12 @@ def read_shot(path):
             elif line.startswith("shot-end") and current is not None:
                 rows, current = current, None
             elif line.startswith("shot ") and current is not None:
-                current.append(bytes.fromhex(line[5:]))
+                broken = not is_hex(line[5:])
+                if not broken:
+                    current.append(bytes.fromhex(line[5:]))
+            elif broken and current is not None and is_hex(line):
+                current.append(bytes.fromhex(line))
+                broken = False
     return size, rows
 
 

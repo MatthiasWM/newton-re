@@ -43,6 +43,7 @@
 #include "LongTime.h"
 #include <time.h>
 #include "host/HostWifi.h"
+#include "NewtonGestalt.h"
 #include "comms/host/HostLink.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -247,6 +248,15 @@ static void
 DeviceBoot(void)
 {
 	Step("the newt world starting");
+	// The board's keyboard is built in, as an eMate 300's is: the keyboard
+	// gestalt says so, and the root view, made in HostBootNewtWorld, reads
+	// it and takes a keyboard as connected from the start (views/RootView.cpp)
+	// - so the system leaves the on-screen keyboards it would open out
+	// (Internet Setup's slips, for one) and keeps them for when they are
+	// asked for (a keyboard button)
+	static UByte builtInKeyboard[4] = { 1, 0, 0, 0 };
+	TUGestalt gestalt;
+	gestalt.RegisterGestalt(kGestalt_Extended_Base + 10, builtInKeyboard, sizeof(builtInKeyboard));
 	HostBootNewtWorld();
 	if (HostDisplay() != nil)
 		HostDevicePanelFollow(DisplayNow);

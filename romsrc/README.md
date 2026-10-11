@@ -65,7 +65,13 @@ python tools/newton-rom/analysis/romsrc.py build romsrc --relayout -o build/obje
   `test_Unistroke --pict`), `InstallFormPart` writes a card's socket from
   the install info rather than a variable that does not exist - a ROM
   bug fixed behind `RomBugFixed()`, the host's switch
-  (`docs/rom-bugs.md`; `NEWTON_ROM_BUGS=1` runs the ROM's code) - and it
+  (`docs/rom-bugs.md`; `NEWTON_ROM_BUGS=1` runs the ROM's code), and a
+  screen smaller than any MessagePad's (the T-Deck Pro's 240x320) is
+  allowed for: an application is not asked to turn an upright screen
+  upright (`obj_642059.Open`), the Typewriter keyboard is made the
+  screen's width when its small size does not fit
+  (`obj_630d25.viewSetupFormScript`), and Internet Setup's edit slip and
+  its keyboard fit the screen (`rex/inetstup.patches.tsv`) - and it
   may be changed further to enhance the
   system. The git tag `romsrc-rom` keeps the last
   tree that is the ROM's but for the additions: `--git-ref romsrc-rom`
