@@ -53,6 +53,18 @@ endforeach()
 list(REMOVE_DUPLICATES all_quoted)
 set_source_files_properties(newtonmain.cpp PROPERTIES COMPILE_OPTIONS "${all_quoted};-iquote${NEWTON_SRC}/host")
 
+# comms/host/HostLink.ns, the host's link for the NIE, compiled in as a
+# string as the desktop build does it (src/comms/CMakeLists.txt) - made
+# when CMake configures, not by a custom command: PlatformIO builds with
+# SCons from CMake's description and runs none (a change to HostLink.ns
+# reconfigures)
+set(INPUT ${NEWTON_SRC}/comms/host/HostLink.ns)
+set(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostLinkSource.cpp)
+set(NAME gHostLinkSource)
+include(${NEWTON_SRC}/cmake/EmbedText.cmake)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
+target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostLinkSource.cpp)
+
 target_compile_definitions(${COMPONENT_LIB} PRIVATE forQ=1 NDEBUG)
 target_compile_options(${COMPONENT_LIB} PRIVATE
     -include${NEWTON_SRC}/host/host_compat.h

@@ -674,9 +674,12 @@ takes a password and remembers or forgets a network.
   The console's `!time <seconds>` does the same by hand; tried that way
   (the Newton then read 1:00 PM at 20:00 GMT, Cupertino being its home
   city).
-- **Not yet tried**: joining a real network - it needs the owner's
-  details. Scanning finds the networks around; remembering and
-  forgetting work.
+- **Joined a real network** (2026-10-12, WPA2): the address got, the
+  clock set by SNTP. On the way: the board had never started the NIE's
+  host link (Internet Setup: "no module packages installed"); the
+  Wi-Fi slip ran off the 240-wide screen (Internet Setup's slip is 320
+  wide); ESP-IDF's event task overflowed its 2304-byte stack when the
+  address came (4 KB now), restarting the board at every join.
 
 ## Order of work
 

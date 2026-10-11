@@ -134,6 +134,18 @@
 			formatFunc: func(values)
 				"Wi-Fi: " & (if values and IsString(values[0]) and StrLen(values[0]) > 0 then values[0] else "none chosen")},
 		wifiSeen: [],						// the last scan's networks
+		// Internet Setup's editor slip is as wide as the MP2x00's screen
+		// (320): on a smaller one (the T-Deck Pro's 240x320) the slip hangs
+		// off its sides and top, and the editor keeps to what is seen of it
+		viewSetupFormScript: func() begin
+			local box := :Parent():GlobalBox();
+			local area := GetAppParams();
+			self.viewBounds := {
+				left: Max(0, area.appAreaGlobalLeft - box.left),
+				top: Max(0, area.appAreaGlobalTop - box.top),
+				right: -Max(0, box.right - (area.appAreaGlobalLeft + area.appAreaWidth)),
+				bottom: -Max(0, box.bottom - (area.appAreaGlobalTop + area.appAreaHeight))};
+		end,
 		viewSetupDoneScript: func() begin
 			:ShowStatus();
 			:Scan();

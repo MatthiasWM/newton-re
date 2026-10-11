@@ -178,13 +178,23 @@ ConsoleReader(void*)
 		// doing (a Newton that is stuck cannot be asked through itself):
 		// !prof the profile so far (tdeck_profile.cpp), !shot what the panel
 		// shows (tdeck_panel.cpp), !time <seconds since 1970, GMT> the clock
-		// set by hand (the Newton's too: tdeck_wifi.cpp), !reset a restart
+		// set by hand (the Newton's too: tdeck_wifi.cpp), !tap <x> <y> the
+		// finger on the display at (x, y) for 100 ms (as the touch panel puts
+		// it, so a modal dialog can be answered from here), !reset a restart
 		else if (strncmp(line, "!prof", 5) == 0)
 			HostDeviceProfileDump();
 		else if (strncmp(line, "!shot", 5) == 0)
 			HostDevicePanelDump();
 		else if (strncmp(line, "!time ", 6) == 0)
 			HostDeviceClockSetTo(atoll(line + 6));
+		else if (strncmp(line, "!tap ", 5) == 0)
+		{
+			char* rest;
+			long x = strtol(line + 5, &rest, 10), y = strtol(rest, NULL, 10);
+			HostWindowPenDown(x, y);
+			vTaskDelay(pdMS_TO_TICKS(100));
+			HostWindowPenUp();
+		}
 		else if (strncmp(line, "!reset", 6) == 0)
 			esp_restart();
 		else

@@ -144,6 +144,8 @@ Scan(void)
 }
 
 
+static void	StartClock(void);
+
 static bool
 Join(const KnownNetwork& network)
 {
@@ -168,7 +170,12 @@ Join(const KnownNetwork& network)
 		if (xQueueReceive(gEvents, &event, pdMS_TO_TICKS(500)) == pdTRUE)
 		{
 			if (event == kEventJoined)
+			{
+				printf("newton: WiFi: %s joined, address %lu.%lu.%lu.%lu\n", gSSID, (unsigned long) (gAddress >> 24),
+					   (unsigned long) ((gAddress >> 16) & 0xFF), (unsigned long) ((gAddress >> 8) & 0xFF), (unsigned long) (gAddress & 0xFF));
+				StartClock();
 				return true;
+			}
 			if (event == kEventLost)
 				return false;
 		}
@@ -337,6 +344,8 @@ StartClock(void)
 }
 
 
+// (on ESP-IDF's event task, whose stack is small - 2304 bytes: a printf or
+//  SNTP's start here overflowed it; the rest is the manager's, in Join)
 static void
 OnEvent(void*, esp_event_base_t base, int32_t id, void* data)
 {
@@ -352,10 +361,7 @@ OnEvent(void*, esp_event_base_t base, int32_t id, void* data)
 		gAddress = ((uint32_t) esp_ip4_addr1(&got->ip_info.ip) << 24) | ((uint32_t) esp_ip4_addr2(&got->ip_info.ip) << 16)
 				 | ((uint32_t) esp_ip4_addr3(&got->ip_info.ip) << 8) | esp_ip4_addr4(&got->ip_info.ip);
 		gState = kDeviceWifiConnected;
-		printf("newton: WiFi: %s joined, address %lu.%lu.%lu.%lu\n", gSSID, (unsigned long) (gAddress >> 24),
-			   (unsigned long) ((gAddress >> 16) & 0xFF), (unsigned long) ((gAddress >> 8) & 0xFF), (unsigned long) (gAddress & 0xFF));
 		event = kEventJoined;
-		StartClock();
 	}
 	if (event != 0)
 		xQueueSend(gEvents, &event, 0);

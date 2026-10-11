@@ -9,6 +9,16 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-12: The T-Deck Pro joins a real network
+
+Internet Setup would not open on the board: its PreMain never started the
+host's link for the NIE (HostLinkStart), so there was no module.  Now it
+does, HostLink.ns compiled in at configure time.  The Wi-Fi slip keeps to
+the visible part of Internet Setup's 320-wide slip; the event task's stack
+is 4 KB (2304 bytes overflowed when an address came, a restart at every
+join); the console's `!tap x y` answers a modal dialog.  The owner's
+network joined, and the clock set from it.
+
 ## 2026-10-12: The T-Deck Pro's clock set from the network
 
 Once WiFi is joined, SNTP (`pool.ntp.org`) sets the board's clock

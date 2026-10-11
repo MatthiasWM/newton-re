@@ -43,6 +43,7 @@
 #include "LongTime.h"
 #include <time.h>
 #include "host/HostWifi.h"
+#include "comms/host/HostLink.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -264,6 +265,18 @@ DeviceBoot(void)
 }
 
 
+// the world's PreMain (gNewtHostPreMain), as the desktop's NewtonPreMain
+// (host/newton.cpp) does it, of what the board has: the host's link for the
+// Newton Internet Enabler (comms/host/HostLink.h), which puts the "Host
+// network" module in Internet Setup - without it the NIE has no module and
+// Internet Setup will not open
+static void
+DevicePreMain(void)
+{
+	HostLinkStart();
+}
+
+
 // The Newton's clock set from the board's, once the board's has been set
 // from the network (tdeck_wifi.cpp): GMT in seconds from 1904, as
 // HostBootNewtWorld sets it at boot from the same clock (host/HostViews.cpp)
@@ -365,6 +378,7 @@ NewtonMainOnDevice(const void* image, size_t size)
 	}
 	HostConfigureNewtWorld(nil, kObjectHeapSize, kDisplayWidth, kDisplayHeight, kDisplayDepth);
 	gNewtHostBoot = DeviceBoot;
+	gNewtHostPreMain = DevicePreMain;
 	NewtInstallUserMain();
 	gHostKernelServicesTask = DeviceServices;
 	Step("the OS booting");

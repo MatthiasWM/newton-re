@@ -98,7 +98,19 @@ it.  Once joined, the NIE's TCP and DNS go out through lwIP.  From the
 console: `HostWifiScan()`, `HostWifiKnown()`, `HostWifiRemember(ssid,
 password)`, `HostWifiForget(ssid)`, `HostWifiStatus()` (host/HostWifi.h).
 
-Internet Setup does not open at 240x320 upright: it asks to turn the
+The board starts the host's link for the NIE (comms/host/HostLink.h) in
+its PreMain, as the desktop does - without it Internet Setup finds no
+module and will not open; HostLink.ns is compiled in when CMake configures
+(PlatformIO runs no custom commands).  Internet Setup's editor slip is the
+MP2x00's 320 wide: the Wi-Fi editor keeps to the part of it on the
+240-wide screen.  ESP-IDF's event task has a 4 KB stack: 2304 bytes
+overflowed when an address was got.
+
+Internet Setup asks to turn the screen whenever the app area is under 320
+high (the ROM's Open, romsrc/functions/obj_642059.Open.ns) and then turns
+it to orientation 2 - upright, as the board already is - so on the board
+it asks every time, and OK opens it.  Other applications that will not
+open at 240x320 upright ask to turn the
 screen.  The board follows the Newton turned to landscape - the panel
 draws the display a quarter turn round (hold the board turned clockwise,
 the keyboard on the left), the touch panel turned back - and the Newton
@@ -124,7 +136,9 @@ time) and the console prints `newton: the clock set: ...`.
 **The board's own console commands**, answered whatever the Newton is
 doing: `!shot` prints what the panel shows (`tools/tdeck/panelshot.py`
 makes a PNG of it), `!prof` the profile, `!time <seconds since 1970,
-GMT>` sets the clock by hand (as a sync from the network does), `!reset`
+GMT>` sets the clock by hand (as a sync from the network does), `!tap <x>
+<y>` puts the finger on the display there for 100 ms (a modal dialog,
+which stops the NewtonScript console, answered from it), `!reset`
 restarts the board.
 
 ## A faster start (2026-10-11)
