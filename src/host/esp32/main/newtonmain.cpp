@@ -40,6 +40,7 @@
 #include "hal/host/HostScreen.h"
 #include "Unicode.h"
 #include "hal/host/HostFlash.h"
+#include "host/HostWifi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,6 +58,7 @@ const long		kDisplayHeight = 320;
 const long		kDisplayDepth = 1;
 
 static long long	gStart;
+extern bool			gHostDeviceWifi;		// (esp32main.cpp: the WiFi started)
 
 
 static void
@@ -81,6 +83,44 @@ FDeviceMilliseconds(RefArg /*rcvr*/)
 {
 	return MAKEINT((long) ((HostDeviceMicroseconds() / 1000) & 0x1fffffff));
 }
+
+// the board's WiFi as host/HostWifi.h's provider (tdeck_wifi.cpp)
+static long
+WifiScan(HostWifiNetwork* networks, long max)
+{
+	const long kMax = 24;
+	DeviceWifiSeen seen[kMax];
+	long count = HostDeviceWifiScan(seen, max < kMax ? max : kMax);
+	for (long i = 0; i < count; i++)
+	{
+		memcpy(networks[i].ssid, seen[i].ssid, sizeof(networks[i].ssid));
+		networks[i].rssi = seen[i].rssi;
+		networks[i].secure = seen[i].secure;
+		networks[i].known = seen[i].known;
+	}
+	return count;
+}
+
+static long
+WifiKnown(char (*ssids)[kHostWifiSSIDSize], long max)
+{
+	return HostDeviceWifiKnown(ssids, max);
+}
+
+static void
+WifiStatus(HostWifiStatusInfo* info)
+{
+	int state;
+	unsigned long address;
+	long rssi;
+	HostDeviceWifiStatus(&state, info->ssid, &address, &rssi);
+	info->state = (HostWifiState) state;
+	info->address = address;
+	info->rssi = rssi;
+}
+
+static const HostWifiProvider	gWifiProvider = { WifiScan, WifiKnown, HostDeviceWifiRemember, HostDeviceWifiForget, WifiStatus };
+
 
 // the internal flash's writes and erases, to the store partition
 static void
@@ -185,6 +225,18 @@ public:
 static TDeviceEvalHandler*	gEvalHandler = nil;
 
 
+// the display as it is now, for the panel (its width and height swap when
+// the Newton turns it: hal/host/HostScreen.h)
+static void
+DisplayNow(const unsigned char** grays, long* width, long* height)
+{
+	THostScreenDriver* display = HostDisplay();
+	*grays = display->Pixels();
+	*width = display->Width();
+	*height = display->Height();
+}
+
+
 // the world's boot (gNewtHostBoot): the desktop's, headless - the object
 // system, the display, the toolbox (host/HostViews.cpp), the timers - and
 // the eval handler in the world's task
@@ -193,9 +245,8 @@ DeviceBoot(void)
 {
 	Step("the newt world starting");
 	HostBootNewtWorld();
-	THostScreenDriver* display = HostDisplay();
-	if (display != nil)
-		HostDevicePanelShow(display->Pixels(), display->Width(), display->Height());
+	if (HostDisplay() != nil)
+		HostDevicePanelFollow(DisplayNow);
 	InitFIQTimer();
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DeviceMilliseconds")), RefVar(MakeCFunction((void*) FDeviceMilliseconds, 0, nil)));
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "DeviceMemory")), RefVar(MakeCFunction((void*) FDeviceMemory, 0, nil)));
@@ -250,6 +301,8 @@ void
 NewtonMainOnDevice(const void* image, size_t size)
 {
 	gStart = HostDeviceMicroseconds();
+	if (gHostDeviceWifi)
+		HostWifiSetProvider(&gWifiProvider);
 	// every NewtonScript throw printed with its script stack (frames/Objects.cpp
 	// reads it at the first throw): the board has no environment to set it in,
 	// and the console is where a fault on it is found

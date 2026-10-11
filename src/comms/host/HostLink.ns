@@ -93,7 +93,8 @@
 		gatewayaddress: [0, 0, 0, 0],
 		localAddress: [0, 0, 0, 0],
 		defaultDomain: "",
-		dnsServers: [[0, 0, 0, 0]]},
+		dnsServers: [[0, 0, 0, 0]],
+		wifiNetwork: ""},
 
 	// a setup's missing slots filled in from blankEntry (a setup made
 	// before they were there); answers true when it added any
@@ -107,6 +108,123 @@
 			end;
 		added;
 	end,
+
+	// The Wi-Fi line of the Host network setup, where the host has a WiFi
+	// to manage (host/HostWifi.h: the ESP32-S3 host's) - an editor like
+	// Ethernet's own (its Configuration editor's shape: the slip's whole
+	// inside, the line written by infoFrame's formatFunc from the setup's
+	// wifiNetwork), holding the networks the host sees, a password, and
+	// Scan, Forget and Join.  Join remembers the network chosen with the
+	// password typed (the host joins it now if it is in range, and any
+	// network it remembers whenever it finds one) and writes its name in
+	// the setup.  Forget makes the host forget the network chosen.
+	wifiEditor: {
+		viewClass: 74,
+		viewBounds: {left: 0, top: 0, right: 0, bottom: 0},
+		viewFlags: 1,
+		viewFormat: 0,
+		viewJustify: 240,
+		noKeyboard: nil,
+		symbol: 'wifiNetwork,
+		path: 'wifiNetwork,
+		protection: 'private,
+		type: 'editor,
+		name: "Wi-Fi",
+		infoFrame: {checkPrefix: [true, nil], checkPaths: ['wifiNetwork],
+			formatFunc: func(values)
+				"Wi-Fi: " & (if values and IsString(values[0]) and StrLen(values[0]) > 0 then values[0] else "none chosen")},
+		wifiSeen: [],						// the last scan's networks
+		viewSetupDoneScript: func() begin
+			:ShowStatus();
+			:Scan();
+			:KeepStatus();
+		end,
+		// the host's state, kept up to date while the slip is open
+		ShowStatus: func() begin
+			local s := HostWifiStatus();
+			local text := if not s then "This host has no Wi-Fi of its own."
+				else if s.state = 'connected then "Joined " & s.ssid & (if s.address then ", " & s.address else "")
+				else if s.state = 'connecting then "Joining " & s.ssid & "..."
+				else if s.state = 'searching then "Looking for a remembered network"
+				else "Wi-Fi is off";
+			if wifiStatus then SetValue(wifiStatus, 'text, text);
+		end,
+		KeepStatus: func()
+			AddDelayedCall(func() if viewCObject then begin :ShowStatus(); :KeepStatus(); end, nil, 2000),
+		Scan: func() begin
+			if wifiStatus then SetValue(wifiStatus, 'text, "Scanning...");
+			RefreshViews();
+			local seen := HostWifiScan();		// (not "or []": or answers true)
+			wifiSeen := if seen then seen else [];
+			local items := foreach n in wifiSeen collect
+				n.ssid & (if not n.secure then " (open)" else "") & (if n.known then " - remembered" else "");
+			if wifiList then begin
+				wifiList.listItems := items;
+				wifiList.selection := -1;
+				wifiList:SetupList();
+				wifiList:RedoChildren();
+			end;
+			:ShowStatus();
+		end,
+		Chosen: func() begin
+			local i := if wifiList then wifiList.selection;
+			if (not i or i < 0) and wifiList and wifiList.selectedItems and Length(wifiList.selectedItems) > 0 then
+				i := wifiList.selectedItems[0];
+			if i and i >= 0 and i < Length(wifiSeen) then wifiSeen[i];
+		end,
+		Join: func() begin
+			local n := :Chosen();
+			if not n then return :Say("Choose a network first.");
+			// (the labelled line's text is its entry line's)
+			local password := if wifiPassword and wifiPassword.entryLine then wifiPassword.entryLine.text else "";
+			if not IsString(password) then password := "";
+			if n.secure and StrLen(password) = 0 then return :Say("Its password, please.");
+			if not HostWifiRemember(n.ssid, password) then return :Say("It could not be remembered.");
+			local t := target;
+			if t then begin
+				t.wifiNetwork := n.ssid;
+				if IsSoupEntry(t) then EntryChangeXmit(t, nil);
+			end;
+			if wifiPassword and wifiPassword.entryLine then SetValue(wifiPassword.entryLine, 'text, "");
+			:Say("Joining " & n.ssid & "...");
+			AddDelayedCall(func() if viewCObject then :Scan(), nil, 6000);
+		end,
+		Forget: func() begin
+			local n := :Chosen();
+			if not n then return :Say("Choose a network first.");
+			if not HostWifiForget(n.ssid) then return :Say(n.ssid & " was not remembered.");
+			local t := target;
+			if t and IsString(t.wifiNetwork) and StrEqual(t.wifiNetwork, n.ssid) then begin
+				t.wifiNetwork := "";
+				if IsSoupEntry(t) then EntryChangeXmit(t, nil);
+			end;
+			:Scan();
+		end,
+		Say: func(text) if wifiStatus then SetValue(wifiStatus, 'text, text),
+		stepChildren: [
+			{_proto: @218, viewBounds: {left: 4, top: 2, right: -4, bottom: 18}, viewJustify: 48,	// protoStaticText
+			 text: "", viewSetupFormScript: func() begin wifiStatus := self; inherited:?viewSetupFormScript(); end},
+			{_proto: @228, viewBounds: {left: 4, top: 20, right: -4, bottom: -82}, viewJustify: 240,	// protoTextList
+			 useScrollers: true, listItems: [], selection: -1,
+			 viewSetupFormScript: func() begin wifiList := self; inherited:?viewSetupFormScript(); end,
+			 viewSetupDoneScript: func() begin
+				inherited:?viewSetupDoneScript();
+				:SetupList();
+				:RedoChildren();
+			 end},
+			{_proto: @189, viewBounds: {left: 4, top: -78, right: -4, bottom: -56}, viewJustify: 176,	// protoLabelInputLine
+			 label: "Password",
+			 viewSetupFormScript: func() begin wifiPassword := self; inherited:?viewSetupFormScript(); end},
+			{_proto: @226, viewBounds: {left: -204, top: -46, right: -144, bottom: -30}, viewJustify: 8388774,	// protoTextButton (above the slip's own bar)
+			 text: "Scan", buttonClickScript: func() :Scan()},
+			{_proto: @226, viewBounds: {left: -136, top: -46, right: -76, bottom: -30}, viewJustify: 8388774,
+			 text: "Forget", buttonClickScript: func() :Forget()},
+			{_proto: @226, viewBounds: {left: -68, top: -46, right: -8, bottom: -30}, viewJustify: 8388774,
+			 text: "Join", buttonClickScript: func() :Join()}],
+		wifiStatus: nil,
+		wifiList: nil,
+		wifiPassword: nil,
+	},
 
 	// Internet Setup's stationery for the Host network setup.  The
 	// application shows and edits a setup through the data definition named
@@ -132,6 +250,9 @@
 			foreach v in views do
 				if v <> 'cardData then AddArraySlot(kept, v);
 			views := kept;
+			// (a host with a WiFi to manage: its line, after the setup's name)
+			if HostWifiAvailable() then
+				AddArraySlot(views, 'wifiNetwork);
 		end;
 		// (and the new setup's pages less the card's picker - a child whose
 		// path starts with cardData, Ethernet's first page's third)
@@ -186,6 +307,8 @@
 		if viewDefs then
 			foreach vd in viewDefs do
 				RegisterViewDef(vd, host);
+		if HostWifiAvailable() then
+			RegisterViewDef(wifiEditor, host);
 		true;
 	end,
 

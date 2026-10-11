@@ -34,6 +34,7 @@
 #include "CardInfo.h"
 #include "HostCards.h"
 #include "HostInterconnect.h"
+#include "HostWifi.h"
 #include "HostTablet.h"
 #include "hal/host/Host.h"
 #include "ROMImport.h"
@@ -276,6 +277,7 @@ HostRegisterViewFunctions(void)
 	SetFrameSlot(functions, RefVar(Intern((char*) "HostTabletCalibrationTarget")), RefVar(MakeCFunction((void*) FHostTabletCalibrationTarget, 0, nil)));
 	HostRegisterCardFunctions();
 	HostRegisterInterconnectFunctions();
+	HostRegisterWifiFunctions();
 }
 
 

@@ -28,7 +28,7 @@ struct HostTabletRecord
 };
 // the queued records: a ring of 4096
 const long kHostTabletQueueSize = 4096;
-static HostTabletRecord	gHostTabletRing[kHostTabletQueueSize];
+static HostTabletRecord	gHostTabletRing[kHostTabletQueueSize] HOST_LARGE_STATIC;
 static long		gHostTabletHead = 0;		// the next to feed
 static long		gHostTabletTail = 0;		// the next slot to fill
 

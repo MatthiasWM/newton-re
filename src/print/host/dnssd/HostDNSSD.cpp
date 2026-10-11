@@ -25,7 +25,10 @@
 #endif
 
 static std::mutex			gLock;
-static HostDNSSDPrinter		gFound[64];
+#ifndef HOST_LARGE_STATIC						// (host/host_compat.h's, where this is built without it)
+#define HOST_LARGE_STATIC
+#endif
+static HostDNSSDPrinter		gFound[64] HOST_LARGE_STATIC;
 static int					gFoundCount = 0;
 static int					gBusy = 0;
 static char*				gInjected = NULL;

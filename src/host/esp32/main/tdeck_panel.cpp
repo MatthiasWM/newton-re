@@ -112,6 +112,9 @@ const int64_t	kSettleAtMostMs = 400;			// ... and one still changing after this 
 static spi_device_handle_t	gSpi;
 static uint8_t*				gBounce;			// (DMA reads it: internal RAM)
 
+// the display as it is now (its size changes when the Newton turns it -
+// hal/host/HostScreen.h: the same grays, Width() per row)
+static void					(*gDisplayNow)(const unsigned char** grays, long* width, long* height) = NULL;
 static const unsigned char* volatile	gGrays = NULL;
 static volatile long		gGraysWidth, gGraysHeight;
 
@@ -339,13 +342,42 @@ Refresh(const uint8_t* before, const uint8_t* picture, bool partial)
 
 // the display's grays as the panel's bits: a bit set is white, gray from
 // half black is black; a display of another size is cut to the panel's
-// (or left white past its edge)
+// (or left white past its edge).  A display wider than it is tall - the
+// Newton turned to landscape (Internet Setup, for one, will not open at
+// 240x320 upright) - is drawn a quarter turn round: the display's top at
+// the panel's left edge, so the board is held turned clockwise, its
+// keyboard on the left (HostDeviceDisplayTurned, which the touch panel
+// turns back by; seen with tools/tdeck/panelshot.py, 2026-10-11)
 static void
 Convert(uint8_t* frame)
 {
+	if (gDisplayNow != NULL)
+	{
+		const unsigned char* g;
+		long w, h;
+		gDisplayNow(&g, &w, &h);
+		gGraysWidth = w;
+		gGraysHeight = h;
+		gGrays = g;
+	}
 	const unsigned char* grays = gGrays;
 	long width = gGraysWidth, height = gGraysHeight;
 	memset(frame, 0xFF, kFrameBytes);
+	if (width > height)
+	{
+		// panel (px, py) shows display (319 - py, px)
+		for (long py = 0; py < kPanelHeight; py++)
+		{
+			long dx = kPanelHeight - 1 - py;
+			if (dx >= width)
+				continue;
+			uint8_t* out = frame + py * kRowBytes;
+			for (long px = 0; px < kPanelWidth && px < height; px++)
+				if (grays[px * width + dx] >= 128)
+					out[px >> 3] &= (uint8_t) ~(0x80 >> (px & 7));
+		}
+		return;
+	}
 	for (long y = 0; y < kPanelHeight && y < height; y++)
 	{
 		const unsigned char* row = grays + y * width;
@@ -399,6 +431,8 @@ TestPattern(uint8_t* shown)
 }
 
 
+static const uint8_t*	gShown = NULL;		// what the panel shows (HostDevicePanelDump)
+
 static void
 PanelTask(void*)
 {
@@ -408,6 +442,7 @@ PanelTask(void*)
 		vTaskSuspend(NULL);
 	}
 	uint8_t* shown = (uint8_t*) heap_caps_malloc(kFrameBytes, MALLOC_CAP_SPIRAM);
+	gShown = shown;
 	uint8_t* pending = (uint8_t*) heap_caps_malloc(kFrameBytes, MALLOC_CAP_SPIRAM);
 	uint8_t* now = (uint8_t*) heap_caps_malloc(kFrameBytes, MALLOC_CAP_SPIRAM);
 	uint8_t* white = (uint8_t*) heap_caps_malloc(kFrameBytes, MALLOC_CAP_SPIRAM);
@@ -538,9 +573,49 @@ HostDevicePanelSet(const char* name, long value)
 
 
 void
+HostDevicePanelFollow(void (*now)(const unsigned char** grays, long* width, long* height))
+{
+	gDisplayNow = now;
+	now((const unsigned char**) &gGrays, (long*) &gGraysWidth, (long*) &gGraysHeight);
+}
+
+
+bool
+HostDeviceDisplayTurned(void)
+{
+	return gGrays != NULL && gGraysWidth > gGraysHeight;
+}
+
+
+void
 HostDevicePanelShow(const unsigned char* grays, long width, long height)
 {
 	gGraysWidth = width;
 	gGraysHeight = height;
 	gGrays = grays;
+}
+
+
+// What the panel shows, printed on the console as "shot-begin 240 320", a
+// line "shot <hex>" for each row (a bit set is white, the leftmost pixel
+// the top bit), "shot-end" - tools/tdeck/panelshot.py makes a picture of it
+void
+HostDevicePanelDump(void)
+{
+	if (gShown == NULL)
+	{
+		printf("shot-none\n");
+		return;
+	}
+	printf("shot-begin %ld %ld\n", kPanelWidth, kPanelHeight);
+	for (long y = 0; y < kPanelHeight; y++)
+	{
+		printf("shot ");
+		for (long b = 0; b < kRowBytes; b++)
+			printf("%02x", gShown[y * kRowBytes + b]);
+		printf("\n");
+		if (y % 40 == 39)
+			vTaskDelay(1);
+	}
+	printf("shot-end\n");
 }

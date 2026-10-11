@@ -207,7 +207,7 @@ THostScreenDriver::Blit(PixelMap* map, Rect* src, Rect* dst, long mode)
 	// grays from a table, made once for each depth (the live inker's srcOr,
 	// which leaves white pixels alone, goes pixel by pixel)
 	static unsigned char sGray[9][256];
-	static unsigned char sExpand[9][256][8];
+	static unsigned char sExpand[9][256][8] HOST_LARGE_STATIC;
 	static Boolean sMade[9];
 	if (depth < 1 || depth > 8)
 		return;

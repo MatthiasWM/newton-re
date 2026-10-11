@@ -218,6 +218,16 @@ configuration are otherwise ignored, the host's network being the host's
 business.  Demo `src/host/demo/inethostsetup.ns` (ctests
 `host.NewtonInetHostSetup` and `.restart`).
 
+**Wi-Fi.** On a host with a WiFi of its own to manage (host/HostWifi.h:
+the ESP32-S3 host's), the Host network setup has one more line, "Wi-Fi:
+<network>" - a slot `wifiNetwork` in its `viewsToDisplay` and an editor
+view definition of HostLink.ns's (`wifiEditor`, shaped as Ethernet's
+Configuration editor: the slip's whole inside, the line written by its
+infoFrame's formatFunc) holding the networks scanned, a password and Scan,
+Forget and Join.  A desktop shows no such line (its operating system
+manages its network) unless `NEWTON_FAKE_WIFI` gives it a pretend WiFi
+(demo/wifisetup.ns, ctest `host.NewtonWifiSetup`).
+
 On a restart the store's packages are activated (`TNewtWorld::PreMain`)
 just before the host's PreMain hook starts HostLink.ns, so their changes to
 the "Packages" soup have gone by and the NIE makes its service registry a

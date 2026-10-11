@@ -1,0 +1,87 @@
+// Internet Setup's Wi-Fi line (comms/host/HostLink.ns) over a host's WiFi
+// (host/HostWifi.h) - here NEWTON_FAKE_WIFI's pretend one, three networks
+// in range: the Host network setup opened, its "Wi-Fi:" line tapped, the
+// slip's list holding the networks scanned, the first chosen and Join
+// tapped with a password typed - the network remembered, the setup's line
+// naming it, the host joined - then Forget tapped: it is forgotten.
+// Snapshots in wifisetup-N.pgm.
+//
+//   NEWTON_FAKE_WIFI=1 build/host/host/newton --display 320x480 --erase \
+//       --store wifisetup.store --headless 120 --script src/host/demo/wifisetup.ns
+
+HostInclude("common.ns");			// tapAt, typeKey, waitFor
+HostInclude("walkhelpers.ns");		// the views, the keys, the steps
+
+wsApp := func() GetRoot().|InternetSetup:NIE|;
+wsEntry := func() call anyEntry with ("Internet Setups", func(e) e.physicalLayer = '|HostNetwork:host|);
+wsReady := func() call wsApp with () and GetDataDefs('|HostNetwork:host|) and call wsEntry with ();
+wsShot := func(file) func(done) begin
+	ScreenSnapshot("wifisetup-" & file & ".pgm");
+	call done with ();
+end;
+// (the setup's lines are drawn, not views of their own: the Wi-Fi line is
+//  the third, below the configuration and the domain name - tapped where it
+//  is, as demo/inethostsetup.ns taps the others)
+kWSLineY := 202;
+wsSlip := func() call findView with (GetRoot(), func(v) v.symbol = 'wifiNetwork and v.type = 'editor and v.viewCObject);
+wsTapView := func(what, find, test) func(done) begin
+	local v := call find with ();
+	if not v then begin
+		call wtCheck with (what, nil, "it is not there");
+		return call done with ();
+	end;
+	local b := v:GlobalBox();
+	call (call tapStep with (what, (b.left + b.right) div 2, (b.top + b.bottom) div 2, test)) with (done);
+end;
+wsButton := func(label) func() call findView with (call wsSlip with (), func(v) IsString(v.text) and StrEqual(v.text, label) and v.buttonClickScript);
+// "secret": its keys' ADB codes
+kWSPasswordKeys := [1, 14, 8, 15, 14, 17];
+
+wtName := "wifisetup";
+wtSteps := [
+	func(done) begin (call wsApp with ()):Open(); call done with (); end,
+	call waitStep with ("the application", call isOpen with ('|InternetSetup:NIE|)),
+	settleStep,
+	call tapStep with ("the setup", 70, 151, func() (call wsApp with ()).currentLayout = 'default),
+	settleStep,
+	call wsShot with ("1"),
+	call tapStep with ("the Wi-Fi line", 90, kWSLineY, wsSlip),
+	settleStep,
+	call wsShot with ("2"),
+	func(done) begin
+		local slip := call wsSlip with ();
+		call wtCheck with ("the networks listed", slip and Length(slip.wifiSeen) = 3 and Length(slip.wifiList.listItems) = 3,
+			"the list has " & (if slip then Length(slip.wifiList.listItems)));
+		// the first network chosen, as a tap on the list chooses it
+		slip.wifiList.selection := 0;
+		call done with ();
+	end,
+	func(done) begin
+		local slip := call wsSlip with ();
+		local b := slip.wifiPassword.entryLine:GlobalBox();		// (the line after its label)
+		call (call tapLineStep with ("the password", b.left + 8, (b.top + b.bottom) div 2)) with (done);
+	end,
+	call keysStep with (kWSPasswordKeys),
+	call wsTapView with ("Join", call wsButton with ("Join"), func() Length(HostWifiKnown()) = 1),
+	settleStep,
+	call wsShot with ("3"),
+	func(done) begin
+		local known := HostWifiKnown();
+		call wtCheck with ("remembered", Length(known) = 1 and StrEqual(known[0], "Newton Lab"), "remembered: " & Length(known));
+		call wtCheck with ("joined", HostWifiStatus().state = 'connected, "the state is " & HostWifiStatus().state);
+		call wtCheck with ("the setup names it", StrEqual((call wsEntry with ()).wifiNetwork, "Newton Lab"),
+			"the setup has " & (call wsEntry with ()).wifiNetwork);
+		(call wsSlip with ()).wifiList.selection := 0;
+		call done with ();
+	end,
+	call wsTapView with ("Forget", call wsButton with ("Forget"), func() Length(HostWifiKnown()) = 0),
+	settleStep,
+	call wsShot with ("4"),
+	func(done) begin
+		call wtCheck with ("forgotten", Length(HostWifiKnown()) = 0, "still remembered");
+		call wtCheck with ("the setup's name cleared", StrLen((call wsEntry with ()).wifiNetwork) = 0, "it is kept");
+		Print("wifisetup: done, " & wtFailures & " failed");
+		HostQuit();
+	end];
+
+call waitFor with ("wifisetup: Internet Setup", wsReady, func() call wtNext with (), 60);

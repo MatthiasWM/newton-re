@@ -15,7 +15,7 @@ static UChar	gPalette[256][3];
 static Boolean	gPaletteMade = false;
 // the nearest entry for each colour of five bits a component, made on
 // first use (32 x 32 x 32)
-static UChar	gNearest[32 * 32 * 32];
+static UChar	gNearest[32 * 32 * 32] HOST_LARGE_STATIC;
 static Boolean	gNearestMade = false;
 
 

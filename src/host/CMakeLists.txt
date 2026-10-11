@@ -5,7 +5,7 @@
 # the host boots with (HostStores.cpp).
 # the view system on the host (HostViews.h), for newtonscript and the newt
 # world's boot
-add_library(host_views STATIC HostViews.cpp HostNatives.cpp HostStores.cpp HostCards.cpp HostInterconnect.cpp FactorySoups.cpp HostObjectsFile.cpp)
+add_library(host_views STATIC HostViews.cpp HostNatives.cpp HostStores.cpp HostCards.cpp HostInterconnect.cpp HostWifi.cpp FactorySoups.cpp HostObjectsFile.cpp)
 target_link_libraries(host_views PUBLIC flash frames comms_script comms_dock comms_fax thirdparty_nie views recognition pcmcia sound system stores packages intl intl_meetings assist hal_host_display hal_host_tablet)
 target_include_directories(host_views PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -1952,6 +1952,18 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/rex/inetenbl.pkg)
                          FIXTURES_REQUIRED host_inethostsetup_store DEPENDS host.NewtonInetHostSetup
                          ENVIRONMENT NEWTON_TRACE_DNS=1
                          PASS_REGULAR_EXPRESSION "default domain \"example.invalid\".*nosuchnewtonhost.example.invalid: 0 address.*inethostsetup: restart done, 0 failed"
+                         FAIL_REGULAR_EXPRESSION "FAILED|waited in vain|exception in a unit handler")
+    # Internet Setup's Wi-Fi line over a host's WiFi (host/HostWifi.h -
+    # NEWTON_FAKE_WIFI's pretend one: demo/wifisetup.ns): the networks
+    # scanned, one joined with a password and named in the setup, forgotten
+    add_test(NAME host.NewtonWifiSetup
+             COMMAND newton --display 320x480 --erase
+                     --store ${CMAKE_CURRENT_BINARY_DIR}/wifisetup.store --headless 150
+                     --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/wifisetup.ns
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    set_tests_properties(host.NewtonWifiSetup PROPERTIES TIMEOUT 240
+                         ENVIRONMENT NEWTON_FAKE_WIFI=1
+                         PASS_REGULAR_EXPRESSION "wifisetup: done, 0 failed"
                          FAIL_REGULAR_EXPRESSION "FAILED|waited in vain|exception in a unit handler")
     # the NIE's protoEndpointFSM (its 'Inet Protos:NIE unit) as a TCP client
     # over the host's link (demo/inetfsm.ns): connected through its own

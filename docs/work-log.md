@@ -9,6 +9,20 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-11: WiFi for the T-Deck Pro, set up in Internet Setup
+
+host/HostWifi.h (a provider and its natives) and the board's provider,
+`src/host/esp32/main/tdeck_wifi.cpp` (networks remembered in NVS, the
+strongest remembered one in range joined); Internet Setup's Host network
+setup has a Wi-Fi line and slip (comms/host/HostLink.ns: scan, password,
+Join, Forget) on a host with WiFi - tested on the desktop with
+`NEWTON_FAKE_WIFI` (ctest host.NewtonWifiSetup).  To make room,
+`HOST_LARGE_STATIC` moves the tree's six largest statics to PSRAM on the
+board.  The panel and touch follow the Newton turned to landscape (which
+Internet Setup needs at 240x320).  The board's console answers `!shot`
+(what the panel shows: tools/tdeck/panelshot.py), `!prof` and `!reset`
+itself, whatever the Newton is doing.
+
 ## 2026-10-11: The T-Deck Pro starts in 3 s
 
 The OS up 3.2 s after the boot starts, from 61.7 s.  A sampling profiler

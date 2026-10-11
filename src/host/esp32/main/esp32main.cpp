@@ -19,6 +19,7 @@
 #include "freertos/queue.h"
 #include "esp_partition.h"
 #include "esp_timer.h"
+#include "esp_system.h"
 #include "esp_heap_caps.h"
 #include "esp_psram.h"
 #include "driver/usb_serial_jtag.h"
@@ -27,6 +28,7 @@
 #include "esp32host.h"
 
 static const void*	gImage = NULL;
+bool				gHostDeviceWifi = false;		// (newtonmain.cpp: the WiFi is the host's - HostWifi.h)
 static size_t		gImageSize = 0;
 
 
@@ -166,15 +168,26 @@ ConsoleReader(void*)
 	static char line[kLineSize];
 	for (;;)
 	{
-		if (fgets(line, sizeof(line), stdin) != NULL)
-			xQueueSend(gLines, line, portMAX_DELAY);
-		else
+		if (fgets(line, sizeof(line), stdin) == NULL)
 		{
 			clearerr(stdin);
 			vTaskDelay(pdMS_TO_TICKS(20));
 		}
+		// the board's own commands, answered here whatever the Newton is
+		// doing (a Newton that is stuck cannot be asked through itself):
+		// !prof the profile so far (tdeck_profile.cpp), !shot what the panel
+		// shows (tdeck_panel.cpp), !reset a restart
+		else if (strncmp(line, "!prof", 5) == 0)
+			HostDeviceProfileDump();
+		else if (strncmp(line, "!shot", 5) == 0)
+			HostDevicePanelDump();
+		else if (strncmp(line, "!reset", 6) == 0)
+			esp_restart();
+		else
+			xQueueSend(gLines, line, portMAX_DELAY);
 	}
 }
+
 
 
 int
@@ -283,6 +296,7 @@ app_main(void)
 	HostDevicePanelStart();
 	HostDeviceInputStart();
 	HostDeviceStoreStart();
+	gHostDeviceWifi = HostDeviceWifiStart();
 	gLines = xQueueCreate(8, kLineSize);
 	xTaskCreatePinnedToCore(ConsoleReader, "console", 4096, NULL, 4, NULL, 0);
 	// the boot runs here, and the run's end is waited for here (the task

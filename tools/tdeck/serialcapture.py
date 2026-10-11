@@ -105,6 +105,7 @@ def main(argv):
                 line = to_send.pop(0)
                 print(">>> " + line, flush=True)
                 out.write(">>> " + line + "\n")
+                out.flush()						# (seen at once, whether or not the board answers)
                 try:
                     port.write((line + "\n").encode("utf-8"))
                 except serial.SerialTimeoutException:
