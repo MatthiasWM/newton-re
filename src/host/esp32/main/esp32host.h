@@ -61,6 +61,8 @@ long		HostDeviceWifiKnown(char (*ssids)[33], long max);
 bool		HostDeviceWifiRemember(const char* ssid, const char* password);
 bool		HostDeviceWifiForget(const char* ssid);
 void		HostDeviceWifiStatus(int* state, char* ssid, unsigned long* address, long* rssi);
+unsigned long	HostDeviceClockSyncs(void);		// how many times the board's clock has been set (from the network, or by hand)
+void		HostDeviceClockSetTo(long long seconds);	// the board's clock set by hand, in seconds from 1970 (GMT)
 
 // the sampling profiler of core 1 (tdeck_profile.cpp): started with the
 // board, a phase's start marked, the samples printed (and the profiler

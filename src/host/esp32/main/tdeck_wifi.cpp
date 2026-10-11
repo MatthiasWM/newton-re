@@ -32,6 +32,9 @@
 #include "esp_timer.h"
 #include "nvs_flash.h"
 #include "nvs.h"
+#include "esp_sntp.h"
+#include <sys/time.h>
+#include <stdlib.h>
 
 #include "esp32host.h"
 
@@ -71,6 +74,7 @@ static volatile int		gState = kDeviceWifiOff;
 static char				gSSID[33];
 static volatile uint32_t	gAddress = 0;
 
+static volatile unsigned long	gClockSyncs = 0;	// (HostDeviceClockSyncs)
 static QueueHandle_t	gRequests = NULL;
 static QueueHandle_t	gEvents = NULL;			// (an int: what ESP-IDF said)
 static KnownList		gKnown;
@@ -307,6 +311,32 @@ ManagerTask(void*)
 }
 
 
+// The board's clock set from the network (SNTP, pool.ntp.org) once it has
+// joined one, and again each hour (ESP-IDF's default); each time, the
+// Newton's own clock is set from it (newtonmain.cpp's services loop asks
+// HostDeviceClockSyncs).  The board's clock survives a restart, not a loss
+// of power.
+static void
+OnClockSet(struct timeval*)
+{
+	gClockSyncs++;
+}
+
+
+static void
+StartClock(void)
+{
+	static bool started = false;
+	if (started)
+		return;
+	started = true;
+	esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
+	esp_sntp_setservername(0, "pool.ntp.org");
+	sntp_set_time_sync_notification_cb(OnClockSet);
+	esp_sntp_init();
+}
+
+
 static void
 OnEvent(void*, esp_event_base_t base, int32_t id, void* data)
 {
@@ -325,6 +355,7 @@ OnEvent(void*, esp_event_base_t base, int32_t id, void* data)
 		printf("newton: WiFi: %s joined, address %lu.%lu.%lu.%lu\n", gSSID, (unsigned long) (gAddress >> 24),
 			   (unsigned long) ((gAddress >> 16) & 0xFF), (unsigned long) ((gAddress >> 8) & 0xFF), (unsigned long) (gAddress & 0xFF));
 		event = kEventJoined;
+		StartClock();
 	}
 	if (event != 0)
 		xQueueSend(gEvents, &event, 0);
@@ -443,4 +474,24 @@ HostDeviceWifiStatus(int* state, char* ssid, unsigned long* address, long* rssi)
 	wifi_ap_record_t ap;
 	if (gState == kDeviceWifiConnected && esp_wifi_sta_get_ap_info(&ap) == ESP_OK)
 		*rssi = ap.rssi;
+}
+
+
+unsigned long
+HostDeviceClockSyncs(void)
+{
+	return gClockSyncs;
+}
+
+
+// the board's clock set by hand (the console's !time) - as a sync from the
+// network is, the Newton's set from it
+void
+HostDeviceClockSetTo(long long seconds)
+{
+	struct timeval tv;
+	tv.tv_sec = (time_t) seconds;
+	tv.tv_usec = 0;
+	settimeofday(&tv, NULL);
+	gClockSyncs++;
 }

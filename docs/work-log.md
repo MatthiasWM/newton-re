@@ -9,6 +9,14 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-12: The T-Deck Pro's clock set from the network
+
+Once WiFi is joined, SNTP (`pool.ntp.org`) sets the board's clock
+(`tdeck_wifi.cpp`), and the Newton's is set from it each time
+(`newtonmain.cpp`, `TURealTimeAlarm::SetTime` in GMT).  The console's
+`!time <seconds since 1970>` sets it by hand the same way - how it was
+tested, no network having been joined yet.
+
 ## 2026-10-11: WiFi for the T-Deck Pro, set up in Internet Setup
 
 host/HostWifi.h (a provider and its natives) and the board's provider,

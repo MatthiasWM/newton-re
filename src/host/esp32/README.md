@@ -114,9 +114,18 @@ PSRAM on the board), with `CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY`
 and the WiFi's and lwIP's buffers in PSRAM.  162 KB of internal RAM is
 free at the start, 53 KB with the OS up (13 KB before).
 
+**The clock**: the board has none that keeps time while it is off, so it
+starts at 1970 (the Newton's 31/12).  Once a network is joined, SNTP
+(`pool.ntp.org`, polled hourly by ESP-IDF) sets the board's clock, and
+each time it does, the Newton's is set from it
+(`TURealTimeAlarm::SetTime`, in GMT; the Newton shows its home city's
+time) and the console prints `newton: the clock set: ...`.
+
 **The board's own console commands**, answered whatever the Newton is
 doing: `!shot` prints what the panel shows (`tools/tdeck/panelshot.py`
-makes a PNG of it), `!prof` the profile, `!reset` restarts the board.
+makes a PNG of it), `!prof` the profile, `!time <seconds since 1970,
+GMT>` sets the clock by hand (as a sync from the network does), `!reset`
+restarts the board.
 
 ## A faster start (2026-10-11)
 

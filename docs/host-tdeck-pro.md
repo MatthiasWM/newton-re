@@ -668,6 +668,12 @@ takes a password and remembers or forgets a network.
   and asks to turn it; the board now follows the Newton to landscape (the
   panel draws the display a quarter turn round, the touch panel turns
   back), and the Newton asks for the pen to be calibrated that way round.
+- **The clock** set from the network: once joined, SNTP (`pool.ntp.org`)
+  sets the board's clock, and the Newton's is set from it each time
+  (`newtonmain.cpp`'s DeviceServices loop, `TURealTimeAlarm::SetTime`).
+  The console's `!time <seconds>` does the same by hand; tried that way
+  (the Newton then read 1:00 PM at 20:00 GMT, Cupertino being its home
+  city).
 - **Not yet tried**: joining a real network - it needs the owner's
   details. Scanning finds the networks around; remembering and
   forgetting work.

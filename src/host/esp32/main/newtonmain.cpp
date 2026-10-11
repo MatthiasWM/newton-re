@@ -40,6 +40,8 @@
 #include "hal/host/HostScreen.h"
 #include "Unicode.h"
 #include "hal/host/HostFlash.h"
+#include "LongTime.h"
+#include <time.h>
 #include "host/HostWifi.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -262,6 +264,23 @@ DeviceBoot(void)
 }
 
 
+// The Newton's clock set from the board's, once the board's has been set
+// from the network (tdeck_wifi.cpp): GMT in seconds from 1904, as
+// HostBootNewtWorld sets it at boot from the same clock (host/HostViews.cpp)
+static void
+SetClockFromBoard(void)
+{
+	const unsigned long long kSecondsFrom1904To1970 = 2082844800ULL;
+	time_t now = time(nil);
+	TTime gmt((ULong) ((unsigned long long) now + kSecondsFrom1904To1970), kSeconds);
+	TURealTimeAlarm::SetTime(gmt);
+	struct tm t;
+	gmtime_r(&now, &t);
+	printf("newton: the clock set: %04d-%02d-%02d %02d:%02d:%02d GMT\n",
+		   t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+}
+
+
 // the kernel services task (gHostKernelServicesTask): the keyboard's keys
 // (host/HostKeyboard.cpp's queue, which tdeck_input.cpp fills) and the
 // console's lines to the world, a hundredth of a second at a time
@@ -279,8 +298,14 @@ DeviceServices(void)
 	printf("> ");
 	TUPort newtPort(portId);
 	static char line[512];
+	unsigned long clockSyncs = 0;
 	for (;;)
 	{
+		if (HostDeviceClockSyncs() != clockSyncs)
+		{
+			clockSyncs = HostDeviceClockSyncs();
+			SetClockFromBoard();
+		}
 		HostKeyboardSendKeys(&newtPort);
 		if (HostDeviceReadLine(line, sizeof(line)))
 		{

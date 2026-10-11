@@ -68,9 +68,8 @@ starts); **a 3 s start** (from a minute: C++ exception tables sorted, two
 quadratic lookups made hashed - tools/tdeck/profile.py).  **WiFi**,
 set up in Internet Setup's Host network setup (scan, remember, join any
 remembered network in range; not yet tried on a real network); the panel
-following the Newton turned to landscape.  Next: the time set from the
-network once joined (the board has no clock: it starts at 31/12); the
-store's writes batched (word by word now); NewtonScript's speed (the
+following the Newton turned to landscape; the clock set from the network
+(SNTP) once joined, or by hand (`!time`).  Next: the store's writes batched (word by word now); NewtonScript's speed (the
 object heap in PSRAM); the built-in packages' frames baked; a 32-bit build
 in the tests; the applications at 240x320 (some ask to rotate); later the
 panel's own waveforms for speed and grays (docs/host-tdeck-pro.md, "Order

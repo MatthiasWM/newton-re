@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -176,11 +177,14 @@ ConsoleReader(void*)
 		// the board's own commands, answered here whatever the Newton is
 		// doing (a Newton that is stuck cannot be asked through itself):
 		// !prof the profile so far (tdeck_profile.cpp), !shot what the panel
-		// shows (tdeck_panel.cpp), !reset a restart
+		// shows (tdeck_panel.cpp), !time <seconds since 1970, GMT> the clock
+		// set by hand (the Newton's too: tdeck_wifi.cpp), !reset a restart
 		else if (strncmp(line, "!prof", 5) == 0)
 			HostDeviceProfileDump();
 		else if (strncmp(line, "!shot", 5) == 0)
 			HostDevicePanelDump();
+		else if (strncmp(line, "!time ", 6) == 0)
+			HostDeviceClockSetTo(atoll(line + 6));
 		else if (strncmp(line, "!reset", 6) == 0)
 			esp_restart();
 		else
