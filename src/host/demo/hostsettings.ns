@@ -10,7 +10,7 @@
 // and turning it off through the panel's Change takes it off the LAN and
 // keeps that.
 //
-//   build/host/host/newton --display 320x480 --headless 200 --store build/hs.store \
+//   build/host/host/newton --display 320x480 --serial-port 0 --headless 200 --store build/hs.store \
 //       --script src/host/demo/hostsettings.ns
 
 HostInclude("common.ns");			// tapAt, waitFor, walkSetup

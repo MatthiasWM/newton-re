@@ -915,11 +915,13 @@ set_tests_properties(host.NewtonRotation PROPERTIES TIMEOUT 180
 
 # the Host preferences panel (HostSettings.h, demo/hostsettings.ns): .set
 # turns beaming over the network on from Prefs with no restart and keeps it,
-# .kept boots the same store with it on and turns it off
+# .kept boots the same store with it on and turns it off, then closes and
+# reopens docking's listener - on a port of its own (--serial-port 0), since
+# 3679 may be held by another newton the suite runs beside it
 add_test(NAME host.NewtonHostSettings.clean COMMAND ${CMAKE_COMMAND} -E rm -f ${CMAKE_CURRENT_BINARY_DIR}/hostsettings.store)
 set_tests_properties(host.NewtonHostSettings.clean PROPERTIES FIXTURES_SETUP hostsettingsclean)
 foreach(run set kept)
-    add_test(NAME host.NewtonHostSettings.${run} COMMAND newton --display 320x480 --headless 200
+    add_test(NAME host.NewtonHostSettings.${run} COMMAND newton --display 320x480 --serial-port 0 --headless 200
              --store ${CMAKE_CURRENT_BINARY_DIR}/hostsettings.store
              --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/hostsettings.ns WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
 endforeach()
