@@ -132,6 +132,27 @@ Boolean		HostFlashContains(Ptr p);
 void		HostFlashWrite(Ptr word, ULong value, ULong mask);
 void		HostFlashErase(Ptr start, ULong size, ULong lanes);
 
+// A host whose flash is neither a file nor memory of its own but a store
+// it can read in place - the ESP32-S3 host's (src/host/esp32): a partition
+// of the board's own flash, memory-mapped, read through the cache, with no
+// copy in RAM (there is no room for one).  The banks are its bytes; each
+// word written and each erase is the backing's to do (the bytes are read
+// only), the same rules applied: a write only clears bits, an erase sets the
+// lanes' bytes.  Set before HostFlashOpen, which then uses it whatever path
+// it is given; nil: files and memory, as before.
+struct HostFlashBacking
+{
+	unsigned char*	bytes;										// the flash's image, size bytes, readable
+	ULong			size;										// a valid size (HostFlashValidSize)
+	Boolean			existed;									// whether it holds a flash used before
+	void			(*write)(ULong offset, const unsigned char* bytes, ULong size);	// these bytes, already ANDed with what was there
+	void			(*erase)(ULong offset, ULong size, ULong lanes);				// as HostFlashErase
+};
+void		HostFlashSetBacking(const HostFlashBacking* backing);
+// whether the flash just opened had been used before: its file already
+// there, or its backing holding a flash
+Boolean		HostFlashExisted(void);
+
 // how many words and erases the chips have taken (for tests)
 extern ULong	gHostFlashWrites;
 extern ULong	gHostFlashErases;

@@ -11,6 +11,11 @@
 #include <stdio.h>
 #ifdef _WIN32
 #include <windows.h>
+#elif defined(ESP_PLATFORM)
+#include <unistd.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_debug_helpers.h"
 #else
 #include <pthread.h>
 #include <unistd.h>
@@ -26,6 +31,10 @@ Reset(void)
 {
 	gHostResetCount++;
 	fprintf(stderr, "[host] machine reset requested\n");
+#ifdef ESP_PLATFORM
+	// (the board: who asked - addr2line on the firmware's ELF names them)
+	esp_backtrace_print(24);
+#endif
 	if (gHostResetHook != nil)
 		gHostResetHook();
 	return 0;
@@ -135,6 +144,13 @@ GetCPUMode(void)
 	return 0x10;
 }
 
+#ifdef ESP_PLATFORM
+// the ESP32-S3 host (src/host/esp32): the top of the stack the Newton's
+// task was started on, which FreeRTOS does not answer (its start, the low
+// end, it does)
+extern "C" { const void* gHostDeviceStackTop = nil; }
+#endif
+
 // The host thread's stack, from the operating system.
 extern "C" void
 GetStackBounds(const void** low, const void** high)
@@ -144,6 +160,9 @@ GetStackBounds(const void** low, const void** high)
 	GetCurrentThreadStackLimits(&lowLimit, &highLimit);
 	*low = (const void*) lowLimit;
 	*high = (const void*) highLimit;
+#elif defined(ESP_PLATFORM)
+	*low = (const void*) pxTaskGetStackStart(NULL);
+	*high = gHostDeviceStackTop != nil ? gHostDeviceStackTop : (const char*) *low + 64 * 1024;
 #elif defined(__APPLE__)
 	// (macOS answers the stack's top - its high address - and its size)
 	pthread_t self = pthread_self();

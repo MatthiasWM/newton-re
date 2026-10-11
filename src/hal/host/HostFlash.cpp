@@ -30,6 +30,21 @@ namespace
 	const uint32_t	kSparseBigEndianBinaries = 0x01;		// (HostFlash.h)
 
 	std::vector<unsigned char>	gFlash;		// the banks, one after the other
+	const HostFlashBacking*		gBacking = nil;		// (HostFlashSetBacking)
+	Boolean						gBackingOpen = false;	// the banks are gBacking's bytes
+	Boolean						gExisted = false;
+
+	unsigned char*
+	FlashBase(void)
+	{
+		return gBackingOpen ? gBacking->bytes : gFlash.empty() ? nil : &gFlash[0];
+	}
+
+	ULong
+	FlashSize(void)
+	{
+		return gBackingOpen ? gBacking->size : (ULong) gFlash.size();
+	}
 	FILE*						gFile = nil;
 	HostFlashFormat				gFormat = kHostFlashFlat;
 	ULong						gBankSize = 0;
@@ -260,6 +275,8 @@ namespace
 		}
 		gFlash.clear();
 		gFlash.shrink_to_fit();
+		gBackingOpen = false;
+		gExisted = false;
 		gMap.clear();
 		gMap.shrink_to_fit();
 		gFreeSlots.clear();
@@ -290,6 +307,19 @@ NewtonErr
 HostFlashOpen(const char* path, ULong size, HostFlashFormat format)
 {
 	HostFlashClose();
+	if (gBacking != nil)
+	{
+		if (!HostFlashValidSize(gBacking->size))
+			return kError_Bad_Parameters;
+		gBackingOpen = true;
+		gExisted = gBacking->existed;
+		gFormat = kHostFlashFlat;
+		gBankSize = BankSizeFor(gBacking->size);
+		HostRegisterPhysicalMemory(kHostFlashBank1, gBankSize, (Ptr) gBacking->bytes);
+		if (gBacking->size > gBankSize)
+			HostRegisterPhysicalMemory(kHostFlashBank2, gBankSize, (Ptr) gBacking->bytes + gBankSize);
+		return noErr;
+	}
 	if (!HostFlashValidSize(size))
 		return kError_Bad_Parameters;
 	gFormat = format;
@@ -298,6 +328,7 @@ HostFlashOpen(const char* path, ULong size, HostFlashFormat format)
 		gFile = fopen(path, "r+b");
 		if (gFile != nil)
 		{
+			gExisted = true;
 			long existing = FileLength(gFile);
 			unsigned char magic[8];
 			fseek(gFile, 0, SEEK_SET);
@@ -371,14 +402,28 @@ HostFlashClose(void)
 Boolean
 HostFlashIsOpen(void)
 {
-	return !gFlash.empty();
+	return FlashBase() != nil;
+}
+
+
+void
+HostFlashSetBacking(const HostFlashBacking* backing)
+{
+	gBacking = backing;
+}
+
+
+Boolean
+HostFlashExisted(void)
+{
+	return gExisted;
 }
 
 
 ULong
 HostFlashSize(void)
 {
-	return (ULong) gFlash.size();
+	return FlashSize();
 }
 
 
@@ -426,7 +471,7 @@ HostFlashSetBinariesBigEndian(void)
 Boolean
 HostFlashContains(Ptr p)
 {
-	return !gFlash.empty() && (unsigned char*) p >= &gFlash[0] && (unsigned char*) p < &gFlash[0] + gFlash.size();
+	return FlashBase() != nil && (unsigned char*) p >= FlashBase() && (unsigned char*) p < FlashBase() + FlashSize();
 }
 
 
@@ -443,6 +488,17 @@ HostFlashWrite(Ptr word, ULong value, ULong mask)
 		return;
 	unsigned char* p = (unsigned char*) word;
 	ULong programmed = value | ~mask;
+	if (gBackingOpen)
+	{
+		// (the bytes are the backing's, read only: what they become is given
+		//  to it to write)
+		unsigned char after[4] = { (unsigned char) (p[0] & (programmed >> 24)), (unsigned char) (p[1] & (programmed >> 16)),
+								   (unsigned char) (p[2] & (programmed >> 8)), (unsigned char) (p[3] & programmed) };
+		gHostFlashWrites++;
+		if (memcmp(after, p, 4) != 0)
+			gBacking->write((ULong) (p - FlashBase()), after, 4);
+		return;
+	}
 	unsigned char before[4] = { p[0], p[1], p[2], p[3] };
 	p[0] &= (unsigned char) (programmed >> 24);
 	p[1] &= (unsigned char) (programmed >> 16);
@@ -450,7 +506,7 @@ HostFlashWrite(Ptr word, ULong value, ULong mask)
 	p[3] &= (unsigned char) programmed;
 	gHostFlashWrites++;
 	if (memcmp(before, p, 4) != 0)
-		WriteThrough((ULong) (p - &gFlash[0]), 4);
+		WriteThrough((ULong) (p - FlashBase()), 4);
 }
 
 
@@ -460,9 +516,14 @@ HostFlashErase(Ptr start, ULong size, ULong lanes)
 	if (!HostFlashContains(start) || !HostFlashContains(start + size - 1))
 		return;
 	unsigned char* p = (unsigned char*) start;
-	for (ULong i = 0; i < size; i++)
-		if ((lanes >> (8 * (3 - ((p - &gFlash[0]) + i) % 4))) & 0xFF)
-			p[i] = 0xFF;
 	gHostFlashErases++;
-	WriteThrough((ULong) (p - &gFlash[0]), size);
+	if (gBackingOpen)
+	{
+		gBacking->erase((ULong) (p - FlashBase()), size, lanes);
+		return;
+	}
+	for (ULong i = 0; i < size; i++)
+		if ((lanes >> (8 * (3 - ((p - FlashBase()) + i) % 4))) & 0xFF)
+			p[i] = 0xFF;
+	WriteThrough((ULong) (p - FlashBase()), size);
 }

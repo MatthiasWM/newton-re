@@ -673,7 +673,7 @@ FindMatchingArea(TView* view, ULong inputMask)
 ULong
 TryGetAreasHit(TUnit* unit, TArray* areas)
 {
-	TUnitPublic pub(unit, nil);
+	TUnitPublic pub(unit, 0);
 	ULong made = 0;
 	TView* view = pub.FindView(pub.RequiredMask());
 	ULong inputMask = pub.InputMask();

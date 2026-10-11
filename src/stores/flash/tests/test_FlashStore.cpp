@@ -19,6 +19,7 @@
 #include "host/RomBugs.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int failures = 0;
@@ -276,14 +277,29 @@ TestLookupCache(void)
 }
 
 
+// A flash kept by a backing (hal/host/HostFlash.h: the ESP32-S3 host's
+// partition, read in place): its bytes change only through the backing's
+// write and erase, as a flash read through a memory mapping does
+static unsigned char*	gBacked = nil;
+
 static void
-FlashStoreScenario(void)
+BackedWrite(ULong offset, const unsigned char* bytes, ULong size)
 {
-	TNewInternalFlash::ClassInfo()->Register();
-	TFlashStore::ClassInfo()->Register();
-	TMuxStore::ClassInfo()->Register();
-	TMuxStoreMonitor::ClassInfo()->Register();
-	TestLookupCache();
+	memcpy(gBacked + offset, bytes, size);
+}
+
+static void
+BackedErase(ULong offset, ULong size, ULong lanes)
+{
+	for (ULong i = offset; i < offset + size; i++)
+		if ((lanes >> (8 * (3 - i % 4))) & 0xFF)
+			gBacked[i] = 0xFF;
+}
+
+
+static void
+Scenario(void)
+{
 	remove(kFlashFile);
 	EXPECT(HostFlashOpen(kFlashFile) == noErr);
 	HostClearSections();
@@ -316,6 +332,31 @@ FlashStoreScenario(void)
 	HostFlashClose();
 	TestMuxStore(kept);
 	remove(kFlashFile);
+}
+
+
+static void
+FlashStoreScenario(void)
+{
+	TNewInternalFlash::ClassInfo()->Register();
+	TFlashStore::ClassInfo()->Register();
+	TMuxStore::ClassInfo()->Register();
+	TMuxStoreMonitor::ClassInfo()->Register();
+	TestLookupCache();
+	Scenario();
+	// the same on a backing's flash
+	static HostFlashBacking backing;
+	gBacked = (unsigned char*) malloc(kHostFlashBankSize);
+	memset(gBacked, 0xFF, kHostFlashBankSize);
+	backing.bytes = gBacked;
+	backing.size = kHostFlashBankSize;
+	backing.existed = false;
+	backing.write = BackedWrite;
+	backing.erase = BackedErase;
+	HostFlashSetBacking(&backing);
+	Scenario();
+	HostFlashSetBacking(nil);
+	free(gBacked);
 	HostStopTasks();
 }
 

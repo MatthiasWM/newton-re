@@ -32,7 +32,7 @@ target_link_libraries(test_HostTLS PRIVATE print_host_tls)
 if(WIN32)
     target_link_libraries(test_HostTLS PRIVATE ws2_32)
 endif()
-if(Python3_FOUND)
+if(Python3_FOUND AND NEWTON_HOST_TLS)
     add_test(NAME print.HostTLS
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/print/ippprinter.py --port 0
                      --tls ${CMAKE_SOURCE_DIR}/../tools/print/testcerts/printer-a.pem --out ${CMAKE_CURRENT_BINARY_DIR}/tls

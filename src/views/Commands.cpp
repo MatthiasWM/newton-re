@@ -29,19 +29,38 @@
 // a Newton word.  A parameter that does fit is the integer the ROM would
 // have written, which is what a script reading cmd.parameter sees.
 //
+// A 32-bit host's pointer is a Newton-sized word, so the width cannot tell
+// it apart (a 64-bit host's heap is above 4 GB, and the width does); one
+// above 0x20000000 does not fit either (the ESP32-S3's PSRAM
+// is at 0x3C000000 - the desktop's 32-bit builds put theirs lower, and it
+// did fit), so the Refs kept as addresses are remembered, the last
+// kAddressRefs of them, and a value is an address on the way out when it is
+// one of those.  (An integer parameter whose Ref is the same word - a
+// number near a quarter of the address, hundreds of millions - would be
+// taken for it; none is.)  Before this, a tap on the T-Deck Pro gave a
+// click's unit as the address shifted down by two, and the button's
+// TrackHilite crashed on it (docs/host-tdeck-pro.md).
+//
 // NEWTON_NS64: a host pointer fits in an integer, and AddressToRef makes
 // one (Objects.cpp), so every parameter is simply an integer - the width
 // can no longer tell a pointer from a number, nor needs to.
+const unsigned	kAddressRefs = 256;
+static Ref		gAddressRefs[kAddressRefs];
+static unsigned	gNextAddressRef = 0;
+
 static Ref
 ParameterRef(Long parameter)
 {
 #if NEWTON_NS64
 	return MAKEINT(parameter);
 #endif
-	Ref value = MAKEINT(parameter);
-	if ((Long) RVALUE(value) == parameter)
-		return value;
-	return AddressToRef((void*) parameter);
+	// (the Newton's thirty bits, whatever a host's Ref could hold)
+	if (parameter >= -0x20000000L && parameter < 0x20000000L)
+		return MAKEINT(parameter);
+	Ref value = AddressToRef((void*) parameter);
+	gAddressRefs[gNextAddressRef] = value;
+	gNextAddressRef = (gNextAddressRef + 1) % kAddressRefs;
+	return value;
 }
 
 
@@ -51,6 +70,9 @@ ParameterValue(Ref value)
 #if NEWTON_NS64
 	return (Long) RVALUE(value);
 #endif
+	for (unsigned i = 0; i < kAddressRefs; i++)
+		if (gAddressRefs[i] == value && value != 0)
+			return (Long) RefToAddress(value);
 	if (value == (Ref) (int) value)			// a Newton-sized word
 		return (Long) RVALUE(value);
 	return (Long) RefToAddress(value);

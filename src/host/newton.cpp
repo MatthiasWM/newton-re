@@ -15,7 +15,8 @@
 
 	newton [--rom image | --objects file] [--heap bytes] [--display WxH[xdepth]] [--colour] [--scale n]
 	       [--script file.ns] [--headless seconds] [--store file] [--erase]
-	       [--flash-size mb] [--flat-flash]
+	       [--flash-size mb] [--flat-flash] [--kernel-heap mb] [--task-stack kb]
+	       [--bake-objects image [--bake-base address]]
 	       [--package file.pkg]... [--card file] [--microphone-tone hz] [--tcp-echo port]
 	       [--serial-port port|none] [--ir-peer listen:port|host:port] [--print-dir dir]
 	       [--ipp-printer uri]
@@ -73,7 +74,25 @@
 	default, the most the ROM's code takes unchanged - or 128;
 	docs/stores/README.md, "Bigger flash"), and --flat-flash makes it a
 	flat file of that many bytes instead (4 MB unless --flash-size says
-	otherwise; at 4 or 8 MB, Einstein's own).  A file that is there keeps its size and
+	otherwise; at 4 or 8 MB, Einstein's own).
+
+	--kernel-heap (megabytes; 32 unless given) and --task-stack (kilobytes,
+	each task thread's stack; 8 MB unless given, Unix hosts only - Windows
+	threads keep the system's size) size what the host gives the OS, with
+	--heap (the NewtonScript heap, inside the kernel heap) and --flash-size,
+	to a small device's budget (docs/host-tdeck-pro.md, "A device-sized
+	run"); NEWTON_MEMORY_REPORT in the environment prints at exit how much
+	of the kernel heap was used (host/HostHeapCheck.h).
+
+	--bake-objects bakes the object file (--objects, or the default) into
+	an image and stops: the ROM's objects as newton would import them, laid
+	out in one region at --bake-base (an address; 0x20000000000 on a 64-bit
+	host and 0x50000000 on a 32-bit one unless given) and written out as
+	they lie (frames/ROMImport.h).  --objects takes such an image as it
+	takes an object file, and maps it there read-only - nothing read,
+	converted or held - as a small device maps it from flash
+	(docs/host-tdeck-pro.md, "The baked object image").  An image is a
+	host build's own layout: bake it with the build that maps it.  A file that is there keeps its size and
 	format; tools/stores/flashimage.py converts between the two.  Set the machine up once and every boot after that
 	comes up on the Notepad.  --erase throws that
 	file away first and starts again at the Setup assistant, which is what
@@ -141,6 +160,9 @@
 #include "HostPackages.h"
 #include "HostOrientation.h"
 #include "HostSettings.h"
+#include "HostMapping.h"
+#include "ROMImport.h"
+#include "memory/host/KernelHeap.h"
 #include "HostFontProvider.h"
 #include "HostWordEngines.h"
 #include "HostTablet.h"
@@ -259,7 +281,8 @@ Usage(void)
 	fprintf(stderr, "usage: newton [--objects file | --rom image] [--heap bytes] [--display WxH[xdepth]] [--colour] [--scale n]\n"
 					"              [--script file.ns] [--headless seconds] [--limit seconds] [--window-pen]\n"
 					"              [--store file] [--erase]\n"
-					"              [--flash-size mb] [--flat-flash]\n"
+					"              [--flash-size mb] [--flat-flash] [--kernel-heap mb] [--task-stack kb]\n"
+					"              [--bake-objects image [--bake-base address]]\n"
 					"              [--package file.pkg]... [--card file] [--microphone-tone hz] [--tcp-echo port]\n"
 					"              [--serial-port port|none] [--ir-peer listen:port|host:port] [--print-dir dir]\n"
 					"              [--ir-lan [port]] [--ir-lan-interface address]\n"
@@ -630,6 +653,12 @@ ReportTheScript(void)
 
 static void HostCrashedSignal(int signal);
 
+// the stack pointer of the context that fell over (a Unix host's signal
+// handler sets it): when the fault is a jump to somewhere outside the
+// program - a call through a bad pointer - the unwinder stops there, and
+// the return addresses still on the stack are what says who made the call
+static void*	gCrashedSP = nil;
+
 static void
 HostCrashed(const char* what, unsigned long code, void* where)
 {
@@ -659,6 +688,17 @@ HostCrashed(const char* what, unsigned long code, void* where)
 			fprintf(stderr, "\n");
 		}
 	}
+	if (gCrashedSP != nil)
+	{
+		// (the words at the stack pointer that point into the program:
+		//  return addresses, the innermost first)
+		fprintf(stderr, "[host] the words on the stack that point into the program, as image offsets:");
+		const uintptr_t* sp = (const uintptr_t*) gCrashedSP;
+		for (int i = 0; i < 64; i++)
+			if ((char*) sp[i] >= base && (char*) sp[i] < base + 0x10000000 && (char*) sp[i] != (char*) where)
+				fprintf(stderr, " %#lx", (unsigned long) ((char*) sp[i] - base));
+		fprintf(stderr, "\n");
+	}
 	if (gREPout != nil && gInterpreter != nil)
 		gREPout->StackTrace(gInterpreter);
 	fflush(stderr);
@@ -682,10 +722,25 @@ HostCrashedSignalAt(int signal, siginfo_t* info, void* context)
 	void* where = info != nil ? info->si_addr : nil;
 #if defined(__x86_64__) && defined(__linux__)
 	if (context != nil)
+	{
 		where = (void*) ((ucontext_t*) context)->uc_mcontext.gregs[REG_RIP];
+		gCrashedSP = (void*) ((ucontext_t*) context)->uc_mcontext.gregs[REG_RSP];
+	}
 #elif defined(__aarch64__) && defined(__linux__)
 	if (context != nil)
 		where = (void*) ((ucontext_t*) context)->uc_mcontext.pc;
+#elif defined(__i386__) && defined(__linux__)
+	if (context != nil)
+	{
+		where = (void*) ((ucontext_t*) context)->uc_mcontext.gregs[REG_EIP];
+		gCrashedSP = (void*) ((ucontext_t*) context)->uc_mcontext.gregs[REG_ESP];
+	}
+#elif defined(__arm__) && defined(__linux__)
+	if (context != nil)
+	{
+		where = (void*) ((ucontext_t*) context)->uc_mcontext.arm_pc;
+		gCrashedSP = (void*) ((ucontext_t*) context)->uc_mcontext.arm_sp;
+	}
 #elif defined(__APPLE__) && defined(__x86_64__)
 	if (context != nil)
 		where = (void*) ((ucontext_t*) context)->uc_mcontext->__ss.__rip;
@@ -922,6 +977,8 @@ main(int argc, char** argv)
 	// costs nothing until it is written; a flat file is all its size on the
 	// disk at once, so it stays Einstein's 4 MB unless asked
 	ULong flashSize = 0;
+	const char* bakeImage = nil;		// --bake-objects
+	uintptr_t bakeBase = 0;
 	Boolean flatFlash = false;
 	for (int i = 1; i < argc; i++)
 	{
@@ -934,6 +991,24 @@ main(int argc, char** argv)
 		}
 		else if (strcmp(argv[i], "--heap") == 0 && i + 1 < argc)
 			heapSize = strtol(argv[++i], nil, 0);
+		else if (strcmp(argv[i], "--kernel-heap") == 0 && i + 1 < argc)
+		{
+			long mb = strtol(argv[++i], nil, 0);
+			if (mb < 1)
+				return Usage();
+			HostSetKernelHeapSize((Size) mb << 20);
+		}
+		else if (strcmp(argv[i], "--bake-objects") == 0 && i + 1 < argc)
+			bakeImage = argv[++i];
+		else if (strcmp(argv[i], "--bake-base") == 0 && i + 1 < argc)
+			bakeBase = (uintptr_t) strtoull(argv[++i], nil, 0);
+		else if (strcmp(argv[i], "--task-stack") == 0 && i + 1 < argc)
+		{
+			long kb = strtol(argv[++i], nil, 0);
+			if (kb < 1)
+				return Usage();
+			HostSetTaskStackSize((size_t) kb << 10);
+		}
 		else if (strcmp(argv[i], "--display") == 0 && i + 1 < argc)
 		{
 			char* rest;
@@ -1052,6 +1127,22 @@ main(int argc, char** argv)
 		return 1;
 	}
 	fclose(readable);
+	// a baked object image is made and mapped through the host's mapping
+	// (host/HostMapping.h)
+	SetHostMappers(HostReserveAt, HostMapFileAt);
+	if (bakeImage != nil)
+	{
+		uintptr_t base = bakeBase != 0 ? bakeBase : DefaultBakedObjectsBase();
+		NewtonErr err = BakeBuiltObjectsFile(romImage, bakeImage, base, (size_t) 32 << 20);
+		if (err != noErr)
+		{
+			fprintf(stderr, "newton: %s could not be baked into %s at %#llx (%ld)\n",
+					romImage, bakeImage, (unsigned long long) base, (long) err);
+			return 1;
+		}
+		fprintf(stderr, "[host] %s baked into %s, to be mapped at %#llx\n", romImage, bakeImage, (unsigned long long) base);
+		return 0;
+	}
 	if (!HostObjectsFileMatches(romImage))
 	{
 		HostObjectsFileMismatch("newton", romImage, NEWTON_DEFAULT_OBJECTS);

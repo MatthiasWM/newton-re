@@ -1,0 +1,10 @@
+// A screenshot of the Newton a few seconds after boot, into the file the SHOT
+// environment variable names (tools/tdeck/pgm2epd.py makes the T-Deck Pro's
+// test frame of it):
+//   SHOT=tmp/tdeck/screen.pgm build/host/host/newton --display 240x320x1 --erase \
+//       --store tmp/tdeck/screen.store --headless 40 --script tools/tdeck/screenshot.ns
+AddDelayedCall(func() begin
+	ScreenSnapshot(HostGetEnv("SHOT"));
+	Print("screenshot: done");
+	HostQuit();
+end, nil, 6000);

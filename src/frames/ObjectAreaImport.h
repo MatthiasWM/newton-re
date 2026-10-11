@@ -41,6 +41,13 @@ struct ImportedObjectEntry
 // a ref that points outside the area, as a host ref (nil: none)
 typedef Ref (*OutsideRefTranslator)(ULong32 ref, void* refCon);
 
+// Where an import puts its area and index: malloc, unless a bake has put
+// an allocator of its own in place (frames/ROMImport.h BakeBuiltObjectsFile,
+// which lays everything out in one region at the address it will be
+// mapped at).  Memory from another allocator is not freed by Dispose.
+typedef void* (*ImportAllocator)(size_t size);
+extern ImportAllocator	gImportAlloc;
+
 class TImportedObjectArea
 {
 public:
@@ -61,6 +68,7 @@ public:
 	Ref			TranslateRef(ULong32 ref) const;		// a source ref as a host ref
 	Boolean		Contains(Ref r) const					{ return (char*) r >= fArea && (char*) r < fAreaEnd; }
 
+	char*		fAreaStart;			// what was allocated (fArea is it aligned)
 	char*		fArea;				// the host objects
 	char*		fAreaEnd;
 	ImportedObjectEntry*	fObjects;	// by source address
@@ -70,6 +78,7 @@ public:
 	const unsigned char*	fBytes;	// the source bytes (they must outlive the area: a part's package is kept while it is installed)
 	OutsideRefTranslator	fOutside;
 	void*		fRefCon;
+	Boolean		fOwned;				// the area and index are malloc's (not a bake's, nor a mapped image's)
 };
 
 #endif	/* __OBJECTAREAIMPORT_H */

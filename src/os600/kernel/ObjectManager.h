@@ -42,7 +42,7 @@ class TObjectManager
 						TObjectManager();
 
 		NewtonErr		MonitorProc(long selector, ObjectMessage* msg);		// the monitor's proc; result to the caller
-		static void		MonitorProcGlue(void* manager, ULong selector, void* msg);
+		static long		MonitorProcGlue(void* manager, ULong selector, void* msg);	// (a MonitorProcPtr, cast: see ObjectManager.cpp)
 
 		TObjectId		fTaskToDelete;		// +0x00  a task that killed itself; removed at the next request
 };

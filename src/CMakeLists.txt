@@ -21,6 +21,19 @@ if(NEWTON_WRAPV)
     add_compile_options(-fwrapv)
 endif()
 
+# Every function four-byte aligned, as the ARM's are.  The reconstruction
+# keeps host function pointers where the ROM keeps code addresses, whose
+# low two bits are always clear: a native's pointer sits in a NewtonScript
+# array slot as a raw Ref (frames/Interpreter.cpp MakeCFunction - with a
+# low bit set it is taken for a heap pointer), and a kernel object's
+# destructor is called with its low bits cleared (os600/kernel/ObjectTable.cpp
+# CallDestructor, DoubleQ.cpp - the ROM's `bic #3`).  x86 at -O2/-O3 aligns
+# functions to 16 anyway; at -Os it packs them byte to byte, and a 32-bit
+# -Os build jumped into its heap destroying its first port
+# (docs/host-tdeck-pro.md).  (A Thumb build cannot keep this: its function
+# pointers have bit 0 set - build ARM code.)
+add_compile_options(-falign-functions=4)
+
 # The 64-bit flavour of NewtonScript (docs/frames/64bit.md): integers as wide
 # as a Ref (62 bits) instead of the ROM's 30, every persistent and wire format
 # still 32-bit with what crosses it narrowed by one policy

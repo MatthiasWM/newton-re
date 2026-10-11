@@ -47,6 +47,35 @@ the way are all in `docs/work-log.md`.
 
 Nothing at present.
 
+### A small device: the T-Deck Pro (branch `tdeck-pro-investigation`, 2026-10-10)
+
+`docs/host-tdeck-pro.md`.  Done: the investigation; 32-bit builds
+(`src/cmake/zig-x86-linux.cmake`, `zig-arm-linux.cmake`); a device spike
+on the owner's board (`tools/tdeck/spike`: the panel, touch, keyboard,
+memory speed); the tree compiled for the ESP32-S3 (674 of 678 files);
+a device-sized run (2 MB kernel heap, 512 KB NewtonScript heap, 32 KB
+stacks: both walkthroughs pass); the baked object image (`newton
+--bake-objects`, mapped read-only); **NewtonScript on the board**
+(`src/host/esp32`, milestone A: the baked objects mapped from flash, the
+REP on USB; 100-500x the desktop's time, the allocating code worst);
+**the OS booted on the board** (milestone B: the kernel's tasks on
+FreeRTOS, the newt world at 240x320, a NewtonScript prompt evaluated in
+it; up in 62 s); **the panel, touch screen and keyboard** (the
+Newton on the e-paper, partial refreshes over what changed; set-up found
+with a webcam on the board, `tools/tdeck/camshot.py`/`panelprobe.py`).
+**The store on the board's flash** (the `store` partition, kept between
+starts); **a 3 s start** (from a minute: C++ exception tables sorted, two
+quadratic lookups made hashed - tools/tdeck/profile.py); **a 32-bit build
+in the tests** (`tools/host/wsl32.sh`: the x86 build under WSL, all 425
+pass).  **WiFi**,
+set up in Internet Setup's Host network setup (scan, remember, join any
+remembered network in range; not yet tried on a real network); the panel
+following the Newton turned to landscape; the clock set from the network
+(SNTP) once joined, or by hand (`!time`).  Next: the store's writes batched (word by word now); NewtonScript's speed (the
+object heap in PSRAM); the built-in packages' frames baked; the applications at 240x320 (some ask to rotate); later the
+panel's own waveforms for speed and grays (docs/host-tdeck-pro.md, "Order
+of work").
+
 ### Left of host fonts (merged 2026-10-10, off unless asked for)
 
 The host's own fonts offered beside the ROM's, drawn by the host's

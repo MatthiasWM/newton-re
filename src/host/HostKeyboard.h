@@ -25,6 +25,8 @@ void	HostKeyboardPush(long keyCode, Boolean down);		// from any thread: a key fo
 long	HostKeyCodeForVirtualKey(long virtualKey);			// a Windows virtual key (or an ASCII letter/digit) as a Newton key code; -1 for none
 void	HostKeyboardQuit(void);								// from any thread: the run is to end
 void	HostKeyboardToolTask(void);							// the task: the keys sent to the newt world until the quit
+class TUPort;
+void	HostKeyboardSendKeys(TUPort* newtPort);				// the keys queued so far sent to the world's port (the task's step; a host with a loop of its own - src/host/esp32 - calls it)
 void	HostKeyboardSetTimeLimit(ULong seconds);				// the run ended after so long with the window open too (newton --limit; 0: none)
 
 #endif	/* __HOSTKEYBOARD_H */

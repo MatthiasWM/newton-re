@@ -1,0 +1,6 @@
+# PlatformIO's build and the sdkconfig ESP-IDF writes from sdkconfig.defaults
+.pio/
+sdkconfig.tdeck-pro
+sdkconfig.old
+# the baked ROM objects (made by the 32-bit build: README.md)
+objects.baked

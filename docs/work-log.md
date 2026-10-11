@@ -9,6 +9,194 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-12: The T-Deck Pro joins a real network
+
+Internet Setup would not open on the board: its PreMain never started the
+host's link for the NIE (HostLinkStart), so there was no module.  Now it
+does, HostLink.ns compiled in at configure time.  The Wi-Fi slip keeps to
+the visible part of Internet Setup's 320-wide slip; the event task's stack
+is 4 KB (2304 bytes overflowed when an address came, a restart at every
+join); the console's `!tap x y` answers a modal dialog.  The owner's
+network joined, and the clock set from it.
+
+## 2026-10-12: The T-Deck Pro's clock set from the network
+
+Once WiFi is joined, SNTP (`pool.ntp.org`) sets the board's clock
+(`tdeck_wifi.cpp`), and the Newton's is set from it each time
+(`newtonmain.cpp`, `TURealTimeAlarm::SetTime` in GMT).  The console's
+`!time <seconds since 1970>` sets it by hand the same way - how it was
+tested, no network having been joined yet.
+
+## 2026-10-11: WiFi for the T-Deck Pro, set up in Internet Setup
+
+host/HostWifi.h (a provider and its natives) and the board's provider,
+`src/host/esp32/main/tdeck_wifi.cpp` (networks remembered in NVS, the
+strongest remembered one in range joined); Internet Setup's Host network
+setup has a Wi-Fi line and slip (comms/host/HostLink.ns: scan, password,
+Join, Forget) on a host with WiFi - tested on the desktop with
+`NEWTON_FAKE_WIFI` (ctest host.NewtonWifiSetup).  To make room,
+`HOST_LARGE_STATIC` moves the tree's six largest statics to PSRAM on the
+board.  The panel and touch follow the Newton turned to landscape (which
+Internet Setup needs at 240x320).  The board's console answers `!shot`
+(what the panel shows: tools/tdeck/panelshot.py), `!prof` and `!reset`
+itself, whatever the Newton is doing.
+
+## 2026-10-11: A 32-bit build in the tests
+
+`tools/host/wsl32.sh` builds the 32-bit x86 flavour
+(`src/cmake/zig-x86-linux.cmake`, the ESP32-S3's ILP32 layout) inside WSL
+with zig put into `tmp/`, and runs the whole ctest suite on it; the
+toolchain file tells the build it runs its own programs there
+(`NEWTON_TARGET_RUNS_HERE`).  All 425 pass, after: `ResampleFiltered`'s
+interpolation shifted unsigned where the ROM's `asr` is signed (right at
+64 bits only by accident - sound.ResampleFiltered, sound.PlaySound);
+`memcpy` from nil in `MakeString` and `THostStore::SetObjectSize` (zig's
+undefined-behaviour checks); test_Ink's decoder with `fBitCount` unset;
+host.NewtonHostSettings losing TCP 3679 to the other newtons ctest runs
+at once (Linux has no Windows-style `SO_REUSEADDR`); the ipps tests
+registered only with a TLS library.  The comms failures seen by hand were
+programs run without `tools/dock/mnp.py`, their desktop end.
+(`docs/host-lp64.md`, "The 32-bit build under WSL".)
+
+## 2026-10-11: The T-Deck Pro starts in 3 s
+
+The OS up 3.2 s after the boot starts, from 61.7 s.  A sampling profiler
+of the Newton's core (`src/host/esp32/main/tdeck_profile.cpp`, the
+ESP32-S3's pc recording read from the other core; `tools/tdeck/profile.py`)
+found: C++ exception tables searched linearly at every throw (Espressif's
+libgcc sorts them only when asked: `_Unwind_SetEnableExceptionFdeSorting`;
+22 ms a throw, now 62 µs - 78% of the boot); `FindRExHeader` scanning the
+image at every call (packages/ROMPackages.cpp remembers); native functions
+and ARM glue registered by comparing each name with every entry
+(frames/NativeFunctions.cpp, armcpu/PackageNativeCPU.cpp: hashed).
+
+## 2026-10-11: The T-Deck Pro's store on its own flash
+
+The board's `store` partition (4 MB) is the Newton's internal flash: the
+ROM's flash store on it, kept between starts (an entry reads back after a
+reset).  hal/host/HostFlash.h gained a backing - a flash read in place and
+written through callbacks, there being no room for the desktop's copy in
+RAM (test: stores.FlashStore runs its scenario on one);
+`src/host/esp32/main/tdeck_store.cpp` maps the partition, writes and
+erases it from a task with an internal stack, and refreshes the mapping's
+cache itself (ESP-IDF's refresh missed it: written words read back
+erased); host/HostStores.cpp asks HostFlashExisted whether the flash was
+used before.  serialcapture.py's `--reset` works again (RTS changes sent
+with DTR, as esptool does on Windows).
+
+## 2026-10-11: The T-Deck Pro's panel, touch screen and keyboard
+
+`src/host/esp32/main/tdeck_panel.cpp` shows the Newton's display on the
+e-paper panel (partial refreshes over the changed rectangle, full ones for
+new pages and a clean-up); `tdeck_input.cpp` makes the touch panel the pen
+and the keyboard the keyboard (the owner's layout), through
+host/HostKeyboard.cpp's shims, which the board now builds
+(`HostKeyboardSendKeys` factored out for its services loop).  The panel's
+set-up was found with a webcam on the board (`tools/tdeck/camshot.py`,
+`panelprobe.py`): the maker's way, with the controller reset before every
+refresh (docs/host-tdeck-pro.md, "The panel, the touch screen and the
+keyboard").
+
+Bugs found on the way:
+- **views/Commands.cpp**: a command's pointer parameter came back shifted
+  down by two on a 32-bit host whose heap is above 0x20000000 (tapping a
+  button crashed the ESP32-S3); the Refs kept as addresses are remembered
+  now (test views.Views).
+- **system/SystemNatives.cpp**: `ExtendedGestalt`'s first buffer was
+  `malloc(0)`, nil on newlib - every extended Gestalt answered nil (the
+  Extras drawer threw); and the board wraps `malloc` so that 0 bytes is a
+  block.
+- `tools/tdeck/serialcapture.py`: `--send-file`, `--after ""`, a write
+  timeout, the port opened without resetting the board.
+
+## 2026-10-11: The OS booted on the T-Deck Pro (milestone B)
+
+`src/host/esp32` boots the OS on the owner's T-Deck Pro: the task
+runtime's threads are FreeRTOS tasks (48 KB stacks in PSRAM, on core 1),
+the newt world comes up at 240x320 one-bit with the store in RAM, and the
+kernel services task hands each line typed on the USB console to the newt
+world as a `'host/'eval` event, whose result is printed - `2 + 3;` is 5
+in a millisecond.  Up in 62 s (kernel 10 s, newt world 17.5 s, the rest
+the built-in applications); 29 KB of internal RAM and 2.6 MB of PSRAM
+left.  The baked image is now mapped at a fixed 0x3d000000.
+
+Bugs the board found (`docs/host-tdeck-pro.md`, "The OS booted"):
+- **Reconstruction**: `TObjectManager::MonitorProcGlue` dropped
+  `MonitorProc`'s result (x86 and the ARM kept it in the result register
+  anyway; Xtensa's windowed registers did not - every object request
+  failed); `TNSConfigServer` wrote one byte past its end (the 4-character
+  conversion's terminator) - both fixed, the desktop suite unchanged.
+- **Host runtime**: a catch inlined into a FreeRTOS task's entry function
+  is never reached (`Trampoline` now `noinline`); a self-deleted static
+  task's memory was freed while FreeRTOS's idle task still used it.
+- `hal/host/HostSockets.cpp` builds on lwIP; `Reset` prints a backtrace
+  on the board; `tools/tdeck/xtensa_compile.py --warn` lists warnings
+  matching a pattern (no function falls off its end).
+
+## 2026-10-11: NewtonScript on the T-Deck Pro (milestone A)
+
+`src/host/esp32`: an ESP-IDF application built with PlatformIO - 650 of the
+tree's sources in one component (`tools/tdeck/idf_sources.py`), a board
+side and a Newton side, the task runtime's entry points for one task - runs
+NewtonScript on the owner's T-Deck Pro with the ROM's objects mapped from
+flash as a baked image (11 ms to bring up) and the prompt on the USB
+serial port.  13 symbols had to be supplied; the tree changed only in
+`hal/host/System.cpp` (an ESP-IDF branch), two includes made to name their
+directory, and the baked layout check (Xtensa pads the header's end).  The
+build had PlatformIO's quirks to get round: objects named by file name
+alone, flags sorted and split, include order lost.  Measured: a loop
+~120x, string-making ~500x, a sort ~80x the 32-bit desktop build's time.
+Flashing: esptool's stub sometimes stops answering after the program has
+run, cleared by taking power off the board.
+
+## 2026-10-10: the T-Deck Pro, continued - spike, Xtensa, budget, baked image
+
+On the owner's T-Deck Pro (a V1.0, quad PSRAM): a PlatformIO/ESP-IDF
+spike (`tools/tdeck/spike`) drove the panel from the UC8253 datasheet
+(full refresh 3.08 s, fastest OTP waveform 0.65 s; the image shown is
+DTM1's - sending it to DTM2 showed the previous frame, which cost an
+evening's blank screens; never deep-sleep it, there is no reset line),
+measured touch (panel pixels, within ~2 mm) and memory (a cache miss ~1 us
+from PSRAM, ~2 us from flash - the largest risk), and read the keyboard
+with the owner's own layout.  `tools/tdeck/xtensa_compile.py` compiled
+674 of 678 files with ESP-IDF's GCC (two GCC-only fixes: duplicate
+`ULong32` typedefs, a constructor in an anonymous union).  `newton
+--kernel-heap`/`--task-stack` and `NEWTON_MEMORY_REPORT` sized and
+measured a device budget: a 2 MB kernel heap with a 512 KB NewtonScript
+heap passes both walkthroughs (`tools/tdeck/devicerun.sh`).  The baked
+object image (`newton --bake-objects`, mapped read-only by `--objects`)
+puts the ROM's objects in a file mapped where it was baked: 5.4 MB at 32
+bits in place of 9.4 MB of RAM, and both walkthroughs pass on it - so
+nothing writes to a ROM object.
+
+## 2026-10-10: a small device investigated - the T-Deck Pro (branch tdeck-pro-investigation)
+
+The owner asked whether the reconstruction could run on something as
+small as the original - a LilyGO T-Deck Pro (ESP32-S3, 8 MB PSRAM, 16 MB
+flash, a 240x320 e-paper, a keyboard).  Measured on the development
+machine (`docs/host-tdeck-pro.md`): a 32-bit ARM `-Os` build is 4.7 MB; a
+boot reaches 5.24 MB of the kernel heap, 4 MB of it the object heap with
+120 KB used; the walkthrough runs with a 1 MB object heap; task stacks go
+no deeper than 24 KB at `-Os`.  The store held whole in RAM and the ROM
+objects read and converted into RAM are what a device must do otherwise.
+
+The tree had never been built for 32 bits.  It compiled but for one call
+(`recognition/Areas.cpp`, `nil` for an integer); zig places 32-bit
+programs at 0x10000, below `kROMCodeLimit` (the reMarkable's trap - the
+new toolchain files link at 0x08000000); and an `-Os` build jumped into
+its heap destroying its first port: the ROM's `bic #3` on a destructor's
+address (`CallDestructor`, `TDoubleQContainer`) and native function
+pointers kept as raw Refs both need four-byte-aligned functions, which
+x86 gives at -O0/-O2/-O3 but not -Os - every build now has
+`-falign-functions=4`.  Found with two additions to the crash tools: the
+handler names the instruction on 32-bit Linux and prints the stack's
+return addresses when the fault is a jump outside the program, and
+`whichfunction.py` reads 32-bit and non-PIE ELF.  New: `src/cmake/zig-x86-linux.cmake`,
+`zig-arm-linux.cmake`, `tools/host/stackdepth.sh`, `codesize.py`.
+
+At 240x320 the OS boots and draws, but Setup will not open in portrait
+or rotated; the applications' layouts are the largest unknown.
+
 ## 2026-10-10: the host's own fonts (branch host-fonts, merged)
 
 The owner asked what it would take for the Newton to use the host

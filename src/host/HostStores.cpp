@@ -133,11 +133,9 @@ HostMountStores(void)
 		Boolean onFlash = false;
 		if (gStoreFile != nil && gProtocolRegistry != nil)
 		{
-			FILE* existing = fopen(gStoreFile, "rb");
-			if (existing != nil)
-				fclose(existing);
 			NewtonErr err = HostFlashOpen(gStoreFile, gNewFlashSize, gNewFlashFlat ? kHostFlashFlat : kHostFlashSparse);
-			if (err == noErr && existing == nil)
+			Boolean existed = err == noErr && HostFlashExisted();		// (its file there before, or its backing used: HostFlash.h)
+			if (err == noErr && !existed)
 				fprintf(stderr, "[host] %s: a new %lu MB %s flash\n", gStoreFile, (unsigned long) (HostFlashSize() >> 20),
 						HostFlashFileFormat() == kHostFlashSparse ? "sparse" : "flat");
 			if (err != noErr)
@@ -146,7 +144,7 @@ HostMountStores(void)
 				fprintf(stderr, "[host] the internal flash would not mount (%ld)\n", (long) err);
 			else
 			{
-				gRestored = (existing != nil);
+				gRestored = existed;
 				TStore* store = GetInternalStore();
 				RefVar storeObject(RegisterTStore(store));
 				// DEVIATION: a store file an older host wrote, its reals and

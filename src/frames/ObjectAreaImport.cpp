@@ -17,8 +17,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+// what the imports have made, in bytes (frames/ROMImport.h ROMObjectsMemory)
+ULong	gImportedAreaBytes = 0;
+
+ImportAllocator	gImportAlloc = malloc;
+
 TImportedObjectArea::TImportedObjectArea()
 {
+	fAreaStart = nil;
 	fArea = nil;
 	fAreaEnd = nil;
 	fObjects = nil;
@@ -28,6 +34,7 @@ TImportedObjectArea::TImportedObjectArea()
 	fBytes = nil;
 	fOutside = nil;
 	fRefCon = nil;
+	fOwned = true;
 }
 
 
@@ -40,8 +47,12 @@ TImportedObjectArea::~TImportedObjectArea()
 void
 TImportedObjectArea::Dispose(void)
 {
-	free(fArea);
-	free(fObjects);
+	if (fOwned)
+	{
+		free(fAreaStart);
+		free(fObjects);
+	}
+	fAreaStart = nil;
 	fArea = nil;
 	fAreaEnd = nil;
 	fObjects = nil;
@@ -141,15 +152,22 @@ TImportedObjectArea::Import(const unsigned char* bytes, ULong32 base, ULong32 si
 		return kError_Bad_Parameters;
 
 	// the host area: outside the object heap (and the kernel heap)
-	char* area = (char*) malloc(total + kObjAlign);
-	ImportedObjectEntry* entries = (ImportedObjectEntry*) malloc(count * sizeof(ImportedObjectEntry));
+	fOwned = gImportAlloc == malloc;
+	char* area = (char*) gImportAlloc(total + kObjAlign);
+	ImportedObjectEntry* entries = (ImportedObjectEntry*) gImportAlloc(count * sizeof(ImportedObjectEntry));
+	if (fOwned)
+		gImportedAreaBytes += (ULong) (total + kObjAlign + count * sizeof(ImportedObjectEntry));
 	if (area == nil || entries == nil)
 	{
-		free(area);
-		free(entries);
+		if (fOwned)
+		{
+			free(area);
+			free(entries);
+		}
 		return kError_No_Memory;
 	}
-	fArea = (char*) AlignedSize((ULong) area);
+	fAreaStart = area;
+	fArea = (char*) AlignedSize((uintptr_t) area);
 	fAreaEnd = fArea + total;
 	fObjects = entries;
 	fCount = count;

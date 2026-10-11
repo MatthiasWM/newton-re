@@ -122,7 +122,11 @@ ExtendedGestalt(RefArg args)
 		return NILREF;					// FGestalt's own range
 
 	long size = gExtendedGestaltSize;
-	char* block = (char*) malloc(size);
+	// (a byte at least: the first guess is 0, and a C library may answer
+	// malloc(0) with nil - the ESP32-S3's newlib does, and every extended
+	// gestalt answered nil there, the Extras drawer's volume slider throwing
+	// on it; the ROM's NewPtr(0) answers a block)
+	char* block = (char*) malloc(size > 0 ? (size_t) size : 1);
 	if (block == nil)
 		return NILREF;
 	ULong wanted = (ULong) size;

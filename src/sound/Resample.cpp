@@ -241,9 +241,12 @@ ResampleFiltered(ResampleState* state, short* /*dst*/, short* /*src*/,
 		while (at < kFilterEnd && tap <= tapCount)
 		{
 			long point = at >> 16;
+			// (the ROM's mul and asr #16: a 32-bit product that wraps,
+			// shifted signed - a falling stretch of the table has a
+			// negative difference)
 			long coefficient = kResampleFilter[point]
-					+ (long) (((ULong) (at & 0xffff)
-							* (ULong) (kResampleFilter[point + 1] - kResampleFilter[point])) >> 16);
+					+ (long) ((Long32) ((ULong32) (at & 0xffff)
+							* (ULong32) (kResampleFilter[point + 1] - kResampleFilter[point])) >> 16);
 			long sample;
 			if (clearOfTheStart || index - tap >= 0)
 				sample = GetSample(state, index - tap);

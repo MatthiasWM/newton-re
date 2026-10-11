@@ -35,8 +35,10 @@ typedef SOCKET HostSocket;
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
+#ifndef ESP_PLATFORM
 #include <ifaddrs.h>
 #include <net/if.h>
+#endif
 typedef int HostSocket;
 #define INVALID_SOCKET (-1)
 #define SOCKET_ERROR (-1)
@@ -124,7 +126,8 @@ HostSocketsInit(void)
 	WSADATA data;
 	if (WSAStartup(MAKEWORD(2, 2), &data) != 0)
 		return kHostSocketError;
-#else
+#elif !defined(ESP_PLATFORM)
+	// (lwIP raises no SIGPIPE: the ESP32-S3 host has no signals)
 	// a send to a connection the other end has reset answers EPIPE rather
 	// than ending the program with SIGPIPE (a POSIX host's default) - here
 	// and in the TLS library writing to the same sockets
@@ -420,6 +423,10 @@ HostInterfaceAddresses(uint32_t* addresses, int maxCount, int* count)
 			addresses[n] = ntohl(list[i].iiAddress.AddressIn.sin_addr.s_addr);
 		n++;
 	}
+#elif defined(ESP_PLATFORM)
+	// (the ESP32-S3 host, src/host/esp32: lwIP has no getifaddrs, and the
+	//  board's Wi-Fi is not brought up yet - no interface to offer)
+	n = 0;
 #else
 	struct ifaddrs* all = NULL;
 	if (getifaddrs(&all) != 0)
@@ -605,7 +612,13 @@ HostResolveAddress(uint32_t address, char* name, size_t size)
 	memset(&sa, 0, sizeof(sa));
 	sa.sin_family = AF_INET;
 	sa.sin_addr.s_addr = htonl(address);
+#ifdef ESP_PLATFORM
+	// (lwIP resolves names forwards only: no address has a name)
+	(void) name;
+	return kHostSocketNotFound;
+#else
 	if (size == 0 || getnameinfo((struct sockaddr*) &sa, sizeof(sa), name, (socklen_t) size, NULL, 0, NI_NAMEREQD) != 0)
 		return kHostSocketNotFound;
+#endif
 	return kHostSocketOK;
 }

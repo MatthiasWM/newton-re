@@ -5,7 +5,7 @@
 # the host boots with (HostStores.cpp).
 # the view system on the host (HostViews.h), for newtonscript and the newt
 # world's boot
-add_library(host_views STATIC HostViews.cpp HostNatives.cpp HostStores.cpp HostCards.cpp HostInterconnect.cpp FactorySoups.cpp HostObjectsFile.cpp)
+add_library(host_views STATIC HostViews.cpp HostNatives.cpp HostStores.cpp HostCards.cpp HostInterconnect.cpp HostWifi.cpp FactorySoups.cpp HostObjectsFile.cpp)
 target_link_libraries(host_views PUBLIC flash frames comms_script comms_dock comms_fax thirdparty_nie views recognition pcmcia sound system stores packages intl intl_meetings assist hal_host_display hal_host_tablet)
 target_include_directories(host_views PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -25,12 +25,15 @@ find_package(Python3 COMPONENTS Interpreter)
 # (a cross build - an aarch64 newton for a reMarkable built on Windows,
 # docs/host-remarkable.md - cannot run its own newtonscript, so the object
 # file is compiled by one built for this machine: -DNEWTON_HOST_NEWTONSCRIPT;
-# the file is the same bytes whichever host built it)
+# the file is the same bytes whichever host built it; a cross build whose
+# programs the build machine runs itself - 32-bit x86 on x86-64 Linux,
+# src/cmake/zig-x86-linux.cmake - sets NEWTON_TARGET_RUNS_HERE and uses
+# its own)
 set(NEWTON_HOST_NEWTONSCRIPT "" CACHE FILEPATH "a cross build: a newtonscript that runs on the build machine, to build the object file with")
 set(romsrc_newtonscript $<TARGET_FILE:newtonscript>)
 set(romsrc_newtonscript_depends newtonscript)
 set(romsrc_can_build TRUE)
-if(CMAKE_CROSSCOMPILING)
+if(CMAKE_CROSSCOMPILING AND NOT NEWTON_TARGET_RUNS_HERE)
     if(NEWTON_HOST_NEWTONSCRIPT)
         set(romsrc_newtonscript ${NEWTON_HOST_NEWTONSCRIPT})
         set(romsrc_newtonscript_depends ${NEWTON_HOST_NEWTONSCRIPT})
@@ -133,7 +136,7 @@ else()
 endif()
 # the host's fonts (HostFontRaster.h): GDI on Windows, none elsewhere yet
 # (win32/HostFontRaster.cpp's #else)
-add_library(host_window STATIC ${host_window_source} ${host_audio_source} HostPenReplay.cpp win32/HostFontRaster.cpp)
+add_library(host_window STATIC ${host_window_source} ${host_audio_source} HostPenReplay.cpp win32/HostFontRaster.cpp HostMapping.cpp)
 target_include_directories(host_window PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 if(NEWTON_HOST_WINDOW STREQUAL "remarkable")
     target_link_libraries(host_window PUBLIC rt pthread dl)
@@ -722,7 +725,7 @@ endif()
 # a restart printing without asking; the printer's certificate changed,
 # the warning declined and the job cancelled; changed again, accepted and
 # the new certificate pinned; and printing with it without asking
-if(Python3_FOUND)
+if(Python3_FOUND AND NEWTON_HOST_TLS)
     set(ipps_dir ${CMAKE_CURRENT_BINARY_DIR}/ipps)
     add_test(NAME host.NewtonIPPS.clean COMMAND ${CMAKE_COMMAND} -E rm -rf ${ipps_dir})
     add_test(NAME host.NewtonIPPS.mkdir COMMAND ${CMAKE_COMMAND} -E make_directory ${ipps_dir})
@@ -915,13 +918,14 @@ set_tests_properties(host.NewtonRotation PROPERTIES TIMEOUT 180
 
 # the Host preferences panel (HostSettings.h, demo/hostsettings.ns): .set
 # turns beaming over the network on from Prefs with no restart and keeps it,
-# .kept boots the same store with it on and turns it off, then closes and
-# reopens docking's listener - on a port of its own (--serial-port 0), since
-# 3679 may be held by another newton the suite runs beside it
+# .kept boots the same store with it on and turns it off.  (Docking on a
+# port of its own: every newton listens on 3679, and on Linux only the
+# first of the newtons ctest runs at once gets it - Windows' SO_REUSEADDR
+# lets each bind it - so .kept would find docking off at boot.)
 add_test(NAME host.NewtonHostSettings.clean COMMAND ${CMAKE_COMMAND} -E rm -f ${CMAKE_CURRENT_BINARY_DIR}/hostsettings.store)
 set_tests_properties(host.NewtonHostSettings.clean PROPERTIES FIXTURES_SETUP hostsettingsclean)
 foreach(run set kept)
-    add_test(NAME host.NewtonHostSettings.${run} COMMAND newton --display 320x480 --serial-port 0 --headless 200
+    add_test(NAME host.NewtonHostSettings.${run} COMMAND newton --display 320x480 --headless 200 --serial-port 0
              --store ${CMAKE_CURRENT_BINARY_DIR}/hostsettings.store
              --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/hostsettings.ns WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
 endforeach()
@@ -1955,6 +1959,18 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/rex/inetenbl.pkg)
                          ENVIRONMENT NEWTON_TRACE_DNS=1
                          PASS_REGULAR_EXPRESSION "default domain \"example.invalid\".*nosuchnewtonhost.example.invalid: 0 address.*inethostsetup: restart done, 0 failed"
                          FAIL_REGULAR_EXPRESSION "FAILED|waited in vain|exception in a unit handler")
+    # Internet Setup's Wi-Fi line over a host's WiFi (host/HostWifi.h -
+    # NEWTON_FAKE_WIFI's pretend one: demo/wifisetup.ns): the networks
+    # scanned, one joined with a password and named in the setup, forgotten
+    add_test(NAME host.NewtonWifiSetup
+             COMMAND newton --display 320x480 --erase
+                     --store ${CMAKE_CURRENT_BINARY_DIR}/wifisetup.store --headless 150
+                     --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/wifisetup.ns
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    set_tests_properties(host.NewtonWifiSetup PROPERTIES TIMEOUT 240
+                         ENVIRONMENT NEWTON_FAKE_WIFI=1
+                         PASS_REGULAR_EXPRESSION "wifisetup: done, 0 failed"
+                         FAIL_REGULAR_EXPRESSION "FAILED|waited in vain|exception in a unit handler")
     # the NIE's protoEndpointFSM (its 'Inet Protos:NIE unit) as a TCP client
     # over the host's link (demo/inetfsm.ns): connected through its own
     # states, "hello" echoed, disconnected
@@ -2383,6 +2399,27 @@ set_tests_properties(host.NewtonWalkthrough.restart PROPERTIES TIMEOUT 180
                      FIXTURES_REQUIRED host_walkthrough_store DEPENDS host.NewtonWalkthrough
                      PASS_REGULAR_EXPRESSION "walkthrough: restart done, 0 failed"
                      FAIL_REGULAR_EXPRESSION "FAILED|waited in vain")
+
+# the same walk on the ROM's objects baked into an image and mapped
+# read-only where it was baked, as a small device maps it from flash
+# (frames/ROMImport.h, docs/host-tdeck-pro.md "The baked object image"):
+# the bake, then the walk on it - which also shows that nothing in it
+# writes to a ROM object (the mapping is read-only)
+add_test(NAME host.NewtonBakedObjects.bake
+         COMMAND newton --bake-objects ${CMAKE_CURRENT_BINARY_DIR}/romsrc-objects.baked
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+set_tests_properties(host.NewtonBakedObjects.bake PROPERTIES TIMEOUT 120 FIXTURES_SETUP host_baked_objects
+                     PASS_REGULAR_EXPRESSION "baked into .*, to be mapped at")
+add_test(NAME host.NewtonBakedObjects
+         COMMAND newton --objects ${CMAKE_CURRENT_BINARY_DIR}/romsrc-objects.baked --display 320x480 --erase
+                 --store ${CMAKE_CURRENT_BINARY_DIR}/walkthrough-baked.store --headless 300
+                 --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/walkthrough.ns
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+set_tests_properties(host.NewtonBakedObjects PROPERTIES TIMEOUT 360
+                     FIXTURES_REQUIRED host_baked_objects DEPENDS host.NewtonBakedObjects.bake
+                     ENVIRONMENT "NEWTON_MEMORY_REPORT=1"
+                     PASS_REGULAR_EXPRESSION "walkthrough: done, 0 failed"
+                     FAIL_REGULAR_EXPRESSION "FAILED|waited in vain|could not be mapped|fell over|mapped, not held, 0 KB")
 
 # the same walk booted on the ROM image (--rom): a regression guard for the
 # --rom path, which the default boot's tests no longer take (the walk's own

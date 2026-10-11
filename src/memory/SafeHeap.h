@@ -37,7 +37,7 @@ class TPhys;
 const ULong kSafeHeapMagic = 'safe';
 const ULong kSafePageSize = 0x1000;
 
-typedef unsigned int	ULong32;			// the ROM's word, whatever ULong is here
+// (ULong32, the ROM's word whatever ULong is here, is host_compat.h's)
 
 
 // A block's header word: size (with the header) in the low 24 bits, the top

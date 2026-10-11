@@ -35,11 +35,17 @@ TObjectManager::TObjectManager()
 
 
 // The monitor proc as TMonitor calls it (MonitorEntryGlue: object, selector,
-// user object); the result goes back through MonitorExitSWI.
-void
+// user object); the result goes back through MonitorExitSWI.  It returns
+// MonitorProc's result: the DDK's MonitorProcPtr returns nothing, but
+// MonitorEntryGlue hands on whatever the proc left in r0 - on the ARM, and
+// on x86, still MonitorProc's result after a void glue; on the ESP32-S3's
+// Xtensa (windowed registers) it is the glue's own first argument, the
+// manager, and every object request failed with its address as the error
+// (docs/host-tdeck-pro.md).
+long
 TObjectManager::MonitorProcGlue(void* manager, ULong selector, void* msg)
 {
-	((TObjectManager*) manager)->MonitorProc((long) selector, (ObjectMessage*) msg);
+	return ((TObjectManager*) manager)->MonitorProc((long) selector, (ObjectMessage*) msg);
 }
 
 
@@ -581,6 +587,6 @@ InitObjectManager(TEnvironment* environment)
 	gTheObjectManagerMonitor = new TMonitor;
 	TObjectId id;
 	RegisterObject(gTheObjectManagerMonitor, kMonitorType, 1, &id);
-	gTheObjectManagerMonitor->Init(TObjectManager::MonitorProcGlue, 0x800, gTheObjectManager, environment, false, 'OBJM', false);
+	gTheObjectManagerMonitor->Init((MonitorProcPtr) TObjectManager::MonitorProcGlue, 0x800, gTheObjectManager, environment, false, 'OBJM', false);
 	gObjectTable->SetScavengeProc(ObjectScavenger);
 }

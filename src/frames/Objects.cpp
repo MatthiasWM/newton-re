@@ -2303,7 +2303,8 @@ MakeString(const UniChar* str, long length)
 {
 	RefVar s(AllocateBinary(RSSYMstring, (length + 1) * sizeof(UniChar)));
 	UniChar* p = (UniChar*) BinaryData(s);
-	memcpy(p, str, length * sizeof(UniChar));
+	if (length > 0)			// (an empty string may come from nil)
+		memcpy(p, str, length * sizeof(UniChar));
 	p[length] = 0;
 	return s;
 }

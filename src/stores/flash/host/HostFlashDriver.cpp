@@ -26,7 +26,7 @@
 	Written by:	the reconstruction
 */
 
-#include "Flash.h"
+#include "stores/flash/Flash.h"		// (by its directory: hal has one of that name)
 #include "MemoryAllocator.h"
 #include "HostFlash.h"
 #include "hal/MMU.h"

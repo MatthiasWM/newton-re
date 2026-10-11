@@ -15,6 +15,23 @@
 #include "NewtonMemory.h"
 #include "OSErrors.h"
 #include "NewtonExceptions.h"
+#include <string.h>
+
+
+// The four characters of a string into a ULong, as ConvertUnicodeCharacters
+// fills it: ConvertFromUnicode (the DEVIATION below) ends what it writes
+// with a 0 - a fifth byte, past the ULong (past the end of the object for
+// fServiceType, which its allocation's rounding hid on the desktop; the
+// ESP32-S3's heap checking caught it - docs/host-tdeck-pro.md) - so it
+// writes into a buffer with room for that.
+static void
+FourCharsFromUnicode(const UniChar* chars, ULong* fourChars)
+{
+	char buffer[sizeof(ULong) + 1];
+	memset(buffer, 0, sizeof(buffer));
+	ConvertFromUnicode(chars, buffer, kMacRomanEncoding, sizeof(ULong));
+	memcpy(fourChars, buffer, sizeof(ULong));
+}
 
 
 TNSConfigServer::TNSConfigServer()
@@ -47,7 +64,7 @@ TNSConfigServer::~TNSConfigServer()
 NewtonErr
 TNSConfigServer::InitConfigServer(RefArg serviceType, RefArg configName)
 {
-	ConvertFromUnicode(GetCString(serviceType), &fServiceType, kMacRomanEncoding, sizeof(fServiceType));
+	FourCharsFromUnicode(GetCString(serviceType), &fServiceType);
 	long length = Umbstrlen(GetCString(configName));
 	fName = (char*) NewPtrClear(length + 1);
 	if (fName == nil)
@@ -108,7 +125,7 @@ TNSConfigServer::SetConfig(RefArg config)
 {
 	ULong configID = 0;
 	if (NOTNIL(config))
-		ConvertFromUnicode(GetCString(config), &configID, kMacRomanEncoding, sizeof(configID));
+		FourCharsFromUnicode(GetCString(config), &configID);
 	NewtonErr err = SetDefaultConfig(fServiceType, fName, configID, 0);
 	// nothing was registered under that name: that is only an error when
 	// there was meant to be something to replace

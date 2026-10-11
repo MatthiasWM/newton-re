@@ -37,6 +37,13 @@ struct TTaskRedirect
 
 enum { kcR0 = 0, kcR1, kcR2, kcR3, kcR4, kcR11 = 11, kcSP = 13, kcLR = 14, kcPC = 15 };
 
+// The size of each task thread's stack, set before the first task starts
+// (newton --task-stack).  A Unix host maps the stacks itself, so it is
+// honoured there (8 MB unless set: a small device's tasks need tens of
+// kilobytes, docs/host-tdeck-pro.md, tools/host/stackdepth.sh); Windows
+// threads keep the system's size.
+void	HostSetTaskStackSize(size_t bytes);
+
 // A stub's resume marker: any value no host function lives at.  A stub that
 // wants "skip the retry" semantics (semaphores) uses marker + 4 as well.
 const TRegister kResumeInStub = 0x100;

@@ -27,6 +27,8 @@
 #ifndef __OBJECTS_H
 #include "objects.h"
 #endif
+#include <stddef.h>
+#include <stdint.h>
 
 // rom is the ROM as it appears at address 0 (build/MP2x00US/rom.bin) or the
 // AIF image it was extracted from (DebugRom/...: the 128-byte header is
@@ -54,6 +56,41 @@ NewtonErr	ImportBuiltObjectsFromFile(const char* path);
 const char*	BuiltObjectsStamp(const void* data, ULong size, ULong* length);
 
 Boolean		ROMObjectsImported(void);
+// What the import keeps in host memory: the object file read whole (an
+// object file's import; nought for a ROM image's) and the converted area
+// with its index - what a small device would map from flash instead
+// (docs/host-tdeck-pro.md) - and a baked image's bytes, mapped rather
+// than held.
+void		ROMObjectsMemory(ULong* fileBytes, ULong* areaBytes, ULong* mappedBytes);
+
+// The baked object image (docs/host-tdeck-pro.md, "The baked object
+// image"): what importing an object file makes - the host's objects, their
+// index, the magic pointers, the lexicons and the other blocks - laid out
+// in one region at the address it will be mapped at, and written out as
+// it lies.  Mapped there again (read-only: nothing writes to a ROM object)
+// it is the ROM's objects at once, with nothing read, converted or held in
+// RAM; a device maps it from flash.  It is the host's own layout (pointer
+// size, byte order, object header), so it is made by a build of the same
+// kind as the one that maps it, and says which it is.
+//
+// The host gives the frames library its mapping (host/HostMapping.h) before
+// either is used: a region reserved at an address, a file mapped at one.
+typedef void* (*HostReserveAtProc)(uintptr_t base, size_t size);
+typedef void* (*HostMapFileAtProc)(const char* path, uintptr_t base, size_t size);
+void		SetHostMappers(HostReserveAtProc reserve, HostMapFileAtProc mapFile);
+uintptr_t	DefaultBakedObjectsBase(void);		// where an image is made and mapped unless told otherwise
+// An object file baked into an image at base (0: the default); the
+// region reserved for the making is reserve bytes.  ==> noErr, or why not.
+NewtonErr	BakeBuiltObjectsFile(const char* objectsPath, const char* imagePath, uintptr_t base, size_t reserve);
+// A baked image already in memory where it was baked (a device's flash
+// partition, mapped): the ROM's objects set from it.  ==> kError_Bad_Parameters
+// when it is not one, is another host's layout, or lies elsewhere than
+// it was baked for (each said on stderr).
+NewtonErr	ImportBakedObjects(const void* image, size_t size);
+
+// A baked image's builder stamp (the object file's it was made from), as
+// BuiltObjectsStamp answers an object file's; nil when data is not one.
+const char*	BakedObjectsStamp(const void* data, ULong size, ULong* length);
 long		ROMObjectCount(void);
 void		ROMObjectAreaBounds(char** start, char** end);	// where the imported ROM objects lie (both nil: none) - Uriah's gUriahROM
 Ref			TranslateROMRef(ULong32 ref);		// a ROM ref as a host ref (nil: a pointer that is not a ROM object's)
