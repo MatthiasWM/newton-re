@@ -9,6 +9,30 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-12: the T-Deck Pro's 4G module driven
+
+The first step of making the board a phone (`docs/host-tdeck-pro-phone.md`).
+The ROM, read first, turns out to have a whole telephony framework - the
+Phone transport `|PhoneHome:Newton|` with incoming calls, caller ID and
+Take Call, the Calls log, and the `'tapiEndpoint` (@662) over providers
+registered with `RegCommConfig` - but registers no provider of its own;
+that is step 2.  Step 1: `host/HostCellular.h`, a portable engine owning
+the module's byte link, ported from the owner's lilyphone1 (its URC
+handling, UCS2 texts, CLCC polling, the network's time); the natives
+`HostCell*`; `tools/modem/fakecell.py`, an A76xx for `newton --cell-port`
+(ctest `host.NewtonCellular`; `host.Cellular` tests the parsing); and the
+board's driver, `src/host/esp32/main/tdeck_modem.cpp` (UART1, the supply
+GPIO 41 released from GPIO hold, the power key GPIO 40).  On the board:
+the module answered once the battery was fitted (its supply, an SGM6609
+boost, runs from the battery - the owner found it from the circuit),
+registered on its home network, set the board's clock from the network's
+time, and reported `+FCLASS: 8` - voice only, no fax.  On the way: the
+engine is its own library (`host_cellular`), since `<thread>` and
+`<mutex>` reach `<locale.h>`, which `src/intl/Locale.h` shadows; a status
+slot named `call` cannot be read in NewtonScript (`call` is a reserved
+word: `callState`); fakecell.py stopped at the first emoji it printed on
+a Windows console (stdout now UTF-8).
+
 ## 2026-10-12: Time Zones' closest-city slip on the T-Deck Pro
 
 The slip `ValidateConfig` puts up for a worksite with no city (Time Zones'

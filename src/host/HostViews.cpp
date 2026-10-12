@@ -35,6 +35,7 @@
 #include "HostCards.h"
 #include "HostInterconnect.h"
 #include "HostWifi.h"
+#include "HostCellular.h"
 #include "HostTablet.h"
 #include "hal/host/Host.h"
 #include "ROMImport.h"
@@ -278,6 +279,7 @@ HostRegisterViewFunctions(void)
 	HostRegisterCardFunctions();
 	HostRegisterInterconnectFunctions();
 	HostRegisterWifiFunctions();
+	HostRegisterCellularFunctions();
 }
 
 

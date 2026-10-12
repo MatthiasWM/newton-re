@@ -43,7 +43,10 @@ KEPT_IN_HOST = {"host/HostNatives.cpp", "host/HostViews.cpp", "host/HostStores.c
                 # package and orientation queues the tool's loop serves)
                 "host/HostKeyboard.cpp", "host/HostPackages.cpp", "host/HostOrientation.cpp",
                 # the WiFi natives over the board's provider (tdeck_wifi.cpp)
-                "host/HostWifi.cpp"}
+                "host/HostWifi.cpp",
+                # the cellular engine and its natives, over the board's UART
+                # (tdeck_modem.cpp; not HostCellularSocket.cpp, a desktop's)
+                "host/HostCellular.cpp", "host/HostCellularNatives.cpp"}
 
 
 def main(argv):

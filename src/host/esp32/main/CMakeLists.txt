@@ -11,7 +11,7 @@ endforeach()
 list(APPEND sources ${NEWTON_FORWARDED})
 # (the DDK's own directory as -I too: three of its headers include others
 #  with <...>, and none of its file names is a system header's)
-idf_component_register(SRCS esp32main.cpp newtonmain.cpp tdeck_panel.cpp tdeck_input.cpp tdeck_store.cpp tdeck_profile.cpp tdeck_wifi.cpp ${sources}
+idf_component_register(SRCS esp32main.cpp newtonmain.cpp tdeck_panel.cpp tdeck_input.cpp tdeck_store.cpp tdeck_profile.cpp tdeck_wifi.cpp tdeck_modem.cpp ${sources}
                        INCLUDE_DIRS . ${NEWTON_SRC}/ddk
                        REQUIRES driver esp_partition spi_flash esp_timer esp_psram vfs freertos lwip nvs_flash esp_wifi esp_netif esp_event)
 
@@ -52,6 +52,9 @@ foreach(n RANGE ${last})
 endforeach()
 list(REMOVE_DUPLICATES all_quoted)
 set_source_files_properties(newtonmain.cpp PROPERTIES COMPILE_OPTIONS "${all_quoted};-iquote${NEWTON_SRC}/host")
+# (the board's modem driver hands its UART to host/HostCellular.h's engine,
+#  which is plain C++ - none of the Newton's headers)
+set_source_files_properties(tdeck_modem.cpp PROPERTIES COMPILE_OPTIONS "-iquote${NEWTON_SRC}/host")
 
 # comms/host/HostLink.ns, the host's link for the NIE, compiled in as a
 # string as the desktop build does it (src/comms/CMakeLists.txt) - made

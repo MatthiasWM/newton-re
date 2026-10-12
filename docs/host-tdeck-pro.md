@@ -688,6 +688,13 @@ takes a password and remembers or forgets a network.
   wide); ESP-IDF's event task overflowed its 2304-byte stack when the
   address came (4 KB now), restarting the board at every join.
 
+## The 4G module (2026-10-12)
+
+The owner's board is the 4G variant (an A7682E): it is driven from the
+reconstruction and, once the battery was fitted, registered on its
+network - the start of making the board a phone, with the ROM's own
+Phone transport and Calls log: `docs/host-tdeck-pro-phone.md`.
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the

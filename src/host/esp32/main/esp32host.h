@@ -64,6 +64,11 @@ void		HostDeviceWifiStatus(int* state, char* ssid, unsigned long* address, long*
 unsigned long	HostDeviceClockSyncs(void);		// how many times the board's clock has been set (from the network, or by hand)
 void		HostDeviceClockSetTo(long long seconds);	// the board's clock set by hand, in seconds from 1970 (GMT)
 
+// the cellular module (tdeck_modem.cpp): powered and started with the
+// board, its UART handed to host/HostCellular.h's engine on a task of its
+// own (==> whether it was started); the engine's natives then answer for it
+bool		HostDeviceCellStart(void);
+
 // the sampling profiler of core 1 (tdeck_profile.cpp): started with the
 // board, a phase's start marked, the samples printed (and the profiler
 // stopped) - tools/tdeck/profile.py reads them

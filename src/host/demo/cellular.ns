@@ -1,0 +1,145 @@
+// The host's cellular module (host/HostCellular.h) through its natives:
+// registered on the network, a message that was waiting picked up, a call
+// made, hung up and made to a busy number, a call answered and hung up by
+// the far end, a message received and two sent (one plain, one that needs
+// UCS2), and a command sent as it is.  The module is tools/modem/fakecell.py
+// on newton's --cell-port; the fake's own commands (AT+FAKERING,
+// AT+FAKETEXT, AT+FAKEHANGUP) make the far end do its part
+// (ctest host.NewtonCellular):
+//
+//   python tools/modem/fakecell.py --busy 5550000 --text "+61400000002=Stored while off" \
+//       --spawn build/host/host/newton --cell-port 0 --headless 120 \
+//       --script src/host/demo/cellular.ns
+
+HostInclude("common.ns");
+cellFailures := 0;
+cellEvents := [];					// the call events taken so far, in order
+cellMark := 0;						// where in cellEvents a step's own begin
+cellStored := nil;
+cellReceived := nil;
+cellUnicode := nil;
+cellPlain := nil;
+cellWide := nil;
+
+cellCheck := func(what, ok, why) begin
+	if ok then
+		Print("cellular: " & what & " ok")
+	else begin
+		Print("cellular: " & what & " FAILED - " & why);
+		cellFailures := cellFailures + 1;
+	end;
+end;
+
+// the call events that have come, kept in cellEvents
+cellTakeEvents := func() begin
+	local e;
+	while e := HostCellNextEvent() do begin
+		Print("cellular: event " & e.event & (if e.number then " " & e.number else ""));
+		AddArraySlot(cellEvents, e);
+	end;
+end;
+
+// an event of the kind come since index from ==> it, or nil
+cellEventSince := func(kind, from) begin
+	call cellTakeEvents with ();
+	local i;
+	for i := from to Length(cellEvents) - 1 do
+		if cellEvents[i].event = kind then
+			return cellEvents[i];
+	nil;
+end;
+
+cellStatus := func() HostCellStatus();
+
+cellSteps := [
+	func(next) call waitFor with ("cellular: registered",
+		func() (call cellStatus with ()).state = 'home, next, 60),
+	func(next) begin
+		local s := call cellStatus with ();
+		call cellCheck with ("the operator", StrEqual(s.operator, "Fake Telecom"), "it is " & s.operator);
+		call cellCheck with ("the signal", s.rssi = -73, "it is " & s.rssi);
+		call cellCheck with ("no call", s.callState = 'idle, "the call is " & s.callState);
+		call waitFor with ("cellular: the stored message", func() cellStored := HostCellNextText(), next, 30);
+	end,
+	func(next) begin
+		call cellCheck with ("the stored message", cellStored and StrEqual(cellStored.number, "+61400000002")
+			and StrEqual(cellStored.text, "Stored while off") and cellStored.time,
+			"got " & (if cellStored then cellStored.number & ": " & cellStored.text else "nothing"));
+		cellMark := Length(cellEvents);
+		call cellCheck with ("dialled", HostCellDial("5551234"), "refused");
+		call waitFor with ("cellular: the call connected", func() call cellEventSince with ('connected, cellMark), next, 30);
+	end,
+	func(next) begin
+		local s := call cellStatus with ();
+		call cellCheck with ("the call is active", s.callState = 'active and StrEqual(s.number, "5551234"),
+			"the call is " & s.callState & " with " & s.number);
+		cellMark := Length(cellEvents);
+		HostCellHangUp();
+		call waitFor with ("cellular: hung up", func() call cellEventSince with ('ended, cellMark), next, 30);
+	end,
+	func(next) begin
+		call cellCheck with ("idle again", (call cellStatus with ()).callState = 'idle, "the call is " & (call cellStatus with ()).callState);
+		cellMark := Length(cellEvents);
+		HostCellDial("5550000");
+		call waitFor with ("cellular: busy", func() call cellEventSince with ('busy, cellMark), next, 30);
+	end,
+	func(next) begin
+		cellMark := Length(cellEvents);
+		local answer := HostCellCommand("AT+FAKERING=\"+61400000001\"");
+		call cellCheck with ("the fake rings", answer and answer.ok, "it said " & (if answer then answer.reply));
+		call waitFor with ("cellular: the ring", func() begin
+			local e := call cellEventSince with ('ring, cellMark);
+			e and e.number;
+		end, next, 30);
+	end,
+	func(next) begin
+		local e := call cellEventSince with ('ring, cellMark);
+		call cellCheck with ("the caller", StrEqual(e.number, "+61400000001"), "the ring said " & e.number);
+		local s := call cellStatus with ();
+		call cellCheck with ("ringing", s.callState = 'incoming and StrEqual(s.number, "+61400000001"),
+			"the call is " & s.callState & " from " & s.number);
+		cellMark := Length(cellEvents);
+		HostCellAnswer();
+		call waitFor with ("cellular: answered", func() call cellEventSince with ('connected, cellMark), next, 30);
+	end,
+	func(next) begin
+		cellMark := Length(cellEvents);
+		HostCellCommand("AT+FAKEHANGUP");
+		call waitFor with ("cellular: the far end hung up", func() call cellEventSince with ('ended, cellMark), next, 30);
+	end,
+	func(next) begin
+		// a message that needs UCS2: an e acute, an em dash, and a thumbs up
+		// above the BMP (a surrogate pair)
+		cellUnicode := "Caf\u00E9\u \u2014\u \uD83DDC4D\u";
+		HostCellCommand("AT+FAKETEXT=\"+61400000003\",\"" & cellUnicode & "\"");
+		call waitFor with ("cellular: a message", func() cellReceived := HostCellNextText(), next, 30);
+	end,
+	func(next) begin
+		call cellCheck with ("the message received", cellReceived and StrEqual(cellReceived.number, "+61400000003")
+			and StrEqual(cellReceived.text, cellUnicode),
+			"got " & (if cellReceived then cellReceived.number & ": " & cellReceived.text else "nothing"));
+		cellPlain := HostCellSendText("+61400000001", "Hello from the Newton");
+		cellWide := HostCellSendText("+61400000001", cellUnicode);
+		call waitFor with ("cellular: sent", func() HostCellSendState(cellPlain) <> 'busy and HostCellSendState(cellWide) <> 'busy, next, 60);
+	end,
+	func(next) begin
+		call cellCheck with ("the plain message sent", HostCellSendState(cellPlain) = 'sent, "it is " & HostCellSendState(cellPlain));
+		call cellCheck with ("the UCS2 message sent", HostCellSendState(cellWide) = 'sent, "it is " & HostCellSendState(cellWide));
+		local answer := HostCellCommand("AT+FCLASS=?");
+		call cellCheck with ("a command sent as it is", answer and not answer.ok, "it answered " & (if answer then answer.reply));
+		call next with ();
+	end,
+	func(next) begin
+		Print("cellular: done, " & cellFailures & " failed");
+		HostQuit();
+	end];
+
+cellStep := 0;
+cellNext := func() begin
+	local step := cellSteps[cellStep];
+	cellStep := cellStep + 1;
+	call step with (cellNext);
+end;
+
+call cellCheck with ("a module", HostCellAvailable(), "none");
+call cellNext with ();

@@ -122,6 +122,12 @@
 	The docker is the Connection application's (comms/Docker.h), started
 	by its Connect button or by autodock.
 
+	--cell-port is a TCP port on 127.0.0.1 a cellular module connects to
+	(host/HostCellular.h: the engine that drives a SIMCom module in AT
+	commands, as the T-Deck Pro's 4G variant carries); 0 picks a free one.
+	Once listening it prints "[host] cell port N";
+	tools/modem/fakecell.py is the module (docs/host-tdeck-pro-phone.md).
+
 	--ir-peer puts the Newton's built-in IR port on a TCP connection to
 	another newton (hal/host/HostIRChip.h), so the two can beam to each
 	other: one is given listen:PORT (0 picks a free port) and the other
@@ -171,6 +177,7 @@
 #include "HostHeapCheck.h"
 #include "HostSoundDriver.h"
 #include "HostEchoServer.h"
+#include "HostCellular.h"
 #include "HostSerialChip.h"
 #include "HostIRChip.h"
 #include "FIQTimer.h"
@@ -264,6 +271,7 @@ __declspec(dllimport) int __stdcall GetThreadTimes(void* thread, unsigned long l
 static long gScale = 1;
 static long gHeadlessSeconds = 0;
 static long gSerialPort = kHostSerialPort;	// --serial-port: -1 none
+static long gCellPort = -1;					// --cell-port: -1 none
 static const char* gIRPeer = nil;			// --ir-peer, or the LAN medium's "lan[:PORT][@ADDRESS]"
 static char gIRLan[80];						// --ir-lan, --ir-lan-interface
 static const char* gIRLanPort = nil;
@@ -285,7 +293,7 @@ Usage(void)
 					"              [--bake-objects image [--bake-base address]]\n"
 					"              [--package file.pkg]... [--card file] [--microphone-tone hz] [--tcp-echo port]\n"
 					"              [--serial-port port|none] [--ir-peer listen:port|host:port] [--print-dir dir]\n"
-					"              [--ir-lan [port]] [--ir-lan-interface address]\n"
+					"              [--ir-lan [port]] [--ir-lan-interface address] [--cell-port port]\n"
 					"              [--ipp-printer uri]\n"
 					"By default it boots the object file built from romsrc/ (NEWTON_OBJECTS overrides);\n"
 					"--rom boots a ROM image instead.\n"
@@ -321,6 +329,19 @@ NewtonBoot(void)
 		}
 		else
 			fprintf(stderr, "[host] no serial port on %ld (%ld)\n", gSerialPort, (long) err);
+	}
+	// the cellular module, when there is one: the engine started before the
+	// OS needs it (it waits for the module to connect)
+	if (gCellPort >= 0)
+	{
+		unsigned short port;
+		if (HostCellularListen((unsigned short) gCellPort, &port))
+		{
+			printf("[host] cell port %u\n", (unsigned) port);
+			fflush(stdout);
+		}
+		else
+			fprintf(stderr, "[host] no cell port on %ld\n", gCellPort);
 	}
 	// DEVIATION: the built-in IR is the Voyager chip's; the host's is a TCP
 	// connection to another newton or, with no --ir-peer, a port with nobody
@@ -1054,6 +1075,8 @@ main(int argc, char** argv)
 		}
 		else if (strcmp(argv[i], "--ir-lan-interface") == 0 && i + 1 < argc)
 			gIRLanInterface = argv[++i];
+		else if (strcmp(argv[i], "--cell-port") == 0 && i + 1 < argc)
+			gCellPort = strtol(argv[++i], nil, 0);
 		else if (strcmp(argv[i], "--serial-port") == 0 && i + 1 < argc)
 		{
 			i++;

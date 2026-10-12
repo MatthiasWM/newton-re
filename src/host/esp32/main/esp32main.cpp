@@ -311,6 +311,7 @@ app_main(void)
 	HostDeviceInputStart();
 	HostDeviceStoreStart();
 	gHostDeviceWifi = HostDeviceWifiStart();
+	HostDeviceCellStart();
 	gLines = xQueueCreate(8, kLineSize);
 	xTaskCreatePinnedToCore(ConsoleReader, "console", 4096, NULL, 4, NULL, 0);
 	// the boot runs here, and the run's end is waited for here (the task

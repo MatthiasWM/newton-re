@@ -88,6 +88,19 @@ Everything comes from PlatformIO (`~/.platformio`); on Linux and macOS
    `sdkconfig.defaults` (delete `sdkconfig.tdeck-pro` so that it is read
    again) checks each block's ends when it is freed.
 
+## The 4G module (2026-10-12)
+
+`main/tdeck_modem.cpp` powers the A7682E (supply GPIO 41, power key GPIO
+40) and hands UART1 (TX 10, RX 11, 115200) to the portable engine,
+`host/HostCellular.h`, on a task of its own; the network's time sets the
+board's clock.  **The module needs the battery fitted** - its supply runs
+from it; on USB alone it stays dark.  From the prompt:
+
+    HostCellStatus();                  // {state: home, operator: ..., rssi: -77, ...}
+    HostCellCommand("ATI");            // any AT command, its reply lines
+
+The plan and what the module said: `docs/host-tdeck-pro-phone.md`.
+
 ## WiFi (2026-10-11)
 
 Internet Setup's **Host network** setup has a **Wi-Fi** line on the board:

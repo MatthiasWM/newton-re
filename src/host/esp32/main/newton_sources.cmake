@@ -156,6 +156,8 @@ set(NEWTON_SOURCES
     hal/host/Timer.cpp
     host/FactorySoups.cpp
     host/HostCards.cpp
+    host/HostCellular.cpp
+    host/HostCellularNatives.cpp
     host/HostInterconnect.cpp
     host/HostKeyboard.cpp
     host/HostNatives.cpp
@@ -667,7 +669,7 @@ set(NEWTON_FORWARDED
     forwarded/recognition_Domain.cpp
     forwarded/recognition_Search.cpp
 )
-set(NEWTON_GROUP_COUNT 50)
+set(NEWTON_GROUP_COUNT 51)
 set(NEWTON_GROUP_0_SOURCES
     alert/AlertDialog.cpp
     alert/AlertManager.cpp
@@ -1311,6 +1313,7 @@ set(NEWTON_GROUP_20_INCLUDES
 set(NEWTON_GROUP_21_SOURCES
     host/FactorySoups.cpp
     host/HostCards.cpp
+    host/HostCellularNatives.cpp
     host/HostInterconnect.cpp
     host/HostNatives.cpp
     host/HostStores.cpp
@@ -1359,11 +1362,19 @@ set(NEWTON_GROUP_21_INCLUDES
     thirdparty/nie
 )
 set(NEWTON_GROUP_22_SOURCES
+    host/HostCellular.cpp
+)
+set(NEWTON_GROUP_22_INCLUDES
+    ddk
+    .
+    hal/host
+)
+set(NEWTON_GROUP_23_SOURCES
     host/HostKeyboard.cpp
     host/HostOrientation.cpp
     host/HostPackages.cpp
 )
-set(NEWTON_GROUP_22_INCLUDES
+set(NEWTON_GROUP_23_INCLUDES
     newt
     ddk
     .
@@ -1404,7 +1415,7 @@ set(NEWTON_GROUP_22_INCLUDES
     host
     thirdparty/nie
 )
-set(NEWTON_GROUP_23_SOURCES
+set(NEWTON_GROUP_24_SOURCES
     ink/CICCodeBook.cpp
     ink/CICConvert.cpp
     ink/CICDecoder.cpp
@@ -1416,7 +1427,7 @@ set(NEWTON_GROUP_23_SOURCES
     ink/InkShapes.cpp
     ink/InkStrokes.cpp
 )
-set(NEWTON_GROUP_23_INCLUDES
+set(NEWTON_GROUP_24_INCLUDES
     ink
     ddk
     .
@@ -1455,29 +1466,13 @@ set(NEWTON_GROUP_23_INCLUDES
     print/host/tls
     testing
 )
-set(NEWTON_GROUP_24_SOURCES
+set(NEWTON_GROUP_25_SOURCES
     intl/Coordinates.cpp
     intl/Dates.cpp
     intl/LexParse.cpp
     intl/Locale.cpp
     intl/NumberFormat.cpp
     intl/RepeatText.cpp
-)
-set(NEWTON_GROUP_24_INCLUDES
-    intl
-    ddk
-    .
-    frames
-    memory
-    os600/user
-    os600/kernel
-    toolbox
-    utility
-    protocols
-    packages
-)
-set(NEWTON_GROUP_25_SOURCES
-    intl/Meetings.cpp
 )
 set(NEWTON_GROUP_25_INCLUDES
     intl
@@ -1491,19 +1486,35 @@ set(NEWTON_GROUP_25_INCLUDES
     utility
     protocols
     packages
+)
+set(NEWTON_GROUP_26_SOURCES
+    intl/Meetings.cpp
+)
+set(NEWTON_GROUP_26_INCLUDES
+    intl
+    ddk
+    .
+    frames
+    memory
+    os600/user
+    os600/kernel
+    toolbox
+    utility
+    protocols
+    packages
     stores
     compression
     sound
     qd
 )
-set(NEWTON_GROUP_26_SOURCES
+set(NEWTON_GROUP_27_SOURCES
     memory/MemoryAllocator.cpp
     memory/MemoryManager.cpp
     memory/SafeHeap.cpp
     memory/SkiaHeap.cpp
     memory/host/KernelHeap.cpp
 )
-set(NEWTON_GROUP_26_INCLUDES
+set(NEWTON_GROUP_27_INCLUDES
     memory
     ddk
     .
@@ -1514,7 +1525,7 @@ set(NEWTON_GROUP_26_INCLUDES
     protocols
     packages
 )
-set(NEWTON_GROUP_27_SOURCES
+set(NEWTON_GROUP_28_SOURCES
     newt/DebugNatives.cpp
     newt/ExternalNewtEvents.cpp
     newt/ForkGlobals.cpp
@@ -1524,7 +1535,7 @@ set(NEWTON_GROUP_27_SOURCES
     newt/SCPEvents.cpp
     newt/StorageCards.cpp
 )
-set(NEWTON_GROUP_27_INCLUDES
+set(NEWTON_GROUP_28_INCLUDES
     newt
     ddk
     .
@@ -1563,7 +1574,7 @@ set(NEWTON_GROUP_27_INCLUDES
     print/host/dnssd
     print/host/tls
 )
-set(NEWTON_GROUP_28_SOURCES
+set(NEWTON_GROUP_29_SOURCES
     os600/kernel/Boot.cpp
     forwarded/os600_kernel_Domain.cpp
     os600/kernel/DoubleQ.cpp
@@ -1589,7 +1600,7 @@ set(NEWTON_GROUP_28_SOURCES
     os600/kernel/TimerEngine.cpp
     os600/kernel/host/TaskRuntime.cpp
 )
-set(NEWTON_GROUP_28_INCLUDES
+set(NEWTON_GROUP_29_INCLUDES
     os600/kernel
     ddk
     .
@@ -1600,7 +1611,7 @@ set(NEWTON_GROUP_28_INCLUDES
     protocols
     packages
 )
-set(NEWTON_GROUP_29_SOURCES
+set(NEWTON_GROUP_30_SOURCES
     os600/user/BuildEnvironments.cpp
     os600/user/ExceptionNames.cpp
     os600/user/Exceptions.cpp
@@ -1628,7 +1639,7 @@ set(NEWTON_GROUP_29_SOURCES
     os600/user/host/SWI.cpp
     os600/user/host/StackManager.cpp
 )
-set(NEWTON_GROUP_29_INCLUDES
+set(NEWTON_GROUP_30_INCLUDES
     os600/user
     ddk
     .
@@ -1639,7 +1650,7 @@ set(NEWTON_GROUP_29_INCLUDES
     protocols
     packages
 )
-set(NEWTON_GROUP_30_SOURCES
+set(NEWTON_GROUP_31_SOURCES
     packages/EndpointPackages.cpp
     packages/FontPartHandler.cpp
     packages/FramePartHandler.cpp
@@ -1648,56 +1659,6 @@ set(NEWTON_GROUP_30_SOURCES
     packages/StorePackageNatives.cpp
     packages/StorePackages.cpp
     packages/Units.cpp
-)
-set(NEWTON_GROUP_30_INCLUDES
-    packages
-    ddk
-    .
-    utility
-    toolbox
-    os600/user
-    os600/kernel
-    memory
-    protocols
-    frames
-    intl
-    stores
-    compression
-    sound
-    qd
-    comms
-    comms/host
-    hal/host
-    views
-    ink
-    recognition
-    testing
-    newt
-    comms/irda
-    comms/fax
-    hal
-    books
-    assist
-    armcpu
-    pcmcia
-    stores/flash
-    alert
-    system
-    power
-    text
-    print/host/dnssd
-    print/host/tls
-)
-set(NEWTON_GROUP_31_SOURCES
-    packages/PackageEvents.cpp
-    packages/PackageIterator.cpp
-    packages/PackageLoader.cpp
-    packages/PackageManager.cpp
-    packages/PackagePipe.cpp
-    packages/PartHandlers.cpp
-    packages/PartPipe.cpp
-    packages/ProtocolStandIns.cpp
-    packages/ROMClassInfo.cpp
 )
 set(NEWTON_GROUP_31_INCLUDES
     packages
@@ -1709,6 +1670,56 @@ set(NEWTON_GROUP_31_INCLUDES
     os600/kernel
     memory
     protocols
+    frames
+    intl
+    stores
+    compression
+    sound
+    qd
+    comms
+    comms/host
+    hal/host
+    views
+    ink
+    recognition
+    testing
+    newt
+    comms/irda
+    comms/fax
+    hal
+    books
+    assist
+    armcpu
+    pcmcia
+    stores/flash
+    alert
+    system
+    power
+    text
+    print/host/dnssd
+    print/host/tls
+)
+set(NEWTON_GROUP_32_SOURCES
+    packages/PackageEvents.cpp
+    packages/PackageIterator.cpp
+    packages/PackageLoader.cpp
+    packages/PackageManager.cpp
+    packages/PackagePipe.cpp
+    packages/PartHandlers.cpp
+    packages/PartPipe.cpp
+    packages/ProtocolStandIns.cpp
+    packages/ROMClassInfo.cpp
+)
+set(NEWTON_GROUP_32_INCLUDES
+    packages
+    ddk
+    .
+    utility
+    toolbox
+    os600/user
+    os600/kernel
+    memory
+    protocols
     stores
     frames
     intl
@@ -1738,7 +1749,7 @@ set(NEWTON_GROUP_31_INCLUDES
     print/host/tls
     alert
 )
-set(NEWTON_GROUP_32_SOURCES
+set(NEWTON_GROUP_33_SOURCES
     pcmcia/ATASimple.cpp
     pcmcia/CHMemModem.cpp
     pcmcia/CISTables.cpp
@@ -1757,7 +1768,7 @@ set(NEWTON_GROUP_32_SOURCES
     pcmcia/NewtCardEvents.cpp
     pcmcia/PCMCIA20Parser.cpp
 )
-set(NEWTON_GROUP_32_INCLUDES
+set(NEWTON_GROUP_33_INCLUDES
     pcmcia
     ddk
     .
@@ -1796,13 +1807,13 @@ set(NEWTON_GROUP_32_INCLUDES
     print/host/dnssd
     print/host/tls
 )
-set(NEWTON_GROUP_33_SOURCES
+set(NEWTON_GROUP_34_SOURCES
     power/BatteryDriver.cpp
     power/PowerManager.cpp
     power/host/HostBatteryDriver.cpp
     power/host/HostPowerSwitch.cpp
 )
-set(NEWTON_GROUP_33_INCLUDES
+set(NEWTON_GROUP_34_INCLUDES
     power
     ddk
     .
@@ -1841,7 +1852,7 @@ set(NEWTON_GROUP_33_INCLUDES
     print/host/tls
     testing
 )
-set(NEWTON_GROUP_34_SOURCES
+set(NEWTON_GROUP_35_SOURCES
     print/DitherTables.cpp
     print/DotPrinter.cpp
     print/DriverCallbacks.cpp
@@ -1860,7 +1871,7 @@ set(NEWTON_GROUP_34_SOURCES
     print/host/HostPAPDriver.cpp
     print/host/HostPrinter.cpp
 )
-set(NEWTON_GROUP_34_INCLUDES
+set(NEWTON_GROUP_35_INCLUDES
     ddk
     .
     qd
@@ -1899,23 +1910,23 @@ set(NEWTON_GROUP_34_INCLUDES
     print/host/dnssd
     print/host/tls
 )
-set(NEWTON_GROUP_35_SOURCES
+set(NEWTON_GROUP_36_SOURCES
     print/host/dnssd/HostDNSSD.cpp
 )
-set(NEWTON_GROUP_35_INCLUDES
+set(NEWTON_GROUP_36_INCLUDES
     print/host/dnssd
 )
-set(NEWTON_GROUP_36_SOURCES
+set(NEWTON_GROUP_37_SOURCES
     print/host/tls/HostTLS.cpp
 )
-set(NEWTON_GROUP_36_INCLUDES
+set(NEWTON_GROUP_37_INCLUDES
     print/host/tls
 )
-set(NEWTON_GROUP_37_SOURCES
+set(NEWTON_GROUP_38_SOURCES
     protocols/ClassInfoRegistry.cpp
     protocols/Protocols.cpp
 )
-set(NEWTON_GROUP_37_INCLUDES
+set(NEWTON_GROUP_38_INCLUDES
     protocols
     ddk
     .
@@ -1926,7 +1937,7 @@ set(NEWTON_GROUP_37_INCLUDES
     utility
     packages
 )
-set(NEWTON_GROUP_38_SOURCES
+set(NEWTON_GROUP_39_SOURCES
     qd/BitFlipTable.cpp
     qd/BusyBox.cpp
     qd/BusyBoxBits.cpp
@@ -1962,7 +1973,7 @@ set(NEWTON_GROUP_38_SOURCES
     qd/Transform.cpp
     qd/ZoomRect.cpp
 )
-set(NEWTON_GROUP_38_INCLUDES
+set(NEWTON_GROUP_39_INCLUDES
     qd
     ddk
     .
@@ -1979,7 +1990,7 @@ set(NEWTON_GROUP_38_INCLUDES
     compression
     sound
 )
-set(NEWTON_GROUP_39_SOURCES
+set(NEWTON_GROUP_40_SOURCES
     recognition/Airus.cpp
     recognition/AirusIterator.cpp
     recognition/AirusTables.cpp
@@ -2126,7 +2137,7 @@ set(NEWTON_GROUP_39_SOURCES
     recognition/XrWordGraph.cpp
     recognition/Xrlv.cpp
 )
-set(NEWTON_GROUP_39_INCLUDES
+set(NEWTON_GROUP_40_INCLUDES
     recognition
     frames
     ddk
@@ -2165,7 +2176,7 @@ set(NEWTON_GROUP_39_INCLUDES
     print/host/dnssd
     print/host/tls
 )
-set(NEWTON_GROUP_40_SOURCES
+set(NEWTON_GROUP_41_SOURCES
     sound/DTMFCodec.cpp
     sound/DTMFTables.cpp
     sound/FrameSoundChannel.cpp
@@ -2182,7 +2193,7 @@ set(NEWTON_GROUP_40_SOURCES
     sound/SoundServer.cpp
     sound/SoundSettings.cpp
 )
-set(NEWTON_GROUP_40_INCLUDES
+set(NEWTON_GROUP_41_INCLUDES
     sound
     ddk
     .
@@ -2199,7 +2210,7 @@ set(NEWTON_GROUP_40_INCLUDES
     stores
     compression
 )
-set(NEWTON_GROUP_41_SOURCES
+set(NEWTON_GROUP_42_SOURCES
     stores/CopyEntries.cpp
     stores/Cursors.cpp
     stores/Entries.cpp
@@ -2227,7 +2238,7 @@ set(NEWTON_GROUP_41_SOURCES
     stores/host/HostLargeObjects.cpp
     stores/host/HostStore.cpp
 )
-set(NEWTON_GROUP_41_INCLUDES
+set(NEWTON_GROUP_42_INCLUDES
     stores
     ddk
     .
@@ -2244,7 +2255,7 @@ set(NEWTON_GROUP_41_INCLUDES
     sound
     qd
 )
-set(NEWTON_GROUP_42_SOURCES
+set(NEWTON_GROUP_43_SOURCES
     stores/flash/FlashBlock.cpp
     stores/flash/FlashIterator.cpp
     stores/flash/FlashRange.cpp
@@ -2257,95 +2268,95 @@ set(NEWTON_GROUP_42_SOURCES
     stores/flash/host/HostCardFlash.cpp
     stores/flash/host/HostFlashDriver.cpp
 )
-set(NEWTON_GROUP_42_INCLUDES
-    stores/flash
-    hal/host
-    ddk
-    .
-    protocols
-    os600/user
-    os600/kernel
-    toolbox
-    memory
-    utility
-    packages
-    hal
-    frames
-    intl
-    stores
-    compression
-    sound
-    qd
-    comms
-    comms/host
-    views
-    ink
-    recognition
-    testing
-    newt
-    comms/irda
-    comms/fax
-    books
-    assist
-    armcpu
-    pcmcia
-    alert
-    system
-    power
-    text
-    print/host/dnssd
-    print/host/tls
-)
-set(NEWTON_GROUP_43_SOURCES
-    system/ConfigServer.cpp
-    system/SystemNatives.cpp
-)
 set(NEWTON_GROUP_43_INCLUDES
-    system
+    stores/flash
+    hal/host
     ddk
     .
-    frames
-    memory
+    protocols
     os600/user
     os600/kernel
     toolbox
+    memory
     utility
-    protocols
     packages
+    hal
+    frames
     intl
-    qd
     stores
     compression
     sound
+    qd
+    comms
+    comms/host
     views
     ink
     recognition
     testing
     newt
-    comms
-    comms/host
-    hal/host
     comms/irda
     comms/fax
-    hal
     books
     assist
     armcpu
     pcmcia
-    stores/flash
     alert
+    system
     power
     text
     print/host/dnssd
     print/host/tls
 )
 set(NEWTON_GROUP_44_SOURCES
+    system/ConfigServer.cpp
+    system/SystemNatives.cpp
+)
+set(NEWTON_GROUP_44_INCLUDES
+    system
+    ddk
+    .
+    frames
+    memory
+    os600/user
+    os600/kernel
+    toolbox
+    utility
+    protocols
+    packages
+    intl
+    qd
+    stores
+    compression
+    sound
+    views
+    ink
+    recognition
+    testing
+    newt
+    comms
+    comms/host
+    hal/host
+    comms/irda
+    comms/fax
+    hal
+    books
+    assist
+    armcpu
+    pcmcia
+    stores/flash
+    alert
+    power
+    text
+    print/host/dnssd
+    print/host/tls
+)
+set(NEWTON_GROUP_45_SOURCES
     testing/Journal.cpp
     testing/SerialDebugger.cpp
     testing/TestAgent.cpp
     testing/TestNatives.cpp
 )
-set(NEWTON_GROUP_44_INCLUDES
+set(NEWTON_GROUP_45_INCLUDES
     testing
     ddk
     .
@@ -2384,7 +2395,7 @@ set(NEWTON_GROUP_44_INCLUDES
     print/host/dnssd
     print/host/tls
 )
-set(NEWTON_GROUP_45_SOURCES
+set(NEWTON_GROUP_46_SOURCES
     text/TXArray.cpp
     text/TXAttributes.cpp
     text/TXBinaryChars.cpp
@@ -2416,7 +2427,7 @@ set(NEWTON_GROUP_45_SOURCES
     text/TXViewNatives.cpp
     text/Textension.cpp
 )
-set(NEWTON_GROUP_45_INCLUDES
+set(NEWTON_GROUP_46_INCLUDES
     text
     ddk
     .
@@ -2455,7 +2466,7 @@ set(NEWTON_GROUP_45_INCLUDES
     print/host/dnssd
     print/host/tls
 )
-set(NEWTON_GROUP_46_SOURCES
+set(NEWTON_GROUP_47_SOURCES
     thirdparty/nie/LanternCardHandler.cpp
     thirdparty/nie/NIENatives.cpp
     thirdparty/nie/NIERuntime.cpp
@@ -2468,7 +2479,7 @@ set(NEWTON_GROUP_46_SOURCES
     thirdparty/nie/ProtoFSMPrinter.cpp
     thirdparty/nie/ProtoFSMQueue.cpp
 )
-set(NEWTON_GROUP_46_INCLUDES
+set(NEWTON_GROUP_47_INCLUDES
     thirdparty/nie
     frames
     ddk
@@ -2508,7 +2519,7 @@ set(NEWTON_GROUP_46_INCLUDES
     print/host/tls
     alert
 )
-set(NEWTON_GROUP_47_SOURCES
+set(NEWTON_GROUP_48_SOURCES
     toolbox/AngleTables.cpp
     toolbox/Angles.cpp
     toolbox/CompMath.cpp
@@ -2516,12 +2527,12 @@ set(NEWTON_GROUP_47_SOURCES
     toolbox/FixedMath.cpp
     toolbox/Matrix.cpp
 )
-set(NEWTON_GROUP_47_INCLUDES
+set(NEWTON_GROUP_48_INCLUDES
     toolbox
     ddk
     .
 )
-set(NEWTON_GROUP_48_SOURCES
+set(NEWTON_GROUP_49_SOURCES
     utility/AEventHandler.cpp
     utility/AppWorld.cpp
     utility/ArrayIterator.cpp
@@ -2550,7 +2561,7 @@ set(NEWTON_GROUP_48_SOURCES
     utility/TimerQueue.cpp
     utility/Unicode.cpp
 )
-set(NEWTON_GROUP_48_INCLUDES
+set(NEWTON_GROUP_49_INCLUDES
     utility
     ddk
     .
@@ -2561,7 +2572,7 @@ set(NEWTON_GROUP_48_INCLUDES
     protocols
     packages
 )
-set(NEWTON_GROUP_49_SOURCES
+set(NEWTON_GROUP_50_SOURCES
     views/Animate.cpp
     views/Application.cpp
     views/Bits.cpp
@@ -2608,7 +2619,7 @@ set(NEWTON_GROUP_49_SOURCES
     views/ViewExtraNatives.cpp
     views/ViewNatives.cpp
 )
-set(NEWTON_GROUP_49_INCLUDES
+set(NEWTON_GROUP_50_INCLUDES
     views
     ink
     ddk
