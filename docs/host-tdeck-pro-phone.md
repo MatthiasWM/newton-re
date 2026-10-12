@@ -203,17 +203,23 @@ Call) and hung up by the caller.
 On the board the Phone transport is "Listening" on the Cellular provider
 from the start.  A real call each way is the owner's to make.
 
-**The number dialled is the Newton's, by its dialling rules.** The Phone
-transport dials `GetRoutingInfo`'s `phoneNumber`, which the dialling rules
-of the current worksite shape (`currentCountry`, `currentAreaCode`: Time
-Zones' home city and the owner's worksites).  The board started out in
-Cupertino, so every ten-digit number went out with the US long-distance 1
-in front: a card's `0412 345 678` was `ATD10412345678;`, `+61 412 345 678`
-was `ATD161412345678;` - and the network answered that the number was
-disconnected (the owner's first real call, 2026-10-12).  With an Australian
-home city (the ROM's Sydney has no country symbol, so no rules apply) the
-same cards dial `ATD0412345678;` and `ATD+61412345678;`.  The engine
-prints each dial on the console (`[cell] dialling: ATD...`).
+**The number is dialled as the card has it.** The Phone transport dials
+`GetRoutingInfo`'s `phoneNumber`, which the dialling rules of the current
+worksite shape - a landline's model: the worksite's area code and country
+(`currentAreaCode`, `currentCountry`) against each card's.  The owner's
+first outgoing call (2026-10-12) reached a "number disconnected" message:
+the worksite ("Work", Melbourne, Australia) had the area code 04 - an
+Australian mobile prefix, not an area code - so a card's `0412 345 678`
+was taken for a local call and dialled `12 345 678`, and `+61 ...` lost
+its `+`.  Melbourne's 03 is no better: a card with no country is a US
+one, and every call became an international call to the US (`0011 1
+0412 345 678`).  A mobile network takes a number as written, national or
+`+`-international, as every mobile phone sends it - so the provider says
+`dialsAsWritten`, and the transport's `SendRequest` (DEVIATION in
+`romsrc/functions/obj_6471d9.SendRequest.ns`) then dials the card's
+number as it is (`GetRoutingInfo`'s `rawNumber`); other providers dial
+as the ROM does.  The engine prints each dial on the console
+(`[cell] dialling: ATD...`).
 
 ## Open questions
 

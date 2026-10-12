@@ -38,7 +38,8 @@
 			supportsCallerId: true,
 			supportsAnswerIncoming: true,
 			supportsSpeaker: true,
-			supportsLineCurrentSense: true
+			supportsLineCurrentSense: true,
+			dialsAsWritten: true		// (the number as the card has it: romsrc's SendRequest, DEVIATION)
 		}
 	},
 

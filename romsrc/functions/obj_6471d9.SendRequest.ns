@@ -21,6 +21,17 @@ func(a1) begin
 		end;
 	l1 := GetDataDefs('|nameRef.phone|):GetRoutingInfo(currentItem.toRef[0])[0];
 	currentItem.numberToDial := l1.phoneNumber;
+	// DEVIATION (host addition): a provider whose config says dialsAsWritten
+	//  - the host's cellular one (comms/host/HostCell.ns) - is given the
+	//  number as the card has it, not as the worksite's dialling rules make
+	//  it: a mobile network takes "0412 345 678" or "+61 412 345 678" as
+	//  they are, and the rules - a landline's area code and a card's
+	//  country - turned an Australian mobile number into a local call
+	//  stripped of its "04", or an international call to the US
+	//  (docs/host-tdeck-pro-phone.md).  Other providers dial as the ROM does.
+	local dialProvider := GetTAPICommFrame(currentItem.serviceProvider);
+	if dialProvider and dialProvider.config and dialProvider.config.dialsAsWritten then
+		currentItem.numberToDial := l1.rawNumber;
 	manualStatus := currentItem.saveAsLog;
 	(try begin
 			self:SetTransportProvider(currentItem.serviceProvider);
