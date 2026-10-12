@@ -91,6 +91,14 @@ add_custom_command(
             -P ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/host/HostText.ns ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
     VERBATIM)
+# host/HostMessages.ns, the Messages application, likewise
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostMessagesSource.cpp
+    COMMAND ${CMAKE_COMMAND} -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/host/HostMessages.ns
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/HostMessagesSource.cpp -DNAME=gHostMessagesSource
+            -P ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/host/HostMessages.ns ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
+    VERBATIM)
 add_library(comms_script STATIC
     Translators.cpp
     CommTrace.cpp
@@ -106,6 +114,7 @@ add_library(comms_script STATIC
     host/HostCellProvider.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/HostCellSource.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/HostTextSource.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/HostMessagesSource.cpp
 )
 # newt: ExceptionNotify and CheckForDeferredActions; views: the root view
 # brought up to date after an endpoint event; the modem navigator every

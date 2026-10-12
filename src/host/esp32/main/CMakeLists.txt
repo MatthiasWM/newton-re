@@ -81,6 +81,13 @@ set(NAME gHostTextSource)
 include(${NEWTON_SRC}/cmake/EmbedText.cmake)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
 target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostTextSource.cpp)
+# comms/host/HostMessages.ns, the Messages application
+set(INPUT ${NEWTON_SRC}/comms/host/HostMessages.ns)
+set(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostMessagesSource.cpp)
+set(NAME gHostMessagesSource)
+include(${NEWTON_SRC}/cmake/EmbedText.cmake)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
+target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostMessagesSource.cpp)
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE forQ=1 NDEBUG)
 target_compile_options(${COMPONENT_LIB} PRIVATE

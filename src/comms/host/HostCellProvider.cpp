@@ -18,6 +18,7 @@
 
 extern const char gHostCellSource[];		// HostCell.ns (HostCellSource.cpp, generated)
 extern const char gHostTextSource[];		// HostText.ns (HostTextSource.cpp, generated)
+extern const char gHostMessagesSource[];	// HostMessages.ns (HostMessagesSource.cpp, generated)
 
 
 // A source evaluated, kept in the global and started
@@ -46,4 +47,5 @@ HostCellProviderStart(void)
 		return;
 	StartSource(gHostCellSource, "HostCell:host", "the cellular provider");
 	StartSource(gHostTextSource, "HostText:host", "the text message transport");
+	StartSource(gHostMessagesSource, "HostMessages:host", "the Messages application");
 }

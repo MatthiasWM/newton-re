@@ -91,8 +91,12 @@ Names card's Call and the Calls log make and take calls; on the board the
 transport listens from the start.  Not yet tried: a real call each way.
 Step 3: text messages, a transport of the In/Out Box
 (`comms/host/HostText.ns`, ctest `host.NewtonTextMessage`): sent from
-anything with a text format, received as Notes into the In Box.  Not yet:
-messages longer than one SMS, Reply, an alert when one comes.  Step 4,
+anything with a text format.  A Messages application
+(`comms/host/HostMessages.ns`, ctests `host.NewtonMessages.*` at four
+screen sizes): conversations, replies, new messages; received texts go to
+it, not the In Box.  Not yet: the Action picker on a message, scroll
+arrows, an alert with Reply/Show, messages longer than one SMS.  Next (the
+owner's): the store's flash writes batched, to speed up soup writes.  Step 4,
 fax - the module has no fax
 class (`+FCLASS: 8`), so an internet fax service or nothing.  Not yet
 tried on the board: a real text each way.

@@ -1,0 +1,176 @@
+// The Messages application (comms/host/HostMessages.ns) over the host's
+// cellular module: its icon in the Extras drawer; texts received filed into
+// conversations, the list and a conversation drawn; a reply sent from the
+// conversation's Reply line, the message 'sent; a new message to a Names
+// card; each screen snapshotted (messages-<width>x<height>-<n>.pgm), so a
+// run at each display size shows the layout made for it.  The module is
+// tools/modem/fakecell.py on --cell-port (ctests host.NewtonMessages.*):
+//
+//   python tools/modem/fakecell.py \
+//       --spawn build/host/host/newton --cell-port 0 --display 240x320 --erase \
+//       --store messages.store --headless 150 --script src/host/demo/messages.ns
+
+HostInclude("common.ns");
+msFailures := 0;
+msApp := nil;
+msCard := nil;
+msShot := 0;
+
+msCheck := func(what, ok, why) begin
+	if ok then
+		Print("messages: " & what & " ok")
+	else begin
+		Print("messages: " & what & " FAILED - " & why);
+		msFailures := msFailures + 1;
+	end;
+end;
+
+msSnap := func() begin
+	if msApp then msApp:Dirty();
+	RefreshViews();
+	local p := GetAppParams();
+	msShot := msShot + 1;
+	ScreenSnapshot("messages-" & NumberStr(p.appAreaWidth + p.appAreaLeft) & "x"
+		& NumberStr(p.appAreaHeight + p.appAreaTop) & "-" & NumberStr(msShot) & ".pgm");
+end;
+
+msEntries := func() begin
+	local items := [];
+	local soup := GetUnionSoup("Messages:host");
+	if soup then begin
+		local cursor := Query(soup, {type: 'index});
+		local e;
+		while e := cursor:Entry() do begin
+			AddArraySlot(items, e);
+			cursor:Next();
+		end;
+	end;
+	items;
+end;
+
+msEntryWith := func(text) begin
+	foreach e in call msEntries with () do
+		if StrEqual(e.text, text) then
+			return e;
+	nil;
+end;
+
+msIconThere := func() begin
+	local cursor := Query(GetUnionSoup(@307.name), {type: 'index});
+	local e;
+	while e := cursor:Entry() do begin
+		// (with the tag the drawer's All Icons lists by)
+		if e.app = '|Messages:host| then
+			return e._tagList and SetContains(e._tagList, '_icon);
+		cursor:Next();
+	end;
+	nil;
+end;
+
+msSteps := [
+	// (a fresh store's Setup assistant closed first, once it is up: its
+	// Continue button and pictures sit over the application's status bar on
+	// a wide screen - walkSetup taps where a 320x480 screen has them)
+	func(next) begin
+		local start := Ticks();
+		local poll;
+		poll := func() begin
+			if GetRoot().setup and GetRoot().setup.viewCObject then begin
+				GetRoot().setup:Close();
+				AddDelayedCall(next, nil, 500);
+			end else if Ticks() - start > 20 * 60 then
+				call next with ()
+			else
+				AddDelayedCall(poll, nil, 250);
+		end;
+		call poll with ();
+	end,
+	func(next) call waitFor with ("messages: the application",
+		func() GetRoot().|Messages:host| and HostCellStatus().state = 'home, next, 90),
+	func(next) begin
+		msApp := GetRoot().|Messages:host|;
+		call msCheck with ("its icon in the Extras drawer", call msIconThere with (), "none");
+		msCard := GetUnionSoup("Names"):AddToDefaultStoreXmit({class: 'person, cardType: 0,
+			name: {class: 'person, first: "Alice", last: "Ng"}, sorton: "Ng Alice",
+			phones: ["0400 000 002"]}, nil);
+		msApp:Open();
+		HostCellCommand("AT+FAKETEXT=\"+61400000002\",\"Are we still on for dinner tonight?\"");
+		HostCellCommand("AT+FAKETEXT=\"+61499999999\",\"Who is this?\"");
+		call waitFor with ("messages: two texts", func() Length(call msEntries with ()) = 2, next, 30);
+	end,
+	func(next) begin
+		local alice := call msEntryWith with ("Are we still on for dinner tonight?");
+		call msCheck with ("Alice's text", alice and alice.dir = 'incoming and StrEqual(alice.name, "Alice Ng")
+			and StrEqual(alice.thread, "00000002"), "it is " & (if alice then alice.name & " " & alice.thread));
+		call msCheck with ("unread", alice and alice.state = 'unread, "it is " & (if alice then alice.state));
+		call msCheck with ("two conversations", Length(msApp.threads) = 2, Length(msApp.threads) & " of them");
+		call msCheck with ("none left in the In Box", Length(call msInBox with ()) = 0, "some");
+		call msSnap with ();
+		msApp:OpenThread("00000002");
+		AddDelayedCall(next, nil, 500);
+	end,
+	func(next) begin
+		local alice := call msEntryWith with ("Are we still on for dinner tonight?");
+		call msCheck with ("read once opened", alice.state = 'read, "it is " & alice.state);
+		call msSnap with ();
+		SetValue(msApp.replyLine.entryLine, 'text, "Yes - 8 at the usual place");
+		msApp.sendButton:buttonClickScript();
+		call waitFor with ("messages: the reply sent", func() begin
+			local e := call msEntryWith with ("Yes - 8 at the usual place");
+			e and e.state = 'sent;
+		end, next, 30);
+	end,
+	func(next) begin
+		local reply := call msEntryWith with ("Yes - 8 at the usual place");
+		call msCheck with ("the reply in Alice's conversation", reply and reply.dir = 'outgoing
+			and StrEqual(reply.thread, "00000002"), "it is " & (if reply then reply.thread));
+		HostCellCommand("AT+FAKETEXT=\"+61400000002\",\"Running late, be there by 8:15. Save me a seat near the window if you can.\"");
+		call waitFor with ("messages: the answer", func() Length(call msEntries with ()) = 4, next, 30);
+	end,
+	func(next) begin
+		local answer := call msEntryWith with ("Running late, be there by 8:15. Save me a seat near the window if you can.");
+		call msCheck with ("read: the conversation is open", answer and answer.state = 'read,
+			"it is " & (if answer then answer.state));
+		call msSnap with ();
+		// a new message, to the card
+		msApp:Compose();
+		local recipient := GetDataDefs('|nameRef.phone|):MakeNameRef(msCard, '|nameRef.phone|);
+		recipient.phone := msCard.phones[0];
+		msApp.toPicker.selected := [recipient];
+		msApp:Redraw();
+		SetValue(msApp.replyLine.entryLine, 'text, "Also - bring the cable");
+		call msSnap with ();
+		msApp.sendButton:buttonClickScript();
+		call waitFor with ("messages: the new message sent", func() begin
+			local e := call msEntryWith with ("Also - bring the cable");
+			e and e.state = 'sent;
+		end, next, 30);
+	end,
+	func(next) begin
+		call msCheck with ("back in the conversation", msApp.mode = 'thread and StrEqual(msApp.currentThread, "00000002"),
+			"the mode is " & msApp.mode);
+		msApp:ShowList();
+		call msSnap with ();
+		Print("messages: done, " & msFailures & " failed");
+		HostQuit();
+	end];
+
+msInBox := func() begin
+	local items := [];
+	local cursor := Query(GetUnionSoup("InBox"), {type: 'index});
+	local e;
+	while e := cursor:Entry() do begin
+		if e.state = 'Received then AddArraySlot(items, e);
+		cursor:Next();
+	end;
+	items;
+end;
+
+msStep := 0;
+msNext := func() begin
+	local step := msSteps[msStep];
+	msStep := msStep + 1;
+	call step with (msNext);
+end;
+
+call msNext with ();

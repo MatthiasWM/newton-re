@@ -39,9 +39,9 @@
 		kTextPollMs: 3000,
 		kSendPollMs: 500,
 		kSendFailed: -54100,					// (TranslateError's own)
-		// texts stay in the In Box (Notes would put each away at once: its
-		// AutoPutaway), for Put Away to file when the user wants
-		defaultConfiguration: {autoStatus: true, dontAutoPutAway: 'never},
+		// (texts put away at once - into the Messages application, its
+		// AutoPutaway: comms/host/HostMessages.ns)
+		defaultConfiguration: {autoStatus: true},
 
 		servedRequest: nil,						// the Out Box's request being served
 		sending: nil,							// the item being sent
@@ -82,6 +82,10 @@
 
 		InstallScript: func(symbol)
 		begin
+			// (a store an earlier version kept texts in the In Box on says
+			// 'never: Messages takes them now)
+			if self:GetConfig('dontAutoPutAway) then
+				self:SetConfig('dontAutoPutAway, nil);
 			AddDelayedSend(self, 'PollTexts, [], kTextPollMs);
 		end,
 
@@ -131,7 +135,10 @@
 			local text := self:ItemText(item);
 			local numbers := self:ItemNumbers(item);
 			if StrFilled(text) and Length(numbers) > 0 then begin
-				self:SetStatusDialog('Sending, 'vStatusTitle, {statusText: "Sending\u2026\u", titleText: item.title});
+				// (a hidden item's sender shows its own progress: the Messages
+				// application, under the message)
+				if not item.hidden then
+					self:SetStatusDialog('Sending, 'vStatusTitle, {statusText: "Sending\u2026\u", titleText: item.title});
 				foreach number in numbers do
 					AddArraySlot(pendingIds, HostCellSendText(number, text));
 			end;
@@ -170,6 +177,9 @@
 		begin
 			local text;
 			local format := GetCurrentFormat(item);
+			// (a string - the Messages application's - is the text)
+			if IsString(item.body) then
+				return Clone(item.body);
 			try
 				if format then
 					text := format:TextScript(item, if format.ResolveBody then format:ResolveBody(item) else item.body)
@@ -264,8 +274,12 @@
 				else nameRefs:MakeNameRef({}, '|nameRef.phone|);
 			if not card then
 				from.phone := message.number;
-			local item := self:NewFromItem({appSymbol: 'paperroll, title: "Text from " & who,
-				body: body, timestamp: when});
+			// (the Messages application's when it is there - it puts each away
+			// at once - the Notepad's otherwise)
+			local messagesApp := '|Messages:host|;
+			local item := self:NewFromItem({appSymbol: if GetRoot().(messagesApp) then messagesApp else 'paperroll,
+				title: "Text from " & who, body: body, timestamp: when,
+				smsNumber: message.number, smsText: text, smsName: if card then who});
 			item.fromRef := from;
 			self:ItemCompleted(item, 'Received, nil);
 		end,

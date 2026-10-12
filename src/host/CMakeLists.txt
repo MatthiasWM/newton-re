@@ -525,6 +525,22 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../fixtures/packages/fonts/monac
     set_tests_properties(host.NewtonTextMessage PROPERTIES TIMEOUT 240
                          PASS_REGULAR_EXPRESSION "fakecell: text to 0400000002: See you at eight.*textmessage: done, 0 failed"
                          FAIL_REGULAR_EXPRESSION "waited in vain|FAILED|Traceback")
+    # the Messages application (comms/host/HostMessages.ns) at each kind of
+    # screen a host gives it - the T-Deck Pro's, a MessagePad's, the T-Deck
+    # turned, the reMarkable's: texts filed into conversations, a reply and a
+    # new message sent, each screen snapshotted (messages-<w>x<h>-<n>.pgm) -
+    # docs/host-tdeck-pro-phone.md
+    foreach(size 240x320 320x480 480x320 810x1080)
+        add_test(NAME host.NewtonMessages.${size}
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/modem/fakecell.py
+                         --spawn $<TARGET_FILE:newton> --cell-port 0 --serial-port none --display ${size} --erase
+                         --store ${CMAKE_CURRENT_BINARY_DIR}/messages-${size}.store --headless 200
+                         --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/messages.ns
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+        set_tests_properties(host.NewtonMessages.${size} PROPERTIES TIMEOUT 300
+                             PASS_REGULAR_EXPRESSION "fakecell: text to 0400000002: Also - bring the cable.*messages: done, 0 failed"
+                             FAIL_REGULAR_EXPRESSION "waited in vain|FAILED|Traceback|Exception")
+    endforeach()
     add_test(NAME host.NewtonModemAnswer
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/modem/fakemodem.py
                      --incoming echo

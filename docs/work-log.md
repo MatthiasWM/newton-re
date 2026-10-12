@@ -9,6 +9,20 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-12: Messages, the application
+
+Texts as conversations rather than In Box items (`docs/host-tdeck-pro-phone.md`,
+"Messages: the application"): `comms/host/HostMessages.ns`, built in with
+the cellular provider, installed as a form part installs an application
+and given an Extras icon, receiving through the In Box's `AutoPutAway` and
+sending with `Send` (hidden, a completion script), laid out from
+`GetAppParams` for any screen - side by side at 400 wide - and tested at
+240x320, 320x480, 480x320 and 810x1080 (ctests `host.NewtonMessages.*`).
+Mockups first (https://claude.ai/artifact/LYYrm5ksveSNVE2HSAK2Lq).  The
+ROM's 1.x proto name table (`@269`) named most protos; the picker's label
+on the host, the packed bold font, `StrTokenize`, `StrTruncate` and the
+reserved words `in` and `to` cost some time.
+
 ## 2026-10-12: text messages through the In/Out Box
 
 Step 3 of the phone (`docs/host-tdeck-pro-phone.md`): a transport, "Text

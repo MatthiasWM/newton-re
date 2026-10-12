@@ -1,7 +1,7 @@
 // Text messages (SMS) through the In/Out Box over the host's cellular
 // module (comms/host/HostText.ns): a text from a number on a Names card
-// comes into the In Box as a Note titled with the card's name, one from a
-// number on no card titled with the number, and a Note sent to the card as
+// comes through the In Box to the Messages application, named by the card,
+// one from a number on no card by the number, and a Note sent to the card as
 // a text - submitted as the routing slip's Send does (the format's
 // SetupItem, Send), the Out Box handing it to the transport, the module
 // told the card's number as a dial string.  The module is
@@ -89,6 +89,21 @@ tmSlipFor := func(title) begin
 	nil;
 end;
 
+// the Messages application's message with this text
+tmMessageWith := func(text) begin
+	local soup := GetUnionSoup("Messages:host");
+	if soup then begin
+		local cursor := Query(soup, {type: 'index});
+		local e;
+		while e := cursor:Entry() do begin
+			if StrEqual(e.text, text) then
+				return e;
+			cursor:Next();
+		end;
+	end;
+	nil;
+end;
+
 tmSteps := [
 	func(next) call waitFor with ("textmessage: the transport",
 		func() GetRoot().|SMS:host| and HostCellStatus().state = 'home, next, 90),
@@ -98,17 +113,25 @@ tmSteps := [
 			phones: ["0400 000 002"]}, nil);
 		HostCellCommand("AT+FAKETEXT=\"+61400000002\",\"Hello from the network\"");
 		call waitFor with ("textmessage: the text from Alice",
-			func() call tmItemTitled with ("Text from Alice Ng"), next, 30);
+			func() call tmMessageWith with ("Hello from the network"), next, 30);
 	end,
 	func(next) begin
-		local item := call tmItemTitled with ("Text from Alice Ng");
-		call tmCheck with ("a Note", item.body.class = 'paperroll, "the body is " & item.body.class);
-		call tmCheck with ("its text", StrEqual(item.body.data[0].text, "Hello from the network"),
-			"the text is " & item.body.data[0].text);
-		call tmCheck with ("received", item.state = 'Received, "the state is " & item.state);
+		// (the transport hands each message to the Messages application, which
+		// puts it away at once: comms/host/HostMessages.ns)
+		local m := call tmMessageWith with ("Hello from the network");
+		call tmCheck with ("Alice's, by her card", StrEqual(m.name, "Alice Ng") and StrEqual(m.number, "+61400000002"),
+			"it is " & m.name & " " & m.number);
+		call tmCheck with ("received", m.dir = 'incoming, "it is " & m.dir);
+		call tmCheck with ("put away from the In Box", not call tmItemTitled with ("Text from Alice Ng"), "it is still there");
 		HostCellCommand("AT+FAKETEXT=\"+61499999999\",\"Who is this?\"");
 		call waitFor with ("textmessage: the text from a stranger",
-			func() call tmItemTitled with ("Text from +61499999999"), next, 30);
+			func() call tmMessageWith with ("Who is this?"), next, 30);
+	end,
+	func(next) begin
+		local m := call tmMessageWith with ("Who is this?");
+		call tmCheck with ("a stranger's, by the number", not m.name and StrEqual(m.number, "+61499999999"),
+			"it is " & m.name & " " & m.number);
+		call next with ();
 	end,
 	func(next) begin
 		// a Note sent to Alice: the card, and the number picked on it

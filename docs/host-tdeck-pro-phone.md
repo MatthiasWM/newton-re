@@ -276,6 +276,69 @@ goes as one, which the network may refuse - concatenated messages (a user
 data header, PDU mode) to come; Reply in the In Box (`GetTransportScripts`);
 an alert when a text comes.
 
+## Messages: the application (2026-10-12)
+
+The In Box is not how people text, so text messages have an application of
+their own, built in wherever the host has a cellular module
+(`src/comms/host/HostMessages.ns`, started with the provider and the
+transport).  The owner liked the mockups
+(https://claude.ai/artifact/LYYrm5ksveSNVE2HSAK2Lq: a Newton-like look -
+the folder tab, diamond pickers, the status bar, bubbles with the
+Newton's hard shadow for your own) and asked that it work on **any screen a
+host gives it**.
+
+- **Installed as a package's form part installs an application**
+  (`InstallFormPart`: `GetRoot().(appSymbol) := BuildContext(template)`),
+  with an icon in the Extras drawer as the ROM's own applications have one:
+  an entry in the Extras soup - whose name is `@307.name`, "Packages" -
+  with `app`, `text` and a bitmap `icon` drawn at boot (`MakeBitmap`,
+  `DrawIntoBitmap`).
+- **Received**: the transport gives each message the application's
+  `appSymbol` (and its number, text and card's name); the In Box's
+  `AutoFunction` sends `AutoPutAway`, which files it in the soup
+  "Messages:host" (`RegUnionSoup`) and says so - an alert (`Notify`), or a
+  beep when Messages is open.  The transport no longer keeps texts in the
+  In Box (`dontAutoPutAway` cleared on a store that saved `'never`).
+- **Sent**: `Send` straight to the transport, the item hidden from the Out
+  Box with a completion script (`ItemCompletionScript`): the message
+  `'sending`, then `'sent` or `'failed`.  The transport shows no status
+  slip for a hidden item, and takes a string body as the text.
+- **A conversation** is a number's last eight digits (`thread`), so
+  "+61 400 ..." and "0400 ..." are one.
+- **Any screen**: the application lays itself out from `GetAppParams`
+  (again in `ReOrientToScreen`); the list and the conversation are drawn by
+  the application, rows and bubbles measured from the system fonts, a
+  bubble at most seven tenths of the width; at least 400 wide, the list and
+  the conversation side by side (the list two fifths, at most 300).
+- **The protos**, from the ROM's 1.x name table (`@269`: protoApp @157,
+  protoStatus @219, protoClosebox @166, protoInputLine @185,
+  protoLabelInputLine @189, protoTextButton @226, protoGlance @183, ...) and
+  by their slots (`@73` protoStatusBar, with `menuLeftButtons`; `@209` the
+  Action button).
+
+Found on the way: `'in` and `to` are reserved words (a symbol `'in`, a
+local `to`); `StrTokenize` answers a tokenizer, not an array;
+`StrTruncate` is not `StyledStrTruncate`; bold is face 1 (`1 << 20` in a
+packed font: 10 point bold is 1058816) - the Programmer's Guide's table of
+packed fonts has its columns misaligned; `GetPoint(4)`/`(5)` are a tap's
+final x and y; `protoAddressPicker`'s viewJustify is full width (a right
+edge is an inset), and on the host its own label came out half drawn
+("T.") - the header draws "To ◆ name" and taps open the hidden picker's
+Names picker (`DoOpenPicker`).
+
+ctests `host.NewtonMessages.240x320`, `.320x480`, `.480x320`,
+`.810x1080` (`src/host/demo/messages.ns`, snapshots
+`messages-<w>x<h>-<n>.pgm`): its icon; texts filed into conversations
+(unread, read once opened; none left in the In Box); a reply from the
+Reply line, `'sent`; an answer arriving into the open conversation; a new
+message to a card.
+
+NOT YET: the Action picker on a message (Reply, Forward, Copy to Notes,
+Delete); scrolling by the status bar's arrows (the application has
+`viewScrollUpScript`/`DownScript`; no arrows drawn); an alert with Reply
+and Show (`Notify` has neither); a message longer than one SMS; removing
+the Extras icon on a host with no module (a store moved to one).
+
 ## Open questions
 
 - Whether a speaker and microphone are fitted to the module's audio pins
