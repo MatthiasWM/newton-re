@@ -1130,6 +1130,9 @@ Perform(const Request& request)
 	{
 	case kRequestDial:
 		snprintf(command, sizeof(command), "ATD%s;", request.number);
+		// (what is dialled, as it goes: the Newton's dialling rules for its
+		// home city shape the number - a US one puts 1 in front)
+		fprintf(stderr, "[cell] dialling: %s\n", command);
 		SetCall(kHostCellCallDialing, request.number);
 		if (!Exec(command, nullptr, 0, 10000))
 			SetCall(kHostCellCallIdle, nullptr);

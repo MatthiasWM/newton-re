@@ -203,6 +203,18 @@ Call) and hung up by the caller.
 On the board the Phone transport is "Listening" on the Cellular provider
 from the start.  A real call each way is the owner's to make.
 
+**The number dialled is the Newton's, by its dialling rules.** The Phone
+transport dials `GetRoutingInfo`'s `phoneNumber`, which the dialling rules
+of the current worksite shape (`currentCountry`, `currentAreaCode`: Time
+Zones' home city and the owner's worksites).  The board started out in
+Cupertino, so every ten-digit number went out with the US long-distance 1
+in front: a card's `0412 345 678` was `ATD10412345678;`, `+61 412 345 678`
+was `ATD161412345678;` - and the network answered that the number was
+disconnected (the owner's first real call, 2026-10-12).  With an Australian
+home city (the ROM's Sydney has no country symbol, so no rules apply) the
+same cards dial `ATD0412345678;` and `ATD+61412345678;`.  The engine
+prints each dial on the console (`[cell] dialling: ATD...`).
+
 ## Open questions
 
 - Whether a speaker and microphone are fitted to the module's audio pins
