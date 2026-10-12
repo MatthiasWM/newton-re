@@ -94,7 +94,8 @@ binary but strings and reals is kept as its bytes):
     layout.tsv       the manifest: every object's address, path and header flags,
                      and each frame's map; `alias` lines say which named
                      object a path inside a compiled function is (an object
-                     the ROM shares, which the compiler makes afresh)
+                     the ROM shares, which the compiler makes afresh) - while
+                     what the compiler makes is still the same as it
 
 The notation of a value (a subset of NewtonScript's literals, plus a few
 constructors of its own):
@@ -1689,7 +1690,10 @@ class Builder:
 			name = self.aliases[path.lower()]
 			if name not in self.defs:
 				raise ValueError("%s: the alias %s is not defined" % (path, name))
-			return Name(name)
+			# (only while it is still the same: a function edited so that it
+			# compiles to other instructions or literals has its own)
+			if self.same_value(v, self.defs[name], set()):
+				return Name(name)
 		v.path = path
 		self.by_path[path.lower()] = v
 		if v.kind == "frame":
@@ -1704,6 +1708,33 @@ class Builder:
 		elif isinstance(v.cls, Obj):
 			v.cls = self.walk(v.cls, path + "^")
 		return v
+
+	def same_value(self, a, b, seen):
+		"""Whether two values are the same object's contents: what an alias
+		in the layout needs of the object a compiled function made."""
+		if isinstance(a, Name) and isinstance(b, Name) and a.name == b.name:
+			return True
+		if isinstance(a, Name):
+			a = self.defs.get(a.name, a)
+		if isinstance(b, Name):
+			b = self.defs.get(b.name, b)
+		if isinstance(a, Obj) and isinstance(b, Obj):
+			if a is b or (id(a), id(b)) in seen:
+				return True
+			seen.add((id(a), id(b)))
+			# (a compiled frame's map is an array the layout's map stands for)
+			kinds = {a.kind, b.kind}
+			return ((len(kinds) == 1 or kinds == {"array", "map"})
+				and [t.lower() for t in a.tags] == [t.lower() for t in b.tags] and a.data == b.data
+				and len(a.items) == len(b.items) and self.same_value(a.cls, b.cls, seen)
+				and all(self.same_value(x, y, seen) for x, y in zip(a.items, b.items)))
+		if type(a) is not type(b):
+			return False
+		if isinstance(a, (Name, Sym)):
+			return a.name.lower() == b.name.lower() if isinstance(a, Sym) else a.name == b.name
+		if isinstance(a, Imm):
+			return a.ref == b.ref
+		return a == b
 
 	def object_size(self, path):
 		"""The size an object's header and body come to now (None: gone)."""

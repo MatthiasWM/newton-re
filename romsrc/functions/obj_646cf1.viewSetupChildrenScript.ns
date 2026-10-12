@@ -20,7 +20,12 @@ func() begin
 			headerText.viewFlags := 0
 		end;
 	if (kbdType = 'alpha) then begin
-			l3 := '{_proto: @375, viewBounds: {left: 1, top: -130, right: 284, bottom: -20}, viewJustify: 144}
+			l3 := '{_proto: @375, viewBounds: {left: 1, top: -130, right: 284, bottom: -20}, viewJustify: 144};
+			// DEVIATION: a slip made narrower than the keyboard (its
+			//  viewSetupFormScript) has a keyboard its width
+			if (viewBounds.right < l3.viewBounds.right) then begin
+					l3 := {_proto: @375, viewBounds: {left: 1, top: -130, right: viewBounds.right, bottom: -20}, viewJustify: 144}
+				end
 		end else begin
 			if (kbdType = 'number) then begin
 					l3 := '{_proto: @676, viewBounds: {left: 0, top: -141, right: 151, bottom: -20}, viewJustify: 144}

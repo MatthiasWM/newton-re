@@ -166,7 +166,12 @@ reported as the decompiler's was.
    - Where the ROM shares an object that a compiled function makes afresh
      (a string two functions push, for example), an `alias` line in the
      manifest says which named object that path is. There are 3784 of
-     them.
+     them. An alias holds only while the compiled object is still the
+     same as the one it names (its slots' names matched whatever their
+     case, a compiled frame map the same as the ROM's map): a function
+     edited so that it compiles to other bytecode or literals keeps its
+     own - its `instructions` were otherwise the shared binary of the
+     function it had been the same as, and the edit was silently lost.
    - Symbols are matched whatever their case, since the host's compiler
      spells a symbol as the host first interned it.
    - **No bytecode is left in the tree.** The 362 `instructions` binaries

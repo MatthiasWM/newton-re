@@ -70,8 +70,10 @@ python tools/newton-rom/analysis/romsrc.py build romsrc --relayout -o build/obje
   allowed for: an application is not asked to turn an upright screen
   upright (`obj_642059.Open`), the Typewriter keyboard is made the
   screen's width when its small size does not fit
-  (`obj_630d25.viewSetupFormScript`), and Internet Setup's edit slip and
-  its keyboard fit the screen (`rex/inetstup.patches.tsv`) - and it
+  (`obj_630d25.viewSetupFormScript`), Internet Setup's edit slip and
+  its keyboard fit the screen (`rex/inetstup.patches.tsv`), and so does
+  the slip that asks for a missing piece of a worksite or the owner's
+  card - Time Zones' "choose the closest city" (`obj_646cf1`, @508) - and it
   may be changed further to enhance the
   system. The git tag `romsrc-rom` keeps the last
   tree that is the ROM's but for the additions: `--git-ref romsrc-rom`

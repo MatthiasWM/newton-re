@@ -9,6 +9,22 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-12: Time Zones' closest-city slip on the T-Deck Pro
+
+The slip `ValidateConfig` puts up for a worksite with no city (Time Zones'
+"This worksite is incomplete.  Please choose the closest city") is 284
+wide, and on the board's 240-wide screen was cut off at both sides; it is
+now the screen's width where it will not fit, and its keyboard the slip's
+(`romsrc/functions/obj_646cf1.*`, DEVIATION) - the city list it opens fits
+already.  On the way, a builder bug: the slip's `viewSetupFormScript` had
+been `func() nil`, whose bytecode the ROM shares, and the layout's `alias`
+for its `instructions` made the build use the shared binary whatever the
+function now compiled to - the edit was dropped without a word.
+`romsrc.py` now keeps an alias only while the compiled object is the same
+as the one it names (names of slots matched whatever their case, a
+compiled frame map taken as the ROM's map); `--git-ref romsrc-rom --check`
+is still identical to the ROM.
+
 ## 2026-10-12: Internet Setup on the T-Deck Pro's small screen
 
 The ROM asked to turn the screen whenever an application wanted more than

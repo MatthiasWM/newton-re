@@ -114,7 +114,11 @@ takes the bounds its walk-through layout has, which fit the screen, and
 its keyboard is the slip's width (`romsrc/rex/inetstup.patches.tsv`); the
 Typewriter keyboard is the screen's width where its small size will not
 fit (`obj_630d25.viewSetupFormScript.ns`) - a keyboard view makes its
-keys to fit its bounds.
+keys to fit its bounds.  The slip that asks for what a worksite or the
+owner's card is missing (`ValidateConfig`: Time Zones' "This worksite is
+incomplete.  Please choose the closest city", 284 wide) is the screen's
+width, its keyboard too (`obj_646cf1.viewSetupFormScript.ns`,
+`viewSetupChildrenScript.ns`).
 
 **The keyboard is built in**, as an eMate 300's is: the board answers the
 keyboard gestalt (`kGestalt_Extended_Base + 10`, `newtonmain.cpp`'s
