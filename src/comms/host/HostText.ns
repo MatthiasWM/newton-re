@@ -1,0 +1,329 @@
+// Text messages (SMS) over the host's cellular module, as a transport of the
+// In/Out Box (comms/host/HostCellProvider.h starts it with the telephone
+// provider, when the host has a module): compiled into the host
+// (HostTextSource.cpp, made by src/cmake/EmbedText.cmake), evaluated at
+// boot and registered with RegTransport; the frame is kept in the global
+// HostText:host.
+//
+// DEVIATION (host addition): the ROM has no text messages.  The transport is
+// made as the Newton Programmer's Guide 2.0 ("Transport Interface", chapter
+// 22) says a transport is made, from the ROM's own protos:
+//   protoTransport @389, its routing slip protoFullRouteSlip @655 (a
+//   protoRoutingSlip @486 with the sender pop-up, the format picker and the
+//   Send button), the To line protoAddressPicker @259 over the Names
+//   file's telephone numbers ('|nameRef.phone|, as the Phone transport's)
+//   (the magic pointers identified by their slots: docs/host-tdeck-pro-phone.md).
+//
+// Sending: anything routed with a 'text format (Notes, Names, ...) is a
+// "Text" action.  The Out Box hands each item over in SendRequest; its text
+// is its format's TextScript, sent to each recipient's number as the card
+// has it (a mobile network takes it as written: national or +
+// international), and the item is completed sent, or kept in the Out Box
+// with an error when the network would not take it.
+//
+// Receiving: the module's messages (HostCellTransportText, polled every
+// kTextPollMs) come into the In Box as Notes - a body of class 'paperroll,
+// one paragraph - so Put Away files them in the Notepad; the title "Text
+// from <name>" when the number is on a card in the Names file, the
+// number otherwise.
+
+{
+	transport: {
+		_proto: @389,							// protoTransport
+		appSymbol: '|SMS:host|,
+		title: "Text Message",
+		actionTitle: "Text",
+		dataTypes: ['text],
+		addressingClass: '|nameRef.phone|,
+		icon: @760,								// (the Phone transport's)
+		kTextPollMs: 3000,
+		kSendPollMs: 500,
+		kSendFailed: -54100,					// (TranslateError's own)
+		// texts stay in the In Box (Notes would put each away at once: its
+		// AutoPutaway), for Put Away to file when the user wants
+		defaultConfiguration: {autoStatus: true, dontAutoPutAway: 'never},
+
+		servedRequest: nil,						// the Out Box's request being served
+		sending: nil,							// the item being sent
+		pendingIds: nil,						// its sendings (HostCellSendText's ids)
+
+		routingSlip: {
+			_proto: @655,						// protoFullRouteSlip (its own bounds, as Beam's slip)
+			viewSetupFormScript: func()
+			begin
+				self:ToRefCheck('|nameRef.phone|);
+				inherited:?viewSetupFormScript();
+			end,
+			// (stepChildren: viewChildren would replace the proto's own - its sender
+			// pop-up, format picker, Send button and close box)
+			stepChildren: [
+				{
+					_proto: @259,				// protoAddressPicker
+					viewBounds: {left: 30, top: 50, right: -20, bottom: 63},
+					text: "To",
+					class: '|nameRef.phone|,
+					selected: nil,
+					alternatives: nil,
+					useMemory: nil,
+					viewSetupFormScript: func()
+					begin
+						selected := fields.toRef;
+						alternatives := fields.alternatives;
+						inherited:?viewSetupFormScript();
+					end,
+					pickActionScript: func(index)
+					begin
+						inherited:?pickActionScript(index);
+						fields.toRef := selected;
+					end
+				}
+			]
+		},
+
+		InstallScript: func(symbol)
+		begin
+			AddDelayedSend(self, 'PollTexts, [], kTextPollMs);
+		end,
+
+		TranslateError: func(error)
+		begin
+			if error = kSendFailed then
+				"The message could not be sent."
+			else
+				inherited:TranslateError(error);
+		end,
+
+		// (always receiving: nothing to start)
+		ReceiveRequest: func(request)
+		begin
+			nil;
+		end,
+
+		/*------------------------------------------------------------------
+			Sending
+		------------------------------------------------------------------*/
+
+		SendRequest: func(request)
+		begin
+			if request.cause = 'submit or sending then
+				return nil;
+			servedRequest := request;
+			self:SendNextItem();
+		end,
+
+		SendNextItem: func()
+		begin
+			local item;
+			try
+				item := self:ItemRequest(servedRequest)
+			onexception |evt.ex| do begin
+				self:HandleThrow();
+				item := nil;
+			end;
+			if not item then begin
+				sending := nil;
+				servedRequest := nil;
+				self:SetStatusDialog('idle, nil, nil);
+				return nil;
+			end;
+			sending := item;
+			pendingIds := [];
+			local text := self:ItemText(item);
+			local numbers := self:ItemNumbers(item);
+			if StrFilled(text) and Length(numbers) > 0 then begin
+				self:SetStatusDialog('Sending, 'vStatusTitle, {statusText: "Sending\u2026\u", titleText: item.title});
+				foreach number in numbers do
+					AddArraySlot(pendingIds, HostCellSendText(number, text));
+			end;
+			AddDelayedSend(self, 'SendingDone, [], kSendPollMs);
+		end,
+
+		// the item's sendings all answered: completed sent, or kept with an error
+		SendingDone: func()
+		begin
+			if not sending then
+				return nil;
+			local failed := Length(pendingIds) = 0;
+			foreach id in pendingIds do begin
+				local state := if id then HostCellSendState(id);
+				if state = 'busy then begin
+					AddDelayedSend(self, 'SendingDone, [], kSendPollMs);
+					return nil;
+				end;
+				if state <> 'sent then
+					failed := true;
+			end;
+			local item := sending;
+			sending := nil;
+			pendingIds := nil;
+			if failed then
+				self:ItemCompleted(item, nil, kSendFailed)
+			else
+				self:ItemCompleted(item, 'sent, nil);
+			self:SendNextItem();
+		end,
+
+		// the item's text: its format's TextScript (a string body as it is).
+		// (TextScript's second argument, "reserved, ignore" by the Programmer's
+		// Reference, is the data the ROM's formats read: the body, resolved)
+		ItemText: func(item)
+		begin
+			local text;
+			local format := GetCurrentFormat(item);
+			try
+				if format then
+					text := format:TextScript(item, if format.ResolveBody then format:ResolveBody(item) else item.body)
+			onexception |evt.ex| do
+				text := nil;
+			if not text and IsString(item.body) then
+				text := item.body;
+			if text then Clone(text);
+		end,
+
+		// each recipient's number as the card has it: the one chosen in the To
+		// line, or - a name with no number chosen - the card's mobile number,
+		// or its first
+		ItemNumbers: func(item)
+		begin
+			local numbers := [];
+			local nameRefs := GetDataDefs('|nameRef.phone|);
+			if item.toRef then
+				foreach ref in item.toRef do begin
+					local info := nameRefs:GetRoutingInfo(ref);
+					local number := if info and Length(info) > 0 then info[0].rawNumber;
+					if not StrFilled(number) and IsFrame(ref) then
+						number := ref.phone;
+					if not StrFilled(number) and IsFrame(ref) and ref._alias then
+						number := self:CardMobile(ResolveEntryAlias(ref._alias));
+					if StrFilled(number) then
+						AddArraySlot(numbers, self:DialString(number));
+				end;
+			numbers;
+		end,
+
+		CardMobile: func(card)
+		begin
+			local first;
+			if card and card.phones then
+				foreach phone in card.phones do
+					if IsString(phone) and StrFilled(phone) then begin
+						if IsSubclass(ClassOf(phone), '|string.phone.mobile|) then
+							return phone;
+						if not first then
+							first := phone;
+					end;
+			first;
+		end,
+
+		// what a GSM number holds: the digits, and a + in front
+		DialString: func(number)
+		begin
+			local dial := "";
+			for i := 0 to StrLen(number) - 1 do begin
+				local c := number[i];
+				if (c >= $0 and c <= $9) or (c = $+ and StrLen(dial) = 0) then
+					dial := dial & c;
+			end;
+			dial;
+		end,
+
+		/*------------------------------------------------------------------
+			Receiving
+		------------------------------------------------------------------*/
+
+		PollTexts: func()
+		begin
+			local message;
+			try
+				while message := HostCellTransportText() do
+					self:ReceivedText(message)
+			onexception |evt.ex| do
+				nil;
+			AddDelayedSend(self, 'PollTexts, [], kTextPollMs);
+		end,
+
+		ReceivedText: func(message)
+		begin
+			local card := self:CardForNumber(message.number);
+			local who := if card then self:CardName(card) else message.number;
+			// (the message's age by the host's clock, not its time: that is GMT,
+			// Time() the Newton's own zone)
+			local when := if message.age then Time() - message.age else Time();
+			local text := message.text;
+			// (a paragraph tall enough for the text: about thirty characters
+			// a line on the MessagePad's Notepad, a line 16 pixels)
+			local lines := 1 + StrLen(text) div 30;
+			for i := 0 to StrLen(text) - 1 do
+				if text[i] = $\n then lines := lines + 1;
+			local height := lines * 16 + 8;
+			local body := {viewStationery: 'paperroll, class: 'paperroll, height: height + 16,
+				timestamp: when, _version: 2,
+				data: [{viewStationery: 'para, viewBounds: SetBounds(0, 0, 230, height), text: text}]};
+			local nameRefs := GetDataDefs('|nameRef.phone|);
+			local from := if card then nameRefs:MakeNameRef(card, '|nameRef.phone|)
+				else nameRefs:MakeNameRef({}, '|nameRef.phone|);
+			if not card then
+				from.phone := message.number;
+			local item := self:NewFromItem({appSymbol: 'paperroll, title: "Text from " & who,
+				body: body, timestamp: when});
+			item.fromRef := from;
+			self:ItemCompleted(item, 'Received, nil);
+		end,
+
+		// the card in the Names file with this number among its phones (the
+		// last eight digits compared: "+61 412 ..." is "0412 ..."), or nil
+		CardForNumber: func(number)
+		begin
+			local want := self:LastDigits(number);
+			if StrLen(want) < 6 then
+				return nil;
+			local soup := GetUnionSoup("Names");
+			if not soup then
+				return nil;
+			local cursor := Query(soup, {type: 'index});
+			local entry;
+			while entry := cursor:Entry() do begin
+				if entry.phones then
+					foreach phone in entry.phones do
+						if IsString(phone) and StrEqual(self:LastDigits(phone), want) then
+							return entry;
+				cursor:Next();
+			end;
+			nil;
+		end,
+
+		LastDigits: func(number)
+		begin
+			local digits := "";
+			for i := 0 to StrLen(number) - 1 do begin
+				local c := number[i];
+				if c >= $0 and c <= $9 then
+					digits := digits & c;
+			end;
+			if StrLen(digits) > 8 then
+				SubStr(digits, StrLen(digits) - 8, 8)
+			else
+				digits;
+		end,
+
+		CardName: func(card)
+		begin
+			local name := card.name;
+			if IsFrame(name) then begin
+				local first := if IsString(name.first) then name.first else "";
+				local last := if IsString(name.last) then name.last else "";
+				local whole := if StrFilled(first) and StrFilled(last) then first & " " & last else first & last;
+				if StrFilled(whole) then
+					return whole;
+			end;
+			if IsString(card.company) and StrFilled(card.company) then
+				return card.company;
+			"?";
+		end
+	},
+
+	Start: func()
+	begin
+		RegTransport(transport.appSymbol, transport);
+	end
+}

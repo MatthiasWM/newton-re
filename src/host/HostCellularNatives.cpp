@@ -14,6 +14,7 @@
 #include "Interpreter.h"
 #include "Unicode.h"
 #include <string.h>
+#include <time.h>
 
 const long	kSecondsFrom1904To1970 = 2082844800L;
 
@@ -186,17 +187,37 @@ FHostCellSendState(RefArg /*rcvr*/, RefArg id)
 
 
 static Ref
-FHostCellNextText(RefArg /*rcvr*/)
+NextText(HostCellReader reader)
 {
 	static HostCellText text;
-	if (!HostCellularNextText(&text))
+	if (!HostCellularNextText(&text, reader))
 		return NILREF;
 	RefVar message(AllocateFrame());
 	SetSlot(message, "number", RefVar(StringOfUTF8(text.number)));
 	SetSlot(message, "text", RefVar(StringOfUTF8(text.text)));
 	// (minutes since 1904, as Time() gives them)
 	SetSlot(message, "time", text.time != 0 ? RefVar(MAKEINT((long) ((text.time + kSecondsFrom1904To1970) / 60))) : RefVar(NILREF));
+	// (how long ago it was sent, in minutes, by the host's clock - which is
+	// GMT: Time() less this is when, in the Newton's own zone; time is GMT)
+	long long now = (long long) ::time(nil);
+	SetSlot(message, "age", text.time != 0 && now >= text.time ? RefVar(MAKEINT((long) ((now - text.time) / 60))) : RefVar(NILREF));
 	return message;
+}
+
+
+static Ref
+FHostCellNextText(RefArg /*rcvr*/)
+{
+	return NextText(kHostCellReaderScript);
+}
+
+
+// the text transport's own (comms/host/HostText.ns): every message, as the
+// script's natives get every one too
+static Ref
+FHostCellTransportText(RefArg /*rcvr*/)
+{
+	return NextText(kHostCellReaderTool);
 }
 
 
@@ -242,6 +263,7 @@ HostRegisterCellularFunctions(void)
 	SetSlot(functions, "HostCellSendText", RefVar(MakeCFunction((void*) FHostCellSendText, 2, nil)));
 	SetSlot(functions, "HostCellSendState", RefVar(MakeCFunction((void*) FHostCellSendState, 1, nil)));
 	SetSlot(functions, "HostCellNextText", RefVar(MakeCFunction((void*) FHostCellNextText, 0, nil)));
+	SetSlot(functions, "HostCellTransportText", RefVar(MakeCFunction((void*) FHostCellTransportText, 0, nil)));
 	SetSlot(functions, "HostCellNextEvent", RefVar(MakeCFunction((void*) FHostCellNextEvent, 0, nil)));
 	SetSlot(functions, "HostCellCommand", RefVar(MakeCFunction((void*) FHostCellCommand, 1, nil)));
 }

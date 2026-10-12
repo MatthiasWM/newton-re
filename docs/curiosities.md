@@ -2411,3 +2411,15 @@ On the way, a reconstruction slip surfaced. `TSerialEndpoint::HandleEventReply`
 (ROM 0x001dc064) hands a tool's event to the script endpoint with its code
 and data, and the reconstruction had copied only its time and service, so
 no `eventHandler` had seen an event's code before this.
+
+## The reserved argument that is the data
+
+The Newton Programmer's Reference documents a routing format's text method
+as `format:TextScript(item, reserved)`: "reserved: Ignore this
+parameter". A transport that handles text, such as a mail transport,
+calls it to get the item's text. But the ROM's own formats read the data
+from that parameter, not from the item: `protoFrameFormat`'s `TextScript`
+(`obj_6417cd`) asks `GetDataDefs(DataClassOf(a2))`. Passed nil, as the
+documentation invites, every Note answers "No Text available for this
+item". The host's text message transport (`comms/host/HostText.ns`) passes
+the item's body, resolved.

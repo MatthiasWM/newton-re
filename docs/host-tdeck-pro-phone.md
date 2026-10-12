@@ -221,6 +221,61 @@ number as it is (`GetRoutingInfo`'s `rawNumber`); other providers dial
 as the ROM does.  The engine prints each dial on the console
 (`[cell] dialling: ATD...`).
 
+## Step 3: text messages through the In/Out Box (2026-10-12)
+
+A transport, "Text Message" (`'|SMS:host|`, `src/comms/host/HostText.ns`,
+started with the telephone provider by `HostCellProviderStart`), made as
+the Newton Programmer's Guide 2.0 says a transport is made (chapter 22,
+"Transport Interface"; `documentation/NewtonProgrammerGuide20.pdf`):
+
+- **The protos**, identified by their slots: `protoTransport` @389,
+  `protoFullRouteSlip` @655 (the sender pop-up, the format picker, the Send
+  button, `PrepareToSend`; built on the base routing slip @486, the Phone
+  transport's), `protoAddressPicker` @259 (`selected`, `_picker`, the
+  remembered names).  The slip's own views are its `stepChildren`: as
+  `viewChildren` they replaced the proto's, and the slip had no Send
+  button.  It sets no bounds of its own, as Beam's does not.
+- **Sending**: the transport's `dataTypes` is `['text]`, so anything with a
+  text format (a Note, a Names card, ...) has a "Text" action; the To line
+  is the Names file's numbers (`'|nameRef.phone|`).  `SendRequest` (cause
+  `'submit` ignored, as the Guide says) takes the Out Box's items one at a
+  time; the text is the format's `TextScript` - whose second argument, which
+  the Reference calls "reserved, ignore", is the data the ROM's formats
+  read (the body, resolved); the number the one chosen in the To line, the
+  card's mobile number when none was, kept to digits and a leading `+`;
+  sent to each recipient, and the item completed `'sent` - or, when the
+  network will not take it, with the transport's error ("The message could
+  not be sent.", its `TranslateError`), which protoTransport's
+  `ItemCompleted` shows and then reopens the item's routing slip (any
+  transport's "send now" item, Beam's too).
+- **Receiving**: `HostCellTransportText`, every 3 s, each message a Note in
+  the In Box (`NewFromItem`, `ItemCompleted(item, 'Received)`): its body of
+  class `'paperroll` with one paragraph, titled "Text from <name>" when the
+  number's last eight digits are on a card in the Names file, the number
+  otherwise; the sender its `fromRef`.  Its time is the Newton's own:
+  `Time()` less the message's age by the host's clock (`age`, which the
+  native now gives beside the GMT `time`).  The transport's configuration
+  says `dontAutoPutAway: 'never` - without it the In Box's `AutoFunction`
+  puts each one away into the Notepad at once (Notes has `AutoPutaway`,
+  as for a beamed note), and the In Box shows nothing.
+- **The engine** gives received messages to each reader, as it does the
+  call events (`HostCellNextText` a script's, `HostCellTransportText` the
+  transport's).
+
+ctest `host.NewtonTextMessage` (`src/host/demo/textmessage.ns`;
+`fakecell.py --refuse` a number the network will not send to): a text from
+a number on a card titled with the card's name, a Note in the In Box;
+one from a stranger titled with the number; a Note sent as a text from
+its routing slip's Send; one refused, the error told and the slip opened
+again; the routing slip opened as the Action button opens it
+(`textmessage-slip.pgm`: the sender, "Text Message", the stamp, To, the
+Text button).
+
+NOT YET: a message longer than one SMS (160 GSM-7 characters, 70 UCS2)
+goes as one, which the network may refuse - concatenated messages (a user
+data header, PDU mode) to come; Reply in the In Box (`GetTransportScripts`);
+an alert when a text comes.
+
 ## Open questions
 
 - Whether a speaker and microphone are fitted to the module's audio pins

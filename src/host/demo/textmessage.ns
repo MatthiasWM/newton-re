@@ -1,0 +1,189 @@
+// Text messages (SMS) through the In/Out Box over the host's cellular
+// module (comms/host/HostText.ns): a text from a number on a Names card
+// comes into the In Box as a Note titled with the card's name, one from a
+// number on no card titled with the number, and a Note sent to the card as
+// a text - submitted as the routing slip's Send does (the format's
+// SetupItem, Send), the Out Box handing it to the transport, the module
+// told the card's number as a dial string.  The module is
+// tools/modem/fakecell.py on --cell-port; AT+FAKETEXT is a message arriving
+// (ctest host.NewtonTextMessage):
+//
+//   python tools/modem/fakecell.py \
+//       --spawn build/host/host/newton --cell-port 0 --display 320x480 --erase \
+//       --store textmessage.store --headless 150 --script src/host/demo/textmessage.ns
+
+HostInclude("common.ns");
+tmFailures := 0;
+tmCard := nil;
+tmSent := nil;
+
+tmCheck := func(what, ok, why) begin
+	if ok then
+		Print("textmessage: " & what & " ok")
+	else begin
+		Print("textmessage: " & what & " FAILED - " & why);
+		tmFailures := tmFailures + 1;
+	end;
+end;
+
+// the In Box's items, newest last
+tmInBox := func() begin
+	local items := [];
+	local soup := GetUnionSoup("InBox");
+	if soup then begin
+		local cursor := Query(soup, {type: 'index});
+		local e;
+		while e := cursor:Entry() do begin
+			AddArraySlot(items, e);
+			cursor:Next();
+		end;
+	end;
+	items;
+end;
+
+tmItemTitled := func(title) begin
+	foreach e in call tmInBox with () do
+		if IsString(e.title) and StrEqual(e.title, title) then
+			return e;
+	nil;
+end;
+
+tmOutBoxCount := func() begin
+	local soup := GetUnionSoup("OutBox");
+	local n := 0;
+	if soup then begin
+		local cursor := Query(soup, {type: 'index});
+		while cursor:Entry() do begin
+			n := n + 1;
+			cursor:Next();
+		end;
+	end;
+	n;
+end;
+
+// a Note sent as the routing slip's Send submits it: the Notes format that
+// makes text, its SetupItem, the recipient, Send
+tmSendNote := func(text, title, recipient) begin
+	local note := GetDataDefs('paperroll):MakeNewEntry();
+	note.data := [{viewStationery: 'para, viewBounds: SetBounds(0, 0, 230, 24), text: text}];
+	local item := GetRoot().|SMS:host|:NewItem(nil);
+	local format;
+	foreach f in GetRouteFormats(note) do
+		if not format and f.dataTypes and SetContains(f.dataTypes, 'text) then
+			format := f;
+	call tmCheck with ("a text format for Notes", format, "none");
+	item.appSymbol := 'paperroll;
+	item.currentFormat := format.symbol;
+	format:SetupItem(item, {target: note, targetView: nil});
+	item.toRef := [recipient];
+	item.title := title;
+	item.Connect := true;
+	Send('|SMS:host|, item);
+end;
+
+// the routing slip open for the item of this title, if there is one
+tmSlipFor := func(title) begin
+	foreach v in GetRoot():ChildViewFrames() do
+		if v.fields and IsString(v.fields.title) and StrEqual(v.fields.title, title) then
+			return v;
+	nil;
+end;
+
+tmSteps := [
+	func(next) call waitFor with ("textmessage: the transport",
+		func() GetRoot().|SMS:host| and HostCellStatus().state = 'home, next, 90),
+	func(next) begin
+		tmCard := GetUnionSoup("Names"):AddToDefaultStoreXmit({class: 'person, cardType: 0,
+			name: {class: 'person, first: "Alice", last: "Ng"}, sorton: "Ng Alice",
+			phones: ["0400 000 002"]}, nil);
+		HostCellCommand("AT+FAKETEXT=\"+61400000002\",\"Hello from the network\"");
+		call waitFor with ("textmessage: the text from Alice",
+			func() call tmItemTitled with ("Text from Alice Ng"), next, 30);
+	end,
+	func(next) begin
+		local item := call tmItemTitled with ("Text from Alice Ng");
+		call tmCheck with ("a Note", item.body.class = 'paperroll, "the body is " & item.body.class);
+		call tmCheck with ("its text", StrEqual(item.body.data[0].text, "Hello from the network"),
+			"the text is " & item.body.data[0].text);
+		call tmCheck with ("received", item.state = 'Received, "the state is " & item.state);
+		HostCellCommand("AT+FAKETEXT=\"+61499999999\",\"Who is this?\"");
+		call waitFor with ("textmessage: the text from a stranger",
+			func() call tmItemTitled with ("Text from +61499999999"), next, 30);
+	end,
+	func(next) begin
+		// a Note sent to Alice: the card, and the number picked on it
+		local recipient := GetDataDefs('|nameRef.phone|):MakeNameRef(tmCard, '|nameRef.phone|);
+		recipient.phone := tmCard.phones[0];
+		call tmSendNote with ("See you at eight", "See you", recipient);
+		local transport := GetRoot().|SMS:host|;
+		call waitFor with ("textmessage: sent", func() (call tmOutBoxCount with ()) = 0
+			and not transport.sending and transport.servedRequest = nil, next, 30);
+	end,
+	func(next) begin
+		// a number the network will not send to (fakecell.py --refuse): the
+		// error told (TranslateError) and - a "send now" item, as protoTransport's
+		// ItemCompleted does for any transport - its routing slip opened again
+		// for the user to put right
+		local recipient := GetDataDefs('|nameRef.phone|):MakeNameRef({}, '|nameRef.phone|);
+		recipient.phone := "0499 000 000";
+		call tmSendNote with ("Nobody home", "Refused", recipient);
+		call waitFor with ("textmessage: refused", func() call tmSlipFor with ("Refused"), func() begin
+			// (its lower part - sender, format, Send - comes in a moment later)
+			AddDelayedCall(next, nil, 3000);
+		end, 30);
+	end,
+	func(next) begin
+		local slip := call tmSlipFor with ("Refused");
+		call tmCheck with ("the refused message's slip open again", slip, "none");
+		call tmCheck with ("explained", StrEqual(GetRoot().|SMS:host|:TranslateError(-54100), "The message could not be sent."), "not");
+		ScreenSnapshot("textmessage-refused.pgm");
+		if slip then
+			slip:Close();
+		// (the alert's close box, as the user would)
+		call tapAt with (244, 275);
+		AddDelayedCall(next, nil, 1000);
+	end,
+	func(next) begin
+		// the routing slip as the Action button opens it, for a Note to Alice
+		local note := GetDataDefs('paperroll):MakeNewEntry();
+		note.data := [{viewStationery: 'para, viewBounds: SetBounds(0, 0, 230, 24), text: "On my way"}];
+		local item := GetRoot().|SMS:host|:NewItem(nil);
+		foreach f in GetRouteFormats(note) do
+			if not item.currentFormat and f.dataTypes and SetContains(f.dataTypes, 'text) then begin
+				item.currentFormat := f.symbol;
+				f:SetupItem(item, {target: note, targetView: nil});
+			end;
+		item.appSymbol := 'paperroll;
+		item.title := "On my way";
+		local recipient := GetDataDefs('|nameRef.phone|):MakeNameRef(tmCard, '|nameRef.phone|);
+		recipient.phone := tmCard.phones[0];
+		item.toRef := [recipient];
+		OpenRoutingSlip(item, {target: note, targetView: nil, appSymbol: 'paperroll});
+		call waitFor with ("textmessage: the routing slip", func() call tmSlipFor with ("On my way"), func() begin
+			AddDelayedCall(func() begin
+				ScreenSnapshot("textmessage-slip.pgm");
+				local slip := call tmSlipFor with ("On my way");
+				call tmCheck with ("a routing slip", slip, "none");
+				call tmCheck with ("its recipient", slip and slip.fields.toRef and Length(slip.fields.toRef) = 1, "none");
+				if slip then
+					slip:Close();
+				call next with ();
+			end, nil, 3000);
+		end, 30);
+	end,
+	func(next) begin
+		// (the sent one gone - the Out Box keeps no log by default - and the
+		// refused one back in its routing slip)
+		call tmCheck with ("the Out Box empty", (call tmOutBoxCount with ()) = 0, (call tmOutBoxCount with ()) & " left");
+		Print("textmessage: done, " & tmFailures & " failed");
+		HostQuit();
+	end];
+
+tmStep := 0;
+tmNext := func() begin
+	local step := tmSteps[tmStep];
+	tmStep := tmStep + 1;
+	call step with (tmNext);
+end;
+
+call tmNext with ();

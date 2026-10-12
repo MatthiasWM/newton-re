@@ -17,6 +17,26 @@
 #include <stdio.h>
 
 extern const char gHostCellSource[];		// HostCell.ns (HostCellSource.cpp, generated)
+extern const char gHostTextSource[];		// HostText.ns (HostTextSource.cpp, generated)
+
+
+// A source evaluated, kept in the global and started
+static void
+StartSource(const char* source, const char* global, const char* what)
+{
+	newton_try
+	{
+		RefVar fn(ParseString(RefVar(MakeString(source))));
+		RefVar frame(InterpretBlock(fn, RefVar()));
+		SetFrameSlot(RefVar(gVarFrame), RefVar(Intern((char*) global)), frame);
+		NSSend(frame, RefVar(Intern((char*) "Start")));
+	}
+	newton_catch_all
+	{
+		fprintf(stderr, "[host] %s did not start: %s\n", what, CurrentException()->name);
+	}
+	end_try;
+}
 
 
 void
@@ -24,16 +44,6 @@ HostCellProviderStart(void)
 {
 	if (!HostCellularStarted())
 		return;
-	newton_try
-	{
-		RefVar fn(ParseString(RefVar(MakeString(gHostCellSource))));
-		RefVar provider(InterpretBlock(fn, RefVar()));
-		SetFrameSlot(RefVar(gVarFrame), RefVar(Intern((char*) "HostCell:host")), provider);
-		NSSend(provider, RefVar(Intern((char*) "Start")));
-	}
-	newton_catch_all
-	{
-		fprintf(stderr, "[host] the cellular provider did not start: %s\n", CurrentException()->name);
-	}
-	end_try;
+	StartSource(gHostCellSource, "HostCell:host", "the cellular provider");
+	StartSource(gHostTextSource, "HostText:host", "the text message transport");
 }

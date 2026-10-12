@@ -9,6 +9,24 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-12: text messages through the In/Out Box
+
+Step 3 of the phone (`docs/host-tdeck-pro-phone.md`): a transport, "Text
+Message" (`comms/host/HostText.ns`), made from the ROM's protos as the
+Newton Programmer's Guide says a transport is made - sending anything with
+a text format to the Names file's numbers, receiving each SMS into the In
+Box as a Note titled with the sender's card (ctest
+`host.NewtonTextMessage`, fakecell.py's new `--refuse`).  On the way: the
+protos found by their slots (protoFullRouteSlip @655, protoAddressPicker
+@259); a slip's own views are `stepChildren` (as `viewChildren` they
+replaced the proto's Send button); `TextScript`'s "reserved" argument is
+the data; Notes' `AutoPutaway` filed every received text in the Notepad
+at once unless the transport says `dontAutoPutAway: 'never`; `foreach`
+does not walk a string's characters; a slot `sendRequest` is the method
+`SendRequest` (symbols are case-insensitive); `to` is reserved; a
+message's time is GMT, so the native gives its age too.  The engine gives
+received messages to each reader, as it does call events.
+
 ## 2026-10-12: calls through the ROM's own Phone transport
 
 Step 2 of the phone (`docs/host-tdeck-pro-phone.md`): the host's cellular

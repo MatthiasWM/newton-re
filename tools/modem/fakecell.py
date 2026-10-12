@@ -29,6 +29,7 @@ Purpose
       body; AT+CMGD deletes it; AT+CMGL="ALL" lists the slots; AT+CMGS="<n>"
       answers "> ", takes the body up to Ctrl-Z (UCS2 hex when the coding
       scheme is 8) and answers +CMGS: <n> and OK - "fakecell: text to N: T";
+      to a number given with --refuse it answers +CMS ERROR: 500;
     - in a call: AT+VTS=<digit> (a keypad tone - "fakecell: tone 5 in the
       call with N"); AT+CSDVC=1 or 3 (the audio to the handset or the
       loudspeaker);
@@ -322,6 +323,11 @@ class Module:
             return
         raw = self.body.decode("latin-1")
         text = from_ucs2_hex(raw) if self.dcs == 8 else raw
+        if self.sending in self.args.refuse:
+            log("text to %s refused: %s" % (self.sending, text))
+            self.sending = None
+            self.say("+CMS ERROR: 500")
+            return
         self.sent += 1
         log("text to %s: %s" % (self.sending, text))
         self.sending = None
@@ -403,6 +409,7 @@ def main():
     ap.add_argument("--no-sim", action="store_true", help="no SIM card (+CME ERROR: 10)")
     ap.add_argument("--pin", action="store_true", help="a SIM that wants its PIN")
     ap.add_argument("--busy", action="append", default=[], help="a number that answers busy")
+    ap.add_argument("--refuse", action="append", default=[], help="a number the network will not send a text to (+CMS ERROR: 500)")
     ap.add_argument("--text", action="append", default=[], help="NUMBER=TEXT: a message stored before the start")
     group = ap.add_mutually_exclusive_group(required=True)
     group.add_argument("--spawn", nargs=argparse.REMAINDER, help="the newton to run, and its arguments")

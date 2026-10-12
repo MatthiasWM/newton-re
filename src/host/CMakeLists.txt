@@ -509,6 +509,22 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../fixtures/packages/fonts/monac
     set_tests_properties(host.NewtonPhoneCall PROPERTIES TIMEOUT 240
                          PASS_REGULAR_EXPRESSION "fakecell: tone 5 in the call.*fakecell: <- AT[+]CHUP.*fakecell: call to 5550000: busy.*fakecell: call from [+]61400000001 answered.*phonecall: done, 0 failed"
                          FAIL_REGULAR_EXPRESSION "waited in vain|FAILED|Traceback")
+    # text messages through the In/Out Box over the cellular module
+    # (comms/host/HostText.ns): received into the In Box as Notes titled
+    # with the sender's card, a Note sent as a text from its routing slip's
+    # Send, one the network refuses reopened in its slip with the error,
+    # and the routing slip itself (snapshot textmessage-slip.pgm) -
+    # docs/host-tdeck-pro-phone.md
+    add_test(NAME host.NewtonTextMessage
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/modem/fakecell.py
+                     --refuse 0499000000
+                     --spawn $<TARGET_FILE:newton> --cell-port 0 --serial-port none --display 320x480 --erase
+                     --store ${CMAKE_CURRENT_BINARY_DIR}/textmessage.store --headless 150
+                     --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/textmessage.ns
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    set_tests_properties(host.NewtonTextMessage PROPERTIES TIMEOUT 240
+                         PASS_REGULAR_EXPRESSION "fakecell: text to 0400000002: See you at eight.*textmessage: done, 0 failed"
+                         FAIL_REGULAR_EXPRESSION "waited in vain|FAILED|Traceback")
     add_test(NAME host.NewtonModemAnswer
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/modem/fakemodem.py
                      --incoming echo

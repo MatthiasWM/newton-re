@@ -89,10 +89,13 @@ telephone provider for the ROM's own Phone transport (the 'cell comm
 tool, `comms/host/HostCellTool.h`; ctest `host.NewtonPhoneCall`): the
 Names card's Call and the Calls log make and take calls; on the board the
 transport listens from the start.  Not yet tried: a real call each way.
-Next: step 3, SMS
-as a transport (In Box / Out Box); step 4, fax - the module has no fax
+Step 3: text messages, a transport of the In/Out Box
+(`comms/host/HostText.ns`, ctest `host.NewtonTextMessage`): sent from
+anything with a text format, received as Notes into the In Box.  Not yet:
+messages longer than one SMS, Reply, an alert when one comes.  Step 4,
+fax - the module has no fax
 class (`+FCLASS: 8`), so an internet fax service or nothing.  Not yet
-tried on the board: a real text (the owner's to say which number).
+tried on the board: a real text each way.
 
 ### Left of host fonts (merged 2026-10-10, off unless asked for)
 

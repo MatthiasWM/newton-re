@@ -98,8 +98,8 @@ static void					(*gClockHandler)(long long, long, bool) = nullptr;
 
 static Request				gRequests[kRequestQueue] HOST_LARGE_STATIC;
 static long					gRequestHead = 0, gRequestCount = 0;
-static HostCellText			gTexts[kTextQueue] HOST_LARGE_STATIC;
-static long					gTextHead = 0, gTextCount = 0;
+static HostCellText			gTexts[kHostCellReaders][kTextQueue] HOST_LARGE_STATIC;	// (each reader its own copy)
+static long					gTextHead[kHostCellReaders], gTextCount[kHostCellReaders];
 static HostCellEvent		gEvents[kHostCellReaders][kEventQueue];		// (each reader its own copy)
 static long					gEventHead[kHostCellReaders], gEventCount[kHostCellReaders];
 static struct { long id; HostCellSendState state; }	gSends[kSendStates];
@@ -815,15 +815,22 @@ static void
 Deliver(const char* number, const char* text, long long time)
 {
 	std::lock_guard<std::mutex> hold(gLock);
-	if (gTextCount == kTextQueue)
+	for (long reader = 0; reader < kHostCellReaders; reader++)
 	{
-		fprintf(stderr, "[cell] the received messages' queue is full: one dropped\n");
-		return;
+		if (gTextCount[reader] == kTextQueue)
+		{
+			// (the oldest forgotten: a reader that is not reading - a script's,
+			// when nobody asks - must not keep the others' from coming)
+			if (reader == kHostCellReaderTool)
+				fprintf(stderr, "[cell] the received messages' queue is full: the oldest dropped\n");
+			gTextHead[reader] = (gTextHead[reader] + 1) % kTextQueue;
+			gTextCount[reader]--;
+		}
+		HostCellText* to = &gTexts[reader][(gTextHead[reader] + gTextCount[reader]++) % kTextQueue];
+		Copy(to->number, number, kHostCellNumberSize);
+		Copy(to->text, text, kHostCellTextSize);
+		to->time = time;
 	}
-	HostCellText* to = &gTexts[(gTextHead + gTextCount++) % kTextQueue];
-	Copy(to->number, number, kHostCellNumberSize);
-	Copy(to->text, text, kHostCellTextSize);
-	to->time = time;
 }
 
 
@@ -1401,14 +1408,14 @@ HostCellularSendState(long id)
 
 
 bool
-HostCellularNextText(HostCellText* text)
+HostCellularNextText(HostCellText* text, HostCellReader reader)
 {
 	std::lock_guard<std::mutex> hold(gLock);
-	if (gTextCount == 0)
+	if (gTextCount[reader] == 0)
 		return false;
-	*text = gTexts[gTextHead];
-	gTextHead = (gTextHead + 1) % kTextQueue;
-	gTextCount--;
+	*text = gTexts[reader][gTextHead[reader]];
+	gTextHead[reader] = (gTextHead[reader] + 1) % kTextQueue;
+	gTextCount[reader]--;
 	return true;
 }
 

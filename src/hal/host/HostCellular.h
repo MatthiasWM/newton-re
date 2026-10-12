@@ -56,9 +56,15 @@
 											such sending)
 					HostCellNextText()		the oldest message received and not
 											yet taken - {number, text, time}
-											(time in minutes since 1904, as
-											Time() gives them; nil when the
-											network gave none) - or nil
+											(time in minutes since 1904, GMT;
+											age how many minutes ago, by the
+											host's clock - Time() - age is when
+											in the Newton's own zone; both nil
+											when the network gave none) - or nil
+					HostCellTransportText()
+											the same, the text transport's own
+											(comms/host/HostText.ns): each
+											message is given to both
 					HostCellNextEvent()		the oldest call event not yet
 											taken - {event, number}: event
 											'ring (number its caller's when the
@@ -175,11 +181,13 @@ bool	HostCellularSendDigits(const char* digits);	// keypad tones in a call (0-9,
 bool	HostCellularSetSpeaker(bool on);			// the call's audio to the loudspeaker, or the handset
 long	HostCellularSendText(const char* number, const char* text);	// ==> an id (0: not queued)
 HostCellSendState	HostCellularSendState(long id);
-bool	HostCellularNextText(HostCellText* text);
-// the call events, each reader given every one: the natives' (a script's)
-// and the telephone provider's comm tool (comms/host/HostCellTool.h), which
-// listens all the time
+// The call events and the received messages are given to each reader, every
+// one: a script's (the natives HostCellNextEvent, HostCellNextText) and the
+// system's - the telephone provider's comm tool (comms/host/HostCellTool.h),
+// which listens all the time, and the text transport (comms/host/HostText.ns,
+// through HostCellTransportText)
 enum HostCellReader { kHostCellReaderScript, kHostCellReaderTool, kHostCellReaders };
+bool	HostCellularNextText(HostCellText* text, HostCellReader reader);
 bool	HostCellularNextEvent(HostCellEvent* event, HostCellReader reader);
 // a command sent as it is, the answer waited for (the module's up to
 // timeoutMs; the asker gives up 5 s after that) ==> whether it ended
