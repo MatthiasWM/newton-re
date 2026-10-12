@@ -64,11 +64,11 @@ one).  An internet fax service over the data connection would be the way
 
 ## Step 1: the module driven (2026-10-12)
 
-**The engine** (`src/host/HostCellular.h`, `.cpp`) is portable C++: one
+**The engine** (`src/hal/host/HostCellular.h`, `.cpp`) is portable C++: one
 thread owns the module's byte link and speaks AT to it; the Newton's side
 asks through a request queue and reads a status snapshot and two queues
 (call events, received texts).  It has none of the Newton's headers (it is
-its own library, `host_cellular`, because `<thread>` and `<mutex>` reach
+its own library, `hal_host_cellular`, because `<thread>` and `<mutex>` reach
 `<locale.h>`, which `src/intl/Locale.h` would shadow).  Kept from
 lilyphone1:
 
@@ -111,7 +111,7 @@ commands of its own a script drives the far end with (`AT+FAKERING`,
 (`src/host/demo/cellular.ns`): registered, a stored message picked up,
 a call made and hung up, one refused busy, one rung in with caller ID,
 answered and hung up by the far end, a message received with an emoji
-(a surrogate pair) and two sent (GSM-7 and UCS2).  ctest `host.Cellular`
+(a surrogate pair) and two sent (GSM-7 and UCS2).  ctest `hal.Cellular`
 tests the parsing (UCS2, time stamps, +CMGR headers).
 
 **The board** (`src/host/esp32/main/tdeck_modem.cpp`): UART1 at 115200
@@ -147,6 +147,61 @@ board's NewtonScript prompt with `HostCellCommand`:
 - `AT+CSDVC=?`: `(1,3)` - the audio to the handset or the speaker;
 - `AT+COPS?` named the operator by its number ("50502") until the engine
   asked for names (`AT+COPS=3,0`).
+
+## Step 2: calls through the ROM's own Phone transport (2026-10-12)
+
+The cellular module is a telephone provider now, and the ROM's Phone
+transport and Calls log make, take and log calls over it, unchanged but
+for one ROM bug fixed.
+
+- **The provider** (`src/comms/host/HostCell.ns`, compiled in and started
+  from PreMain by `HostCellProviderStart`, `comms/host/HostCellProvider.h`,
+  when the host has a module): `RegCommConfig('|Cellular:host|, {name:
+  "Cellular", type: "TAPI", serviceId: "cell", config: {...}})` with every
+  `supports...` the transport asks about.  DEVIATION: it is made the
+  default once, when the user's `'currentDialSpeaker` names a provider with
+  no service (a fresh store says `'speaker` - the ROM registers that one
+  itself at boot: "Speaker", the tones through the loudspeaker), calls are
+  then received (`'phoneAutoReceive`), the transport's `'enableAutoUI` is
+  set so that its preferences offer receiving, and auto-receive is started
+  there (the boot's own `StartAutoCallReceive` runs before PreMain).
+- **The comm tool** (`src/comms/host/HostCellTool.h`, service `'cell`,
+  `THostCellService` in `HostServices.h`): answers the `'tapiEndpoint`'s
+  options as the ROM's modem tool does its TAPI ones - `taps` (connected
+  at once), `outg` and `sdgt` (the number in the `rout` address beside
+  them, kept to what a GSM dial string holds: the transport's number comes
+  as " 5551234"), `answ`, `disc`, `tasp` (`AT+CSDVC` 3 or 1), `rout` read
+  for the caller's number; `hold`, `unho`, `forw`, `focr`, `tran` not
+  supported.  The engine's call events become T_TAPIEVT events: a ring 1,
+  connected 8, ended 6 (on hook), busy 11 then 6.  The engine keeps a queue
+  of events for each reader (the natives' and the tool's), since the tool
+  listens all the time.
+- **The engine** (moved to `src/hal/host/HostCellular.*`, library
+  `hal_host_cellular`, because `comms` now uses it): keypad tones
+  (`AT+VTS`, one a digit) and the loudspeaker or the handset (`AT+CSDVC`);
+  `HostCellularWillRun`, which a board calls before its task has started
+  the module, so that the Newton's side, booting meanwhile, counts it as
+  there.
+- **ROM BUG (fixed)**: `ItemCompleted` (`romsrc/functions/obj_6471d9.
+  ItemCompleted.ns`) hangs the endpoint up only for a call's status, read
+  after `SetStatusDialog` has made it `'HangingUp` - so the keypad's Hang
+  Up never told the endpoint.  Unseen with "Speaker", which has none.
+  Fixed behind `RomBugFixed()`; `docs/curiosities.md`, "A telephone
+  framework with nobody to call".
+- **A reconstruction slip**: `TSerialEndpoint::HandleEventReply` (ROM
+  0x001dc064) passed a tool's event to the script endpoint without its
+  code and data (only its time and service); the ROM copies all of them.
+  No `eventHandler` had seen a tool event's code before.
+
+ctest `host.NewtonPhoneCall` (`src/host/demo/phonecall.ns`, fakecell.py):
+the provider the default and listening; a call made as the Call slip makes
+it (`NewItem`, `ItemSubmit`: the Calls app's `StartSend`), a keypad tone and
+the speaker switched in it, hung up from the Newton and logged; one hung up
+by the far end; one refused busy; one rung in with caller ID, taken (Take
+Call) and hung up by the caller.
+
+On the board the Phone transport is "Listening" on the Cellular provider
+from the start.  A real call each way is the owner's to make.
 
 ## Open questions
 

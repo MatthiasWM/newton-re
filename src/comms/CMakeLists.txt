@@ -16,10 +16,11 @@ add_library(comms STATIC
     host/HostEchoServer.cpp
     host/HostDNSTool.cpp
     host/HostLinkTool.cpp
+    host/HostCellTool.cpp
 )
 # hal_host_sockets: the host's network, which host/HostTCPTool.cpp (the
 # stand-in for the NIE's TCP tool) works over
-target_link_libraries(comms PUBLIC newton_config os600_user memory utility hal_host_sockets)
+target_link_libraries(comms PUBLIC newton_config os600_user memory utility hal_host_sockets hal_host_cellular)
 target_include_directories(comms PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/host)
 
 # The serial tools (SerialTool.h): TSerTool, TAsyncSerTool and the 'aser
@@ -74,6 +75,14 @@ add_custom_command(
             -P ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/host/HostLink.ns ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
     VERBATIM)
+# host/HostCell.ns, the cellular module's telephone provider, likewise
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostCellSource.cpp
+    COMMAND ${CMAKE_COMMAND} -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/host/HostCell.ns
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/HostCellSource.cpp -DNAME=gHostCellSource
+            -P ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/host/HostCell.ns ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
+    VERBATIM)
 add_library(comms_script STATIC
     Translators.cpp
     CommTrace.cpp
@@ -86,6 +95,8 @@ add_library(comms_script STATIC
     Beamer.cpp
     host/HostLink.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/HostLinkSource.cpp
+    host/HostCellProvider.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/HostCellSource.cpp
 )
 # newt: ExceptionNotify and CheckForDeferredActions; views: the root view
 # brought up to date after an endpoint event; the modem navigator every

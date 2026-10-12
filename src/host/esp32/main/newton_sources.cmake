@@ -74,6 +74,8 @@ set(NEWTON_SOURCES
     comms/fax/FaxToolPhases.cpp
     comms/fax/T4FaxLine.cpp
     comms/fax/T4Tables.cpp
+    comms/host/HostCellProvider.cpp
+    comms/host/HostCellTool.cpp
     comms/host/HostDNSTool.cpp
     comms/host/HostEchoServer.cpp
     comms/host/HostLink.cpp
@@ -139,6 +141,8 @@ set(NEWTON_SOURCES
     hal/host/HostATA.cpp
     hal/host/HostCard.cpp
     hal/host/HostCardSocket.cpp
+    hal/host/HostCellular.cpp
+    hal/host/HostCellularSocket.cpp
     hal/host/HostFIQTimer.cpp
     hal/host/HostFlash.cpp
     hal/host/HostIRChip.cpp
@@ -156,7 +160,6 @@ set(NEWTON_SOURCES
     hal/host/Timer.cpp
     host/FactorySoups.cpp
     host/HostCards.cpp
-    host/HostCellular.cpp
     host/HostCellularNatives.cpp
     host/HostInterconnect.cpp
     host/HostKeyboard.cpp
@@ -892,6 +895,7 @@ set(NEWTON_GROUP_6_SOURCES
     comms/NewScriptEndpoint.cpp
     comms/StreamingEndpoint.cpp
     comms/Translators.cpp
+    comms/host/HostCellProvider.cpp
     comms/host/HostLink.cpp
 )
 set(NEWTON_GROUP_6_INCLUDES
@@ -991,6 +995,7 @@ set(NEWTON_GROUP_8_SOURCES
     comms/Options.cpp
     comms/SerialEndpoint.cpp
     comms/SerialOptions.cpp
+    comms/host/HostCellTool.cpp
     comms/host/HostDNSTool.cpp
     comms/host/HostEchoServer.cpp
     comms/host/HostLinkTool.cpp
@@ -1201,10 +1206,19 @@ set(NEWTON_GROUP_15_INCLUDES
     packages
 )
 set(NEWTON_GROUP_16_SOURCES
+    hal/host/HostCellular.cpp
+    hal/host/HostCellularSocket.cpp
+)
+set(NEWTON_GROUP_16_INCLUDES
+    hal/host
+    ddk
+    .
+)
+set(NEWTON_GROUP_17_SOURCES
     hal/host/HostIRChip.cpp
     hal/host/HostSerialChip.cpp
 )
-set(NEWTON_GROUP_16_INCLUDES
+set(NEWTON_GROUP_17_INCLUDES
     hal/host
     ddk
     .
@@ -1219,37 +1233,37 @@ set(NEWTON_GROUP_16_INCLUDES
     comms
     comms/host
 )
-set(NEWTON_GROUP_17_SOURCES
-    hal/host/HostScreen.cpp
-)
-set(NEWTON_GROUP_17_INCLUDES
-    hal/host
-    ddk
-    .
-    protocols
-    os600/user
-    os600/kernel
-    toolbox
-    memory
-    utility
-    packages
-    qd
-    frames
-    intl
-    stores
-    compression
-    sound
-)
 set(NEWTON_GROUP_18_SOURCES
-    hal/host/HostSockets.cpp
+    hal/host/HostScreen.cpp
 )
 set(NEWTON_GROUP_18_INCLUDES
     hal/host
+    ddk
+    .
+    protocols
+    os600/user
+    os600/kernel
+    toolbox
+    memory
+    utility
+    packages
+    qd
+    frames
+    intl
+    stores
+    compression
+    sound
 )
 set(NEWTON_GROUP_19_SOURCES
-    hal/host/HostSoundDriver.cpp
+    hal/host/HostSockets.cpp
 )
 set(NEWTON_GROUP_19_INCLUDES
+    hal/host
+)
+set(NEWTON_GROUP_20_SOURCES
+    hal/host/HostSoundDriver.cpp
+)
+set(NEWTON_GROUP_20_INCLUDES
     hal/host
     ddk
     .
@@ -1267,11 +1281,11 @@ set(NEWTON_GROUP_19_INCLUDES
     stores
     compression
 )
-set(NEWTON_GROUP_20_SOURCES
+set(NEWTON_GROUP_21_SOURCES
     hal/host/HostTablet.cpp
     hal/host/HostTabletDriver.cpp
 )
-set(NEWTON_GROUP_20_INCLUDES
+set(NEWTON_GROUP_21_INCLUDES
     hal/host
     ddk
     .
@@ -1310,7 +1324,7 @@ set(NEWTON_GROUP_20_INCLUDES
     print/host/tls
     testing
 )
-set(NEWTON_GROUP_21_SOURCES
+set(NEWTON_GROUP_22_SOURCES
     host/FactorySoups.cpp
     host/HostCards.cpp
     host/HostCellularNatives.cpp
@@ -1320,7 +1334,7 @@ set(NEWTON_GROUP_21_SOURCES
     host/HostViews.cpp
     host/HostWifi.cpp
 )
-set(NEWTON_GROUP_21_INCLUDES
+set(NEWTON_GROUP_22_INCLUDES
     host
     stores/flash
     hal/host
@@ -1360,14 +1374,6 @@ set(NEWTON_GROUP_21_INCLUDES
     print/host/dnssd
     print/host/tls
     thirdparty/nie
-)
-set(NEWTON_GROUP_22_SOURCES
-    host/HostCellular.cpp
-)
-set(NEWTON_GROUP_22_INCLUDES
-    ddk
-    .
-    hal/host
 )
 set(NEWTON_GROUP_23_SOURCES
     host/HostKeyboard.cpp

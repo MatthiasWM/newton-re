@@ -1,5 +1,5 @@
 /*
-	File:		host/HostCellular.h
+	File:		hal/host/HostCellular.h
 
 	Contains:	The host's cellular modem: a SIMCom A76xx-class module
 				(the LilyGO T-Deck Pro's 4G variant carries an A7682E;
@@ -159,6 +159,10 @@ enum HostCellSendState
 // hasOffset is false).
 void	HostCellularRun(const HostCellularLink* link);
 bool	HostCellularStarted(void);
+// The host says the engine is coming before its thread gets to
+// HostCellularRun (a board first powers the module and waits for it), so
+// that the Newton's side, starting meanwhile, counts it as there
+void	HostCellularWillRun(void);
 void	HostCellularSetClockHandler(void (*handler)(long long utcSeconds, long offsetMinutes, bool hasOffset));
 
 // What the Newton's side asks of it (any thread; none of them waits on the
@@ -167,16 +171,22 @@ void	HostCellularStatus(HostCellStatusInfo* info);
 bool	HostCellularDial(const char* number);
 bool	HostCellularAnswer(void);
 bool	HostCellularHangUp(void);
+bool	HostCellularSendDigits(const char* digits);	// keypad tones in a call (0-9, *, #, A-D)
+bool	HostCellularSetSpeaker(bool on);			// the call's audio to the loudspeaker, or the handset
 long	HostCellularSendText(const char* number, const char* text);	// ==> an id (0: not queued)
 HostCellSendState	HostCellularSendState(long id);
 bool	HostCellularNextText(HostCellText* text);
-bool	HostCellularNextEvent(HostCellEvent* event);
+// the call events, each reader given every one: the natives' (a script's)
+// and the telephone provider's comm tool (comms/host/HostCellTool.h), which
+// listens all the time
+enum HostCellReader { kHostCellReaderScript, kHostCellReaderTool, kHostCellReaders };
+bool	HostCellularNextEvent(HostCellEvent* event, HostCellReader reader);
 // a command sent as it is, the answer waited for (the module's up to
 // timeoutMs; the asker gives up 5 s after that) ==> whether it ended
 // OK; reply the lines before the result code, each ended by '\n'
 bool	HostCellularCommand(const char* command, char* reply, long size, long timeoutMs);
 
-// (the engine's parsing, for its tests - host/tests/test_HostCellular.cpp)
+// (the engine's parsing, for its tests - hal/tests/test_HostCellular.cpp)
 bool	HostCellularUCS2ToUTF8(const char* hex, char* out, long size);
 bool	HostCellularUTF8ToUCS2(const char* utf8, char* out, long size);
 bool	HostCellularParseStamp(const char* stamp, long long* utcSeconds, long* offsetMinutes, bool* hasOffset);

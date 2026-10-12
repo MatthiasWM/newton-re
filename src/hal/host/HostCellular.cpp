@@ -1,5 +1,5 @@
 /*
-	File:		host/HostCellular.cpp
+	File:		hal/host/HostCellular.cpp
 
 	Contains:	The cellular modem engine (HostCellular.h): one thread
 				owning the module's byte link, in AT commands.
@@ -79,7 +79,7 @@ Copy(char* to, const char* from, long size)
 	The engine's state: written by its thread, read by anyone, under gLock
 ------------------------------------------------------------------------------*/
 
-enum RequestKind { kRequestDial, kRequestAnswer, kRequestHangUp, kRequestSendText };
+enum RequestKind { kRequestDial, kRequestAnswer, kRequestHangUp, kRequestSendText, kRequestDigits, kRequestSpeaker };
 
 struct Request
 {
@@ -100,8 +100,8 @@ static Request				gRequests[kRequestQueue] HOST_LARGE_STATIC;
 static long					gRequestHead = 0, gRequestCount = 0;
 static HostCellText			gTexts[kTextQueue] HOST_LARGE_STATIC;
 static long					gTextHead = 0, gTextCount = 0;
-static HostCellEvent		gEvents[kEventQueue];
-static long					gEventHead = 0, gEventCount = 0;
+static HostCellEvent		gEvents[kHostCellReaders][kEventQueue];		// (each reader its own copy)
+static long					gEventHead[kHostCellReaders], gEventCount[kHostCellReaders];
 static struct { long id; HostCellSendState state; }	gSends[kSendStates];
 static long					gNextSendId = 1;
 
@@ -128,14 +128,17 @@ static char					gRingNumber[kHostCellNumberSize];
 static void
 PushEvent(HostCellEventKind kind, const char* number)		// (gLock held)
 {
-	if (gEventCount == kEventQueue)
+	for (long reader = 0; reader < kHostCellReaders; reader++)
 	{
-		gEventHead = (gEventHead + 1) % kEventQueue;		// the oldest forgotten
-		gEventCount--;
+		if (gEventCount[reader] == kEventQueue)
+		{
+			gEventHead[reader] = (gEventHead[reader] + 1) % kEventQueue;		// the oldest forgotten
+			gEventCount[reader]--;
+		}
+		HostCellEvent* event = &gEvents[reader][(gEventHead[reader] + gEventCount[reader]++) % kEventQueue];
+		event->kind = kind;
+		Copy(event->number, number != nullptr ? number : "", kHostCellNumberSize);
 	}
-	HostCellEvent* event = &gEvents[(gEventHead + gEventCount++) % kEventQueue];
-	event->kind = kind;
-	Copy(event->number, number != nullptr ? number : "", kHostCellNumberSize);
 }
 
 
@@ -1141,6 +1144,19 @@ Perform(const Request& request)
 	case kRequestSendText:
 		SetSendState(request.id, SendText(request.number, request.text) ? kHostCellSendSent : kHostCellSendFailed);
 		break;
+	case kRequestDigits:
+		// (one AT+VTS a digit: every A76xx takes that form)
+		for (const char* p = request.number; *p != 0; p++)
+			if (isdigit((unsigned char) *p) || *p == '*' || *p == '#' || (*p >= 'A' && *p <= 'D'))
+			{
+				snprintf(command, sizeof(command), "AT+VTS=%c", *p);
+				Exec(command, nullptr, 0, 3000);
+			}
+		break;
+	case kRequestSpeaker:
+		// (AT+CSDVC: 1 the handset, 3 the loudspeaker)
+		Exec(request.id != 0 ? "AT+CSDVC=3" : "AT+CSDVC=1", nullptr, 0, 2000);
+		break;
 	}
 }
 
@@ -1278,6 +1294,15 @@ HostCellularStarted(void)
 
 
 void
+HostCellularWillRun(void)
+{
+	std::lock_guard<std::mutex> hold(gLock);
+	gStarted = true;
+	gStatus.state = kHostCellNone;
+}
+
+
+void
 HostCellularSetClockHandler(void (*handler)(long long, long, bool))
 {
 	gClockHandler = handler;
@@ -1329,6 +1354,20 @@ HostCellularHangUp(void)
 }
 
 
+bool
+HostCellularSendDigits(const char* digits)
+{
+	return digits != nullptr && digits[0] != 0 && Ask(kRequestDigits, digits, nullptr);
+}
+
+
+bool
+HostCellularSetSpeaker(bool on)
+{
+	return Ask(kRequestSpeaker, nullptr, nullptr, on ? 1 : 0);
+}
+
+
 long
 HostCellularSendText(const char* number, const char* text)
 {
@@ -1372,14 +1411,14 @@ HostCellularNextText(HostCellText* text)
 
 
 bool
-HostCellularNextEvent(HostCellEvent* event)
+HostCellularNextEvent(HostCellEvent* event, HostCellReader reader)
 {
 	std::lock_guard<std::mutex> hold(gLock);
-	if (gEventCount == 0)
+	if (gEventCount[reader] == 0)
 		return false;
-	*event = gEvents[gEventHead];
-	gEventHead = (gEventHead + 1) % kEventQueue;
-	gEventCount--;
+	*event = gEvents[reader][gEventHead[reader]];
+	gEventHead[reader] = (gEventHead[reader] + 1) % kEventQueue;
+	gEventCount[reader]--;
 	return true;
 }
 

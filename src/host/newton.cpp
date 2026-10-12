@@ -123,7 +123,7 @@
 	by its Connect button or by autodock.
 
 	--cell-port is a TCP port on 127.0.0.1 a cellular module connects to
-	(host/HostCellular.h: the engine that drives a SIMCom module in AT
+	(hal/host/HostCellular.h: the engine that drives a SIMCom module in AT
 	commands, as the T-Deck Pro's 4G variant carries); 0 picks a free one.
 	Once listening it prints "[host] cell port N";
 	tools/modem/fakecell.py is the module (docs/host-tdeck-pro-phone.md).
@@ -189,6 +189,7 @@
 #include "ModemTool.h"
 #include "FaxTool.h"
 #include "HostLink.h"
+#include "HostCellProvider.h"
 #include "print/host/HostPrinter.h"
 #include "print/host/HostIPP.h"
 #include "power/host/HostPowerSwitch.h"
@@ -312,6 +313,21 @@ static void
 NewtonBoot(void)
 {
 	HostHeapCheckInstall();		// (NEWTON_HEAPCHECK: host/HostHeapCheck.h)
+	// the cellular module, when there is one: the engine started before the
+	// newt world boots, whose PreMain registers it as a telephone provider
+	// when it is there (comms/host/HostCellProvider.h; it waits for the
+	// module to connect)
+	if (gCellPort >= 0)
+	{
+		unsigned short port;
+		if (HostCellularListen((unsigned short) gCellPort, &port))
+		{
+			printf("[host] cell port %u\n", (unsigned) port);
+			fflush(stdout);
+		}
+		else
+			fprintf(stderr, "[host] no cell port on %ld\n", gCellPort);
+	}
 	HostBootNewtWorld();
 	// DEVIATION: the ROM's boot starts the timers and the serial hardware
 	// (InitializeCommHardware); the host does it here, the external port a
@@ -329,19 +345,6 @@ NewtonBoot(void)
 		}
 		else
 			fprintf(stderr, "[host] no serial port on %ld (%ld)\n", gSerialPort, (long) err);
-	}
-	// the cellular module, when there is one: the engine started before the
-	// OS needs it (it waits for the module to connect)
-	if (gCellPort >= 0)
-	{
-		unsigned short port;
-		if (HostCellularListen((unsigned short) gCellPort, &port))
-		{
-			printf("[host] cell port %u\n", (unsigned) port);
-			fflush(stdout);
-		}
-		else
-			fprintf(stderr, "[host] no cell port on %ld\n", gCellPort);
 	}
 	// DEVIATION: the built-in IR is the Voyager chip's; the host's is a TCP
 	// connection to another newton or, with no --ir-peer, a port with nobody
@@ -608,6 +611,7 @@ NewtonPreMain(void)
 	HostInstallPackageGlobal();
 	HostInstallOrientationGlobal();
 	HostLinkStart();
+	HostCellProviderStart();			// (comms/host/HostCellProvider.h: the cellular module, when there is one, for the Phone transport)
 	HostInstallPrinter();
 	HostInstallPowerGlobals();			// (power/host/HostPowerSwitch.h: HostPowerSwitch(), HostWakeAfter(ms), ...)
 	HostInstallFonts();					// (the host's fonts, offered when asked for: before the Host panel, which may turn them on)

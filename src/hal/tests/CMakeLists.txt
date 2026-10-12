@@ -1,4 +1,9 @@
 # the serial chip registry and the host's serial port over a TCP socket
+# the cellular engine's parsing (host/HostCellular.h)
+add_executable(test_HostCellular test_HostCellular.cpp)
+target_link_libraries(test_HostCellular PRIVATE hal_host_cellular)
+add_test(NAME hal.Cellular COMMAND test_HostCellular)
+
 add_executable(test_HostSerialChip test_HostSerialChip.cpp)
 target_link_libraries(test_HostSerialChip PRIVATE hal_host_serial os600_kernel os600_user)
 add_test(NAME hal.HostSerialChip COMMAND test_HostSerialChip)

@@ -65,7 +65,7 @@ unsigned long	HostDeviceClockSyncs(void);		// how many times the board's clock h
 void		HostDeviceClockSetTo(long long seconds);	// the board's clock set by hand, in seconds from 1970 (GMT)
 
 // the cellular module (tdeck_modem.cpp): powered and started with the
-// board, its UART handed to host/HostCellular.h's engine on a task of its
+// board, its UART handed to hal/host/HostCellular.h's engine on a task of its
 // own (==> whether it was started); the engine's natives then answer for it
 bool		HostDeviceCellStart(void);
 

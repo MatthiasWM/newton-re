@@ -2384,3 +2384,30 @@ the World Clock's own has already set `target := nil`.  The read throws,
 and `Delete` catches the root exception and drops it, so nobody ever saw
 it - until the host's exception trace printed every throw where it
 happens (found by the application sweep, 2026-10-01).
+
+## A telephone framework with nobody to call
+
+NewtonOS 2.1 carries a complete telephony framework: the Phone transport
+(`|PhoneHome:Newton|`, `romsrc/objects/PhoneHome_Newton_mp535.ns`) with
+incoming calls, caller ID and a Take Call button; the Calls log; and
+`protoTAPIEndpoint` (@662) with dial, answer, hang up, hold, transfer,
+forward and keypad tones. Providers plug in with `RegCommConfig`. But the
+ROM registers only one, "Speaker", which has no comm service: it plays
+the number's tones through the loudspeaker for you to hold to a
+handset's mouthpiece. Nothing in the ROM can ring the Newton, and the
+"receive calls" preference is hidden unless the transport's
+`enableAutoUI` is set. The host's cellular module is the first provider
+it has had (`docs/host-tdeck-pro-phone.md`).
+
+That is also why a bug in it never showed. The keypad's Hang Up runs
+`CancelRequest` → `ItemCompleted` (`obj_6471d9.ItemCompleted`), which
+hangs the endpoint up only if the status is one of a call's. It reads
+the status *after* `SetStatusDialog` has set it to `'HangingUp`, so the
+endpoint is never told. With "Speaker" there is no endpoint and the call
+is the handset's. A provider that holds the call keeps it up while the
+Newton logs it as finished. ROM BUG (fixed) in the romsrc function.
+
+On the way, a reconstruction slip surfaced. `TSerialEndpoint::HandleEventReply`
+(ROM 0x001dc064) hands a tool's event to the script endpoint with its code
+and data, and the reconstruction had copied only its time and service, so
+no `eventHandler` had seen an event's code before this.

@@ -92,7 +92,7 @@ Everything comes from PlatformIO (`~/.platformio`); on Linux and macOS
 
 `main/tdeck_modem.cpp` powers the A7682E (supply GPIO 41, power key GPIO
 40) and hands UART1 (TX 10, RX 11, 115200) to the portable engine,
-`host/HostCellular.h`, on a task of its own; the network's time sets the
+`hal/host/HostCellular.h`, on a task of its own; the network's time sets the
 board's clock.  **The module needs the battery fitted** - its supply runs
 from it; on USB alone it stays dark.  From the prompt:
 

@@ -79,18 +79,20 @@ of work").
 ### The T-Deck Pro as a phone (branch `tdeck-cellular`, 2026-10-12)
 
 `docs/host-tdeck-pro-phone.md`.  Done, step 1: the 4G module (an A7682E)
-driven by a portable AT engine (`host/HostCellular.h`, ported from the
+driven by a portable AT engine (`hal/host/HostCellular.h`, ported from the
 owner's lilyphone1) with NewtonScript natives, a fake module for the
 desktop (`tools/modem/fakecell.py`, ctest `host.NewtonCellular`), and the
 board's driver (`tdeck_modem.cpp`): on the owner's board it registers,
 reads the network's time and answers `HostCellCommand` (it needs the
-battery fitted - its supply runs from it).  Next: step 2, a cellular
-provider for the ROM's own Phone transport (`|PhoneHome:Newton|`, the
-`'tapiEndpoint` @662 over a comm tool answering the `taps` options), so
-the Names card's Call and the Calls log make and take calls; step 3, SMS
+battery fitted - its supply runs from it).  Step 2: the module a
+telephone provider for the ROM's own Phone transport (the 'cell comm
+tool, `comms/host/HostCellTool.h`; ctest `host.NewtonPhoneCall`): the
+Names card's Call and the Calls log make and take calls; on the board the
+transport listens from the start.  Not yet tried: a real call each way.
+Next: step 3, SMS
 as a transport (In Box / Out Box); step 4, fax - the module has no fax
 class (`+FCLASS: 8`), so an internet fax service or nothing.  Not yet
-tried on the board: a real call or text (the owner's to say which number).
+tried on the board: a real text (the owner's to say which number).
 
 ### Left of host fonts (merged 2026-10-10, off unless asked for)
 

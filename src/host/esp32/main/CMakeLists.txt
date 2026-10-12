@@ -52,9 +52,9 @@ foreach(n RANGE ${last})
 endforeach()
 list(REMOVE_DUPLICATES all_quoted)
 set_source_files_properties(newtonmain.cpp PROPERTIES COMPILE_OPTIONS "${all_quoted};-iquote${NEWTON_SRC}/host")
-# (the board's modem driver hands its UART to host/HostCellular.h's engine,
+# (the board's modem driver hands its UART to hal/host/HostCellular.h's engine,
 #  which is plain C++ - none of the Newton's headers)
-set_source_files_properties(tdeck_modem.cpp PROPERTIES COMPILE_OPTIONS "-iquote${NEWTON_SRC}/host")
+set_source_files_properties(tdeck_modem.cpp PROPERTIES COMPILE_OPTIONS "-iquote${NEWTON_SRC}/hal/host")
 
 # comms/host/HostLink.ns, the host's link for the NIE, compiled in as a
 # string as the desktop build does it (src/comms/CMakeLists.txt) - made
@@ -67,6 +67,13 @@ set(NAME gHostLinkSource)
 include(${NEWTON_SRC}/cmake/EmbedText.cmake)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
 target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostLinkSource.cpp)
+# comms/host/HostCell.ns, the 4G module's telephone provider, the same way
+set(INPUT ${NEWTON_SRC}/comms/host/HostCell.ns)
+set(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostCellSource.cpp)
+set(NAME gHostCellSource)
+include(${NEWTON_SRC}/cmake/EmbedText.cmake)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
+target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostCellSource.cpp)
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE forQ=1 NDEBUG)
 target_compile_options(${COMPONENT_LIB} PRIVATE

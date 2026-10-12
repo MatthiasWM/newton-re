@@ -1,0 +1,127 @@
+// The ROM's own Phone transport (|PhoneHome:Newton|) and Calls log over the
+// host's cellular module: the module registered as a telephone provider
+// (comms/host/HostCell.ns, the 'cell tool HostCellTool.h), listening for
+// calls from the start; a call made as the Names card's Call slip makes it
+// (the transport's item, ItemSubmit), keypad tones and the loudspeaker in
+// it, hung up from the Newton; one hung up by the far end; one refused
+// busy; one rung in with caller ID, taken (Take Call) and hung up.  The
+// module is tools/modem/fakecell.py on --cell-port; its own commands
+// (AT+FAKERING, AT+FAKEHANGUP) make the far end do its part
+// (ctest host.NewtonPhoneCall):
+//
+//   python tools/modem/fakecell.py --busy 5550000 \
+//       --spawn build/host/host/newton --cell-port 0 --display 320x480 --erase \
+//       --store phonecall.store --headless 150 --script src/host/demo/phonecall.ns
+
+HostInclude("common.ns");
+pcFailures := 0;
+pcTransport := nil;
+pcLogged := 0;
+
+pcCheck := func(what, ok, why) begin
+	if ok then
+		Print("phonecall: " & what & " ok")
+	else begin
+		Print("phonecall: " & what & " FAILED - " & why);
+		pcFailures := pcFailures + 1;
+	end;
+end;
+
+pcStatus := func() pcTransport.status;
+
+// a call made as kDoCallSlip and the routing slip's DoCall make one
+pcCall := func(number) begin
+	local fields := pcTransport:NewItem(nil);
+	fields.toRef := [GetDataDefs('|nameRef.phone|):MakeNameRef({}, '|nameRef.phone|)];
+	fields.toRef[0].phone := number;
+	local info := GetDataDefs('|nameRef.phone|):GetRoutingInfo(fields.toRef[0])[0];
+	fields.name := info.name;
+	fields.phoneNumber := info.rawNumber;
+	fields.title := pcTransport:GetItemTitle(fields);
+	fields.state := 'ready;
+	pcTransport:ItemSubmit(fields);
+end;
+
+// the calls the Calls log holds
+pcLogCount := func() begin
+	local soup := GetUnionSoup("Calls");
+	if not soup then return 0;
+	local cursor := Query(soup, {type: 'index});
+	local n := 0;
+	while cursor:Entry() do begin
+		n := n + 1;
+		cursor:Next();
+	end;
+	n;
+end;
+
+pcSteps := [
+	func(next) call waitFor with ("phonecall: listening",
+		func() (pcTransport := GetRoot().|PhoneHome:Newton|) and (call pcStatus with ()) = 'Listening, next, 90),
+	func(next) begin
+		call pcCheck with ("the provider", StrEqual(GetTAPICommFrame(GetUserConfig('currentDialSpeaker)).name, "Cellular"),
+			"the provider is " & GetUserConfig('currentDialSpeaker));
+		call pcCheck with ("receiving calls", pcTransport:GetConfig('phoneAutoReceive), "not receiving");
+		pcLogged := call pcLogCount with ();
+		call pcCall with ("5551234");
+		call waitFor with ("phonecall: the call made", func() (call pcStatus with ()) = 'DialingDoneTo
+			and (call cellCallState with ()) = 'active, next, 30);
+	end,
+	func(next) begin
+		pcTransport.callEndpoint:SendDigit("5", nil);
+		pcTransport:SetSpeaker(nil);
+		pcTransport:SetSpeaker(true);
+		// hung up from the Newton, as the call's status slip does
+		pcTransport:CancelRequest('completed);
+		call waitFor with ("phonecall: hung up", func() (call cellCallState with ()) = 'idle
+			and (call pcStatus with ()) = 'Listening, next, 30);
+	end,
+	func(next) begin
+		call pcCheck with ("the call logged", (call pcLogCount with ()) > pcLogged,
+			(call pcLogCount with ()) & " calls logged, " & pcLogged & " before");
+		call pcCall with ("5551234");
+		call waitFor with ("phonecall: the second call", func() (call cellCallState with ()) = 'active, next, 30);
+	end,
+	func(next) begin
+		HostCellCommand("AT+FAKEHANGUP");
+		call waitFor with ("phonecall: the far end hung up", func() (call pcStatus with ()) = 'Listening
+			and (call cellCallState with ()) = 'idle, next, 30);
+	end,
+	func(next) begin
+		call pcCall with ("5550000");
+		call waitFor with ("phonecall: busy", func() (call pcStatus with ()) = 'Listening
+			and (call cellCallState with ()) = 'idle and pcTransport.currentItem = nil, next, 30);
+	end,
+	func(next) begin
+		HostCellCommand("AT+FAKERING=\"+61400000001\"");
+		call waitFor with ("phonecall: ringing", func() (call pcStatus with ()) = 'RingingFrom
+			and pcTransport.currentItem and pcTransport.currentItem.phoneNumber, next, 30);
+	end,
+	func(next) begin
+		call pcCheck with ("the caller", StrEqual(pcTransport.currentItem.phoneNumber, "+61400000001"),
+			"the caller is " & pcTransport.currentItem.phoneNumber);
+		// Take Call
+		pcTransport:receiveRequestComplete();
+		call waitFor with ("phonecall: taken", func() (call pcStatus with ()) = 'DialingDoneFrom
+			and (call cellCallState with ()) = 'active, next, 30);
+	end,
+	func(next) begin
+		HostCellCommand("AT+FAKEHANGUP");
+		call waitFor with ("phonecall: the caller hung up", func() (call pcStatus with ()) = 'Listening
+			and (call cellCallState with ()) = 'idle, next, 30);
+	end,
+	func(next) begin
+		Print("phonecall: done, " & pcFailures & " failed");
+		HostQuit();
+	end];
+
+cellCallState := func() HostCellStatus().callState;
+
+pcStep := 0;
+pcNext := func() begin
+	local step := pcSteps[pcStep];
+	pcStep := pcStep + 1;
+	call step with (pcNext);
+end;
+
+call pcNext with ();

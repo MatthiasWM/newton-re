@@ -1674,8 +1674,16 @@ TSerialEndpoint::HandleEventReply(TCommToolEventPB* pb)
 			fState = kInRel;
 		if (fClientRefCon != 0)
 		{
+			// (the tool's event as the client's: its result, code, data,
+			// time and service - the ROM copies each; the data is what a
+			// script's eventHandler gets as data: a telephone API event's
+			// kind, comms/host/HostCellTool.h)
 			size = 0x24;
-			event.fTime.time.lo = pb->fReply.fEventTime.time.lo;
+			event.fError = pb->fReply.fResult;
+			event.fClient = fClientRefCon;
+			event.fEventCode = pb->fReply.fEventCode;
+			event.fReserved = pb->fReply.fEventData;
+			event.fTime = pb->fReply.fEventTime;
 			event.fData = pb->fReply.fServiceId;
 		}
 		PostEventRequest(pb);

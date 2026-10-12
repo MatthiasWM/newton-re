@@ -10,6 +10,7 @@
 #include "HostTCPTool.h"
 #include "HostDNSTool.h"
 #include "HostLinkTool.h"
+#include "HostCellTool.h"
 #include "CommManager.h"
 #include "NewtErrors.h"
 
@@ -117,10 +118,43 @@ THostLinkService::DoneStarting(TAEvent* event, ULong size, TServiceInfo* service
 }
 
 
+PROTOCOL_IMPL_SOURCE_MACRO(THostCellService)
+PROTOCOL_CLASSINFO(THostCellService, "TCMService", "serv\0cell\0\0", 0, 0, nil)
+
+THostCellService*
+THostCellService::New()
+{
+	return this;
+}
+
+void
+THostCellService::Delete()
+{
+}
+
+// As the inet service's, over the cellular tool.
+NewtonErr
+THostCellService::Start(TOptionArray* options, ULong serviceId, TServiceInfo* serviceInfo)
+{
+	THostCellTool tool(serviceId);
+	NewtonErr err = StartCommTool(&tool, serviceId, serviceInfo);
+	if (err == noErr)
+		err = OpenCommTool(serviceInfo->GetPortId(), options, this);
+	return err;
+}
+
+NewtonErr
+THostCellService::DoneStarting(TAEvent* event, ULong size, TServiceInfo* serviceInfo)
+{
+	return ((TCommToolReply*) event)->fResult;
+}
+
+
 void
 RegisterHostCommServices(void)
 {
 	THostInetService::ClassInfo()->Register();
 	THostDNSService::ClassInfo()->Register();
 	THostLinkService::ClassInfo()->Register();
+	THostCellService::ClassInfo()->Register();
 }

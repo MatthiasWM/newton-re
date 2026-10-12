@@ -1,0 +1,66 @@
+// The host's cellular module as a telephone provider for the ROM's Phone
+// transport (comms/host/HostCellProvider.h): compiled into the host
+// (HostCellSource.cpp, made by src/cmake/EmbedText.cmake) and evaluated at
+// boot when the host has a module (HostCellAvailable()); it answers the
+// frame kept in the global HostCell:host.
+//
+// The ROM has the framework and registers no provider
+// (docs/host-tdeck-pro-phone.md): the Phone transport, |PhoneHome:Newton|,
+// lists the providers in CommConfigRegistry whose type is "TAPI"
+// (GetCommConfig(nil, "TAPI", nil): the "Using" picker of its routing slip
+// and its preferences), opens a 'tapiEndpoint (@662) on the one chosen -
+// its serviceId the comm tool's service, here the host's 'cell
+// (comms/host/HostCellTool.h) - and asks of it only what its config says
+// it can do.
+//
+// DEVIATION (host addition): the provider made the default once (the
+// user's 'currentDialSpeaker, when it names no provider with a service: a
+// fresh store says 'speaker, the boot's own "Speaker" entry, which dials
+// tones through the loudspeaker) and calls taken
+// (the transport's 'phoneAutoReceive) - a phone that does not ring is no
+// phone; the transport's 'enableAutoUI set so that its preferences show
+// the "receive calls" choice, which the ROM hides; and auto-receive
+// started here, since the boot's own StartAutoCallReceive (an init script)
+// runs before this is registered.
+
+{
+	providerSymbol: '|Cellular:host|,
+
+	provider: {
+		name: "Cellular",
+		type: "TAPI",
+		serviceId: "cell",
+		config: {
+			configOptions: nil,
+			supportsMakeOutgoing: true,
+			supportsSendDigit: true,
+			supportsEventIncoming: true,
+			supportsCallerId: true,
+			supportsAnswerIncoming: true,
+			supportsSpeaker: true,
+			supportsLineCurrentSense: true
+		}
+	},
+
+	Start: func()
+	begin
+		RegCommConfig(providerSymbol, provider);
+		AddDeferredCall(func() begin
+			local transport := GetRoot().|PhoneHome:Newton|;
+			if not transport then
+				return;
+			transport:SetConfig('enableAutoUI, true);
+			if not transport:GetConfig('hostCellOffered) then begin
+				transport:SetConfig('hostCellOffered, true);
+				local current := GetUserConfig('currentDialSpeaker);
+				if (not current) or (not CommConfigRegistry.(current)) or (not CommConfigRegistry.(current).serviceId) then begin
+					SetUserConfig('currentDialSpeaker, providerSymbol);
+					transport:SetConfig('phoneAutoReceive, true);
+				end;
+			end;
+			if transport:GetConfig('phoneAutoReceive)
+			and GetUserConfig('currentDialSpeaker) = providerSymbol then
+				transport:StartAutoReceive();
+		end, nil);
+	end
+}

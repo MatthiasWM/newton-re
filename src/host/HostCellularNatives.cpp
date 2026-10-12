@@ -204,7 +204,7 @@ static Ref
 FHostCellNextEvent(RefArg /*rcvr*/)
 {
 	HostCellEvent event;
-	if (!HostCellularNextEvent(&event))
+	if (!HostCellularNextEvent(&event, kHostCellReaderScript))
 		return NILREF;
 	static const char* const kEvents[] = { "ring", "connected", "ended", "busy", "noAnswer" };
 	RefVar frame(AllocateFrame());

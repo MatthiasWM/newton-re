@@ -9,6 +9,28 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-12: calls through the ROM's own Phone transport
+
+Step 2 of the phone (`docs/host-tdeck-pro-phone.md`): the host's cellular
+module registered as a telephone provider (`comms/host/HostCell.ns`) over
+a comm tool of its own, the 'cell service (`comms/host/HostCellTool.h`),
+which answers the `'tapiEndpoint`'s options and turns the engine's call
+events into T_TAPIEVT events - so the ROM's Phone transport and Calls log
+make, take and log calls unchanged (ctest `host.NewtonPhoneCall`).  On the
+way: a ROM bug, `ItemCompleted` deciding whether to hang up from a status
+it has just overwritten (fixed behind `RomBugFixed()`; unseen on a
+MessagePad, whose only provider holds no call); a reconstruction slip,
+`TSerialEndpoint::HandleEventReply` dropping a tool event's code and data
+on the way to the script endpoint; the ROM registers a provider of its own
+at boot ("Speaker", no service), so "none chosen" means a provider without
+a service; the engine moved to `hal/host` (`hal_host_cellular`), gave each
+event reader its own queue (the tool and a script's natives each took the
+other's events), learnt keypad tones and the speaker, and
+`HostCellularWillRun` (the board's task starts the module for half a
+minute before the engine runs, and the Newton's side, booting meanwhile,
+must count it as there).  On the board the transport listens on the
+Cellular provider from the start.
+
 ## 2026-10-12: the T-Deck Pro's 4G module driven
 
 The first step of making the board a phone (`docs/host-tdeck-pro-phone.md`).
@@ -16,18 +38,18 @@ The ROM, read first, turns out to have a whole telephony framework - the
 Phone transport `|PhoneHome:Newton|` with incoming calls, caller ID and
 Take Call, the Calls log, and the `'tapiEndpoint` (@662) over providers
 registered with `RegCommConfig` - but registers no provider of its own;
-that is step 2.  Step 1: `host/HostCellular.h`, a portable engine owning
+that is step 2.  Step 1: `hal/host/HostCellular.h`, a portable engine owning
 the module's byte link, ported from the owner's lilyphone1 (its URC
 handling, UCS2 texts, CLCC polling, the network's time); the natives
 `HostCell*`; `tools/modem/fakecell.py`, an A76xx for `newton --cell-port`
-(ctest `host.NewtonCellular`; `host.Cellular` tests the parsing); and the
+(ctest `host.NewtonCellular`; `hal.Cellular` tests the parsing); and the
 board's driver, `src/host/esp32/main/tdeck_modem.cpp` (UART1, the supply
 GPIO 41 released from GPIO hold, the power key GPIO 40).  On the board:
 the module answered once the battery was fitted (its supply, an SGM6609
 boost, runs from the battery - the owner found it from the circuit),
 registered on its home network, set the board's clock from the network's
 time, and reported `+FCLASS: 8` - voice only, no fax.  On the way: the
-engine is its own library (`host_cellular`), since `<thread>` and
+engine is its own library (`hal_host_cellular`), since `<thread>` and
 `<mutex>` reach `<locale.h>`, which `src/intl/Locale.h` shadows; a status
 slot named `call` cannot be read in NewtonScript (`call` is a reserved
 word: `callState`); fakecell.py stopped at the first emoji it printed on

@@ -1,4 +1,4 @@
-// The cellular engine's parsing (host/HostCellular.h): UCS2 message bodies
+// The cellular engine's parsing (hal/host/HostCellular.h): UCS2 message bodies
 // to and from UTF-8, the module's time stamps, and +CMGR's header - each
 // against a line as the A7682E gives it (lilyphone1's notes) or a value
 // worked out by hand.  The engine's conversation with a module is

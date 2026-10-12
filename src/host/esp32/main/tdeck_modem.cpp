@@ -3,7 +3,7 @@
 
 	Contains:	The board's cellular module (the T-Deck Pro's 4G variant:
 				a SIMCom A7682E), given to the portable engine
-				(host/HostCellular.h) as its byte link: UART1 at 115200
+				(hal/host/HostCellular.h) as its byte link: UART1 at 115200
 				8N1, and a task of the board's own that runs the engine.
 
 				The pins and the start are lilyphone1's (the owner's
@@ -181,6 +181,7 @@ HostDeviceCellStart(void)
 	gLink.read = UartRead;
 	gLink.write = UartWrite;
 	HostCellularSetClockHandler(NetworkTime);
+	HostCellularWillRun();					// (the Newton's side boots while the module starts)
 	// (core 0, beside the WiFi's task: the Newton's are on core 1)
 	if (xTaskCreatePinnedToCore(CellTask, "cell", 8192, NULL, 4, NULL, 0) != pdPASS)
 	{

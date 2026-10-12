@@ -45,6 +45,7 @@
 #include "host/HostWifi.h"
 #include "NewtonGestalt.h"
 #include "comms/host/HostLink.h"
+#include "comms/host/HostCellProvider.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -284,6 +285,7 @@ static void
 DevicePreMain(void)
 {
 	HostLinkStart();
+	HostCellProviderStart();			// (the 4G module, for the Phone transport: comms/host/HostCellProvider.h)
 }
 
 

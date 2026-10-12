@@ -1,4 +1,4 @@
-// The host's cellular module (host/HostCellular.h) through its natives:
+// The host's cellular module (hal/host/HostCellular.h) through its natives:
 // registered on the network, a message that was waiting picked up, a call
 // made, hung up and made to a busy number, a call answered and hung up by
 // the far end, a message received and two sent (one plain, one that needs

@@ -56,6 +56,22 @@ if(WIN32)
     target_link_libraries(hal_host_sockets PUBLIC ws2_32)
 endif()
 
+# The cellular modem engine (host/HostCellular.h): a SIMCom module driven
+# in AT commands over a byte link the host gives it - a board's UART, or a
+# desktop's TCP connection to tools/modem/fakecell.py (HostCellularSocket.cpp,
+# newton --cell-port).  Built without the Newton include paths: std::thread
+# and std::mutex reach <locale.h>, which src/intl/Locale.h would shadow.
+add_library(hal_host_cellular STATIC
+    host/HostCellular.cpp
+    host/HostCellularSocket.cpp
+)
+target_link_libraries(hal_host_cellular PUBLIC newton_config hal_host_sockets)
+target_include_directories(hal_host_cellular PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/host)
+find_package(Threads)
+if(Threads_FOUND)
+    target_link_libraries(hal_host_cellular PUBLIC Threads::Threads)
+endif()
+
 # The serial chips' seam (HALSerialChip.h): the TSerialChip and
 # PSerialChipRegistry protocols and the ROM's registry, PTheSerChipRegistry;
 # the serial tools find their chip here (docs/comms/README.md, "The desktop

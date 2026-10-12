@@ -2,10 +2,10 @@
 """A SIMCom A76xx-class cellular module for the host build, over TCP.
 
 Purpose
-    The host's cellular engine (src/host/HostCellular.h) drives a SIMCom
+    The host's cellular engine (src/hal/host/HostCellular.h) drives a SIMCom
     module in AT commands - the T-Deck Pro's 4G variant carries an A7682E
     on a UART.  A desktop newton has no module; given --cell-port it listens
-    on a TCP port for one (src/host/HostCellularSocket.cpp), and this is
+    on a TCP port for one (src/hal/host/HostCellularSocket.cpp), and this is
     the module at the other end.  It speaks the part of the A76xx dialect
     the engine uses, as lilyphone1 (the owner's firmware for the board)
     found the real module speaks it:
@@ -29,6 +29,9 @@ Purpose
       body; AT+CMGD deletes it; AT+CMGL="ALL" lists the slots; AT+CMGS="<n>"
       answers "> ", takes the body up to Ctrl-Z (UCS2 hex when the coding
       scheme is 8) and answers +CMGS: <n> and OK - "fakecell: text to N: T";
+    - in a call: AT+VTS=<digit> (a keypad tone - "fakecell: tone 5 in the
+      call with N"); AT+CSDVC=1 or 3 (the audio to the handset or the
+      loudspeaker);
     - anything else ERROR (AT+FCLASS=? among them: an LTE module carries no
       fax, the owner's to be checked on the real one).
 
@@ -253,6 +256,19 @@ class Module:
         elif ubody == "+CLCC":
             if self.call is not None:
                 self.say('+CLCC: 1,%d,%d,0,0,"%s",145' % (self.call["dir"], self.call["stat"], self.call["number"]))
+            self.ok()
+        elif ubody.startswith("+VTS="):
+            if self.call is None or self.call["stat"] != 0:
+                self.say("ERROR")
+                return
+            log("tone %s in the call with %s" % (body.split("=", 1)[1], self.call["number"]))
+            self.ok()
+        elif ubody.startswith("+CSDVC="):
+            device = body.split("=", 1)[1]
+            if device not in ("1", "3"):
+                self.say("ERROR")
+                return
+            log("the audio to the %s" % ("loudspeaker" if device == "3" else "handset"))
             self.ok()
         elif ubody.startswith("+CMGR="):
             self.read_slot(int(body.split("=", 1)[1]))

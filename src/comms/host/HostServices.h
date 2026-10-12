@@ -18,6 +18,10 @@
 				endpoint, over a THostLinkTool (DEVIATION: the host's link is
 				always up; HostLinkTool.h).
 
+				THostCellService, 'serv=cell - a telephone API provider over
+				the host's cellular module, for the ROM's Phone transport
+				(HostCellTool.h; not in the ROM, which has no provider).
+
 	Host code for the NIE's services (no ROM counterpart; the shape is the
 	ROM's TAsyncService, 0x0003b0c4-0x0003b14c).
 */
@@ -57,6 +61,17 @@ public:
 	PROTOCOL_IMPL_HEADER_MACRO(THostLinkService);
 
 	THostLinkService*	New();
+	void				Delete();
+	NewtonErr			Start(TOptionArray* options, ULong serviceId, TServiceInfo* serviceInfo);
+	NewtonErr			DoneStarting(TAEvent* event, ULong size, TServiceInfo* serviceInfo);
+};
+
+PROTOCOL THostCellService : public TCMService
+{
+public:
+	PROTOCOL_IMPL_HEADER_MACRO(THostCellService);
+
+	THostCellService*	New();
 	void				Delete();
 	NewtonErr			Start(TOptionArray* options, ULong serviceId, TServiceInfo* serviceInfo);
 	NewtonErr			DoneStarting(TAEvent* event, ULong size, TServiceInfo* serviceInfo);

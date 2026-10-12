@@ -1,5 +1,5 @@
 /*
-	File:		host/HostCellularSocket.cpp
+	File:		hal/host/HostCellularSocket.cpp
 
 	Contains:	A desktop's cellular module: a TCP connection taken on a
 				listening port (newton --cell-port), the module at the

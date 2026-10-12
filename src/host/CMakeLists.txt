@@ -9,21 +9,8 @@ add_library(host_views STATIC HostViews.cpp HostNatives.cpp HostStores.cpp HostC
 target_link_libraries(host_views PUBLIC flash frames comms_script comms_dock comms_fax thirdparty_nie views recognition pcmcia sound system stores packages intl intl_meetings assist hal_host_display hal_host_tablet)
 target_include_directories(host_views PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-# the cellular modem engine (host/HostCellular.h) and a desktop's link to
-# one (--cell-port): a library of its own, built without the Newton's
-# include directories (std::thread and std::mutex reach <locale.h>, which
-# src/intl/Locale.h would shadow); and its parsing tested
-add_library(host_cellular STATIC HostCellular.cpp HostCellularSocket.cpp)
-target_link_libraries(host_cellular PUBLIC newton_config hal_host_sockets)
-find_package(Threads)
-if(Threads_FOUND)
-    target_link_libraries(host_cellular PUBLIC Threads::Threads)
-endif()
-target_link_libraries(host_views PUBLIC host_cellular)
-add_executable(test_HostCellular tests/test_HostCellular.cpp)
-target_link_libraries(test_HostCellular PRIVATE host_cellular)
-target_include_directories(test_HostCellular PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME host.Cellular COMMAND test_HostCellular)
+# the cellular modem engine (hal/host/HostCellular.h), under the natives
+target_link_libraries(host_views PUBLIC hal_host_cellular)
 
 add_executable(newtonscript newtonscript.cpp NSRoundTrip.cpp IMATool.cpp)
 target_link_libraries(newtonscript PRIVATE host_views)
@@ -494,7 +481,7 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../fixtures/packages/fonts/monac
     set_tests_properties(host.NewtonModemDial PROPERTIES TIMEOUT 200
                          PASS_REGULAR_EXPRESSION "<- ATI4.*<- ATDT5551212.*-> CONNECT 19200.*escaped to commands.*<- ATH0.*modem: received hello.*modem: line of 19 characters.*modem: done.*the program answered 0"
                          FAIL_REGULAR_EXPRESSION "waited in vain|fell over")
-    # the cellular module (host/HostCellular.h) through its natives, the
+    # the cellular module (hal/host/HostCellular.h) through its natives, the
     # module tools/modem/fakecell.py on --cell-port: registered, a stored
     # message, calls made, refused busy, answered and hung up by the far
     # end, a message received and two sent (GSM-7 and UCS2) -
@@ -507,6 +494,20 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../fixtures/packages/fonts/monac
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     set_tests_properties(host.NewtonCellular PROPERTIES TIMEOUT 200
                          PASS_REGULAR_EXPRESSION "fakecell: text to [+]61400000001: Hello from the Newton.*cellular: done, 0 failed"
+                         FAIL_REGULAR_EXPRESSION "waited in vain|FAILED|Traceback")
+    # the ROM's own Phone transport and Calls log over the cellular module
+    # (comms/host/HostCellTool.h, the 'cell provider HostCell.ns): calls
+    # made, hung up by either end, refused busy, rung in with caller ID and
+    # taken - docs/host-tdeck-pro-phone.md
+    add_test(NAME host.NewtonPhoneCall
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/modem/fakecell.py
+                     --busy 5550000
+                     --spawn $<TARGET_FILE:newton> --cell-port 0 --serial-port none --display 320x480 --erase
+                     --store ${CMAKE_CURRENT_BINARY_DIR}/phonecall.store --headless 150
+                     --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/phonecall.ns
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    set_tests_properties(host.NewtonPhoneCall PROPERTIES TIMEOUT 240
+                         PASS_REGULAR_EXPRESSION "fakecell: tone 5 in the call.*fakecell: <- AT[+]CHUP.*fakecell: call to 5550000: busy.*fakecell: call from [+]61400000001 answered.*phonecall: done, 0 failed"
                          FAIL_REGULAR_EXPRESSION "waited in vain|FAILED|Traceback")
     add_test(NAME host.NewtonModemAnswer
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/modem/fakemodem.py
