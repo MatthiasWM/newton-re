@@ -51,6 +51,12 @@
 		kBold: 1058816,							// bold (face 1: 1 << 20)
 		kSmall: 9216,							// 9 point
 
+		// (the folder tab's: what its picker calls all of them and the unfiled)
+		appAll: "All Messages",
+		appObjectUnfiled: "Unfiled Messages",
+		labelsFilter: '_all,					// the folder shown: '_all, nil the unfiled, or a folder
+		storesFilter: nil,
+
 		mode: 'list,							// 'list, 'thread or 'compose
 		currentThread: nil,						// the thread shown
 		threads: nil,							// the conversations, newest first
@@ -58,7 +64,7 @@
 		threadScroll: 0,						// messages scrolled past, from the newest
 
 		// (the child views, found by their role once they exist)
-		headerView: nil, listView: nil, threadView: nil, replyLine: nil,
+		folderTab: nil, headerView: nil, listView: nil, threadView: nil, replyLine: nil,
 		sendButton: nil, toPicker: nil, statusBar: nil,
 
 		viewSetupFormScript: func()
@@ -78,7 +84,7 @@
 
 		viewQuitScript: func()
 		begin
-			headerView := listView := threadView := replyLine := sendButton := toPicker := statusBar := nil;
+			folderTab := headerView := listView := threadView := replyLine := sendButton := toPicker := statusBar := nil;
 		end,
 
 		Relayout: func()
@@ -102,14 +108,20 @@
 			local showList := wide or mode = 'list;
 			local showThread := wide or mode <> 'list;
 			local tx := if wide then listW + 1 else 0;
-			SetValue(headerView, 'viewBounds, RelBounds(0, 0, w, headerH));
-			SetValue(listView, 'viewBounds, RelBounds(0, headerH, listW, barTop - headerH));
-			SetValue(threadView, 'viewBounds, RelBounds(tx, headerH, w - tx, barTop - headerH - replyH));
+			// the folder tab over the list (across the top when wide: the
+			// conversation's header under it); none over a conversation alone
+			local tabH := if showList then (folderTab:LocalBox()).bottom + 2 else 0;
+			if showList then folderTab:Show() else folderTab:Hide();
+			if showThread then headerView:Show() else headerView:Hide();
+			SetValue(headerView, 'viewBounds, RelBounds(tx, tabH, w - tx, headerH));
+			SetValue(listView, 'viewBounds, RelBounds(0, tabH, listW, barTop - tabH));
+			local threadTop := tabH + headerH;
+			SetValue(threadView, 'viewBounds, RelBounds(tx, threadTop, w - tx, barTop - threadTop - replyH));
 			local sendW := StrFontWidth(sendButton.text, kBold) + 20;
 			SetValue(replyLine, 'viewBounds, RelBounds(tx + 6, barTop - replyH + 4, w - tx - sendW - 18, replyH - 8));
 			SetValue(sendButton, 'viewBounds, RelBounds(w - sendW - 6, barTop - replyH + 4, sendW, replyH - 8));
 			local pickerH := 13;
-			SetValue(toPicker, 'viewBounds, RelBounds(tx + 8, (headerH - pickerH) div 2, w - tx - 16, pickerH));
+			SetValue(toPicker, 'viewBounds, RelBounds(tx + 8, tabH + (headerH - pickerH) div 2, w - tx - 16, pickerH));
 			if showList then listView:Show() else listView:Hide();
 			if showThread then begin
 				threadView:Show();
@@ -147,19 +159,21 @@
 				local cursor := Query(soup, {type: 'index});
 				local e;
 				while e := cursor:Entry() do begin
-					local key := Intern("t" & e.thread);
-					local t := byThread.(key);
-					if not t then begin
-						t := {thread: e.thread, number: e.number, name: e.name, text: e.text, time: e.time,
-							dir: e.dir, state: e.state, unread: 0};
-						byThread.(key) := t;
-						AddArraySlot(list, t);
-					end else if e.time >= t.time then begin
-						t.text := e.text; t.time := e.time; t.dir := e.dir; t.state := e.state;
-						if e.name then t.name := e.name;
+					if :InFolder(e) then begin
+						local key := Intern("t" & e.thread);
+						local t := byThread.(key);
+						if not t then begin
+							t := {thread: e.thread, number: e.number, name: e.name, text: e.text, time: e.time,
+								dir: e.dir, state: e.state, unread: 0};
+							byThread.(key) := t;
+							AddArraySlot(list, t);
+						end else if e.time >= t.time then begin
+							t.text := e.text; t.time := e.time; t.dir := e.dir; t.state := e.state;
+							if e.name then t.name := e.name;
+						end;
+						if e.state = 'unread then
+							t.unread := t.unread + 1;
 					end;
-					if e.state = 'unread then
-						t.unread := t.unread + 1;
 					cursor:Next();
 				end;
 			end;
@@ -206,6 +220,26 @@
 			:Layout();
 			if replyLine then SetKeyView(replyLine.entryLine, 0);
 		end,
+
+		// the folder tab's picker chose a folder (or a store)
+		NewFilingFilter: func(what)
+		begin
+			listScroll := 0;
+			:Reload();
+			:Layout();
+		end,
+
+		// a message in the folder shown (a message's labels are its folder)
+		InFolder: func(e)
+		begin
+			if labelsFilter = '_all then true
+			else if not labelsFilter then not e.labels
+			else e.labels = labelsFilter;
+		end,
+
+		// what the folder tab files and filters: the application itself
+		GetTargetInfo: func(reason)
+			{target: nil, targetView: self, targetStore: GetDefaultStore()},
 
 		ShowList: func()
 		begin
@@ -363,7 +397,16 @@
 		end,
 
 		stepChildren: [
-			// the header: the folder tab and the time; a conversation's name and number
+			// the folder tab, the clock beside it, as the Extras drawer's
+			// (protoClockFolderTab: its picker the filing filter, which
+			// NewFilingFilter is told of)
+			{
+				_proto: @670,						// protoClockFolderTab (on protoNewFolderTab @669, on @211)
+				role: 'folderTab
+			},
+
+			// the header over a conversation: its name and number - a new
+			// message's To line (the folder tab is a view of its own: Layout)
 			{
 				viewClass: 74, viewFlags: 513, viewFormat: 0, role: 'headerView,
 				viewBounds: {left: 0, top: 0, right: 240, bottom: 24},
@@ -373,44 +416,23 @@
 					local w := b.right;
 					local h := b.bottom;
 					local base := :Parent();
-					local wide := w >= base.kSideBySideWidth;
-					local listW := if wide then (base.listView:LocalBox()).right else w;
 					:DrawShape(MakeLine(0, h - 1, w, h - 1), {penSize: 1});
-					// the folder tab and the time, over the list
-					if wide or base.mode = 'list then begin
-						local label := "All Messages";
-						local tabW := StrFontWidth(label, base.kBold) + 32;
-						:DrawShape(MakeRoundRect(6, 4, 6 + tabW, h + 6, 6), {penSize: 1, penPattern: 5, fillPattern: 1});
-						:DrawShape(MakeLine(7, h - 1, 5 + tabW, h - 1), {penSize: 1, penPattern: 1});
-						:DrawShape(base:Diamond(17, (h + 4) div 2, 4), {penPattern: 0, fillPattern: 5});
-						:DrawShape(MakeText(label, 26, 6, 6 + tabW, h), {font: base.kBold});
-						local now := base:TimeText(Time());
-						local nowW := StrFontWidth(now, base.kFont);
-						if listW - nowW - 8 > 6 + tabW + 4 then
-							:DrawShape(MakeText(now, listW - nowW - 8, 7, listW, h), {font: base.kFont});
-					end;
-					if wide then
-						:DrawShape(MakeLine(listW, 0, listW, h), {penSize: 1});
 					// a new message's To line: tapped, the Names file's picker (the
 					// address picker's own, which is kept hidden: on the host its
 					// label came out half drawn)
 					if base.mode = 'compose then begin
-						local x := if wide then listW + 1 else 0;
 						local sel := base.toPicker.selected;
 						local who := if sel and Length(sel) > 0 then base:RecipientName(sel[0]) else "Choose a name";
-						:DrawShape(MakeText("To", x + 8, 6, x + 30, h), {font: base.kBold});
-						:DrawShape(base:Diamond(x + 38, h div 2, 4), {penPattern: 0, fillPattern: 5});
-						:DrawShape(MakeText(StyledStrTruncate(who, w - x - 60, base.kBold), x + 48, 6, w, h), {font: base.kBold});
+						:DrawShape(MakeText("To", 8, 6, 30, h), {font: base.kBold});
+						:DrawShape(base:Diamond(38, h div 2, 4), {penPattern: 0, fillPattern: 5});
+						:DrawShape(MakeText(StyledStrTruncate(who, w - 60, base.kBold), 48, 6, w, h), {font: base.kBold});
 					end;
-					// the conversation's name and number, over the conversation (a new
-					// message's To line is a view of its own, there)
 					local t := if base.currentThread then base:ThreadFor(base.currentThread);
 					if t and base.mode = 'thread then begin
-						local x := if wide then listW + 1 else 0;
-						:DrawShape(base:Diamond(x + 12, h div 2, 4), {penPattern: 0, fillPattern: 5});
+						:DrawShape(base:Diamond(12, h div 2, 4), {penPattern: 0, fillPattern: 5});
 						local name := if t.name then t.name else t.number;
 						local nw := if t.name then StrFontWidth(t.number, base.kSmall) else 0;
-						:DrawShape(MakeText(StyledStrTruncate(name, w - x - nw - 40, base.kBold), x + 22, 6, w - nw - 12, h), {font: base.kBold});
+						:DrawShape(MakeText(StyledStrTruncate(name, w - nw - 40, base.kBold), 22, 6, w - nw - 12, h), {font: base.kBold});
 						if t.name then
 							:DrawShape(MakeText(t.number, w - nw - 8, 8, w, h), {font: base.kSmall});
 					end;
@@ -421,7 +443,7 @@
 					local base := :Parent();
 					if base.mode = 'compose then
 						base.toPicker:DoOpenPicker()
-					else if base.mode <> 'list and :LocalBox().right < base.kSideBySideWidth then
+					else if base.mode <> 'list and (base:LocalBox()).right < base.kSideBySideWidth then
 						base:ShowList();
 					true;
 				end

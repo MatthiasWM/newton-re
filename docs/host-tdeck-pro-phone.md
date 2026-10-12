@@ -310,6 +310,17 @@ host gives it**.
   the application, rows and bubbles measured from the system fonts, a
   bubble at most seven tenths of the width; at least 400 wide, the list and
   the conversation side by side (the list two fifths, at most 300).
+- **The folder tab** is the system's, as the Extras drawer's (the owner
+  asked for it): `protoClockFolderTab` @670 (on `protoNewFolderTab` @669,
+  on the folder tab @211 - told apart by their slots: @670 has
+  `TimeString` and `viewIdleScript`, @669 a `title`), across the top of
+  the list (across the whole application when wide); its picker is the
+  filing filter - the application gives `appAll` "All Messages",
+  `appObjectUnfiled` "Unfiled Messages", `labelsFilter` (`'_all`, nil
+  the unfiled, or a folder: a message's `labels`), `GetTargetInfo` (the
+  tab finds the application through it: without one it threw -48811,
+  labelsFilter) and `NewFilingFilter`.  NOT YET: filing a conversation
+  into a folder.
 - **The protos**, from the ROM's 1.x name table (`@269`: protoApp @157,
   protoStatus @219, protoClosebox @166, protoInputLine @185,
   protoLabelInputLine @189, protoTextButton @226, protoGlance @183, ...) and
