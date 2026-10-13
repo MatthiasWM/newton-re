@@ -15,9 +15,11 @@
 				(its interrupt) 5, BUSY 6, on the SPI bus the panel shares
 				(SCK 36, MOSI 33, MISO 47: tdeck_panel.cpp's
 				HostDeviceSpiBusStart); its supply is switched by GPIO 46
-				(BOARD_LORA_EN, high on).  The radio is set up as
-				lilyphone1's build flags have it: the TCXO on DIO3 at 1.8 V,
-				a 140 mA current limit, the DC-DC regulator, 22 dBm.
+				(BOARD_LORA_EN, high on).  The radio is set up as LilyGO's
+				examples have it (main/CMakeLists.txt's SX126X_*): the TCXO
+				on DIO3 at 2.4 V, DIO2 driving the antenna's TX/RX switch,
+				the boosted receive gain, a 140 mA current limit, the DC-DC
+				regulator, 22 dBm.
 
 				The bus: RadioLib drives the chip select itself (a GPIO) and
 				brackets each exchange with spiBeginTransaction/End, which

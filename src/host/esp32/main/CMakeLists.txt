@@ -65,7 +65,13 @@ set_source_files_properties(tdeck_modem.cpp PROPERTIES COMPILE_OPTIONS "-iquote$
 # contact and channel counts change BaseChatMesh's layout, and RadioLib's
 # GODMODE and STATIC_ONLY its classes', so every one of these files is
 # built with the same definitions; the radio's (LORA_*, SX126X_*) are
-# lilyphone1's build flags.
+# lilyphone1's build flags, except the TCXO's voltage and the RF switch,
+# which are LilyGO's (its examples/test_lora_recv; Meshtastic's t-deck-pro
+# variant the same): the module's DIO2 drives its antenna's TX/RX switch,
+# and without SX126X_DIO2_AS_RF_SWITCH the switch was never turned to
+# receive - the radio sent, and heard only what was very close
+# (2026-10-14: 50 packets sent, 1 heard, overnight).  The boosted receive
+# gain is MeshCore's own T-Deck variant's.
 set(MESHCORE ${NEWTON_SRC}/thirdparty/meshcore)
 set(mesh_sources
     ${MESHCORE}/MeshCore/src/Dispatcher.cpp
@@ -137,7 +143,8 @@ set(mesh_includes -I${MESHCORE}/compat -I${MESHCORE}/MeshCore/src -I${MESHCORE}/
                   -I${MESHCORE}/base64/src -I${MESHCORE}/RadioLib/src)
 set(mesh_definitions MAX_CONTACTS=64 MAX_GROUP_CHANNELS=4 ED25519_NO_SEED=1 RADIOLIB_GODMODE=1 RADIOLIB_STATIC_ONLY=1
                      MESHCORE_RADIOLIB=1 LORA_FREQ=916.575 LORA_BW=62.5 LORA_SF=7 LORA_CR=8 LORA_TX_POWER=22
-                     SX126X_DIO3_TCXO_VOLTAGE=1.8 SX126X_CURRENT_LIMIT=140)
+                     SX126X_DIO3_TCXO_VOLTAGE=2.4 SX126X_CURRENT_LIMIT=140
+                     SX126X_DIO2_AS_RF_SWITCH=true SX126X_RX_BOOSTED_GAIN=1)
 set_source_files_properties(${mesh_sources} ${radiolib_sources} PROPERTIES
                             COMPILE_OPTIONS "${mesh_includes};-iquote${NEWTON_SRC}/hal/host"
                             COMPILE_DEFINITIONS "${mesh_definitions}")

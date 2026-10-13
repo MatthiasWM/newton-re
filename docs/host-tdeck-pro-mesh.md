@@ -57,13 +57,24 @@ four presets by index: its "Victoria AU" becomes the community's Australia
 each packet's header, so either hears the other), the others keep their
 values exactly.
 
-The radio is set up as lilyphone1's build flags have it: the private sync
-word (0x12), the TCXO on DIO3 at 1.8 V, a 140 mA current limit, the DC-DC
-regulator, 22 dBm, a 32-symbol preamble at SF 7 (MeshCore's wrapper's
+The radio is set up as lilyphone1's build flags have it - the private sync
+word (0x12), a 140 mA current limit, the DC-DC regulator, 22 dBm, a 32-symbol preamble at SF 7 (MeshCore's wrapper's
 `setParams`).  MeshCore's own tuning is left at its defaults, which are
 what lilyphone1 set (airtime budget 1.0, receive delay base 10, no extra
 acknowledgements).  Checked against lilyphone1's source, 2026-10-13, at
-the owner's asking.
+the owner's asking - except for three things that are LilyGO's
+(`examples/test_lora_recv` in its T-Deck-Pro repository; Meshtastic's
+`t-deck-pro` variant has the same): **DIO2 drives the module's antenna
+switch** (`SX126X_DIO2_AS_RF_SWITCH`), the TCXO is at **2.4 V** (not 1.8),
+and the receive gain is boosted (`SX126X_RX_BOOSTED_GAIN`, as MeshCore's
+own T-Deck variant has it).
+
+**Without the RF switch the board was all but deaf** (2026-10-14: the
+owner's other MeshCore receiver had a morning of channel messages, the
+board none; `HostMeshStatus()` said 50 packets sent and 1 heard
+overnight, its contacts last heard the day before): the switch was never
+turned to receive, so the radio sent normally and heard only what was
+very close.  lilyphone1 has the same omission.
 
 Changed from lilyphone1 (each a thing its source shows):
 
