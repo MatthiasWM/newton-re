@@ -1,0 +1,2 @@
+GPS Monitor 2.0b9 - runs on all Newton PDAs with NOS 2.0 or higher and supports various interface settings as well as PC-card receivers. It has been developed for checking GPS satellite navigation receivers for compatibility with GPS Map and GPS Map Lite, the powerful moving map based navigation applications for Newton. You can also use the application for monitoring your GPS receivers output and for copying displayed data to the clipboard and to other applications.
+

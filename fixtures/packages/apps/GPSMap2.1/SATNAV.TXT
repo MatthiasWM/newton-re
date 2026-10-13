@@ -1,0 +1,36 @@
+
+            About the Centennial SatNav GPS Card driver...
+            ==============================================
+
+1.  This driver works only with 2.x Newton devices and has only been
+    tested with MP2000
+
+2.  This driver supports only the binary protocol version of the 
+    SatNav card. The NMEA version will be supported by GPS Map 2.0.
+    If you have already a NMEA version you may get a 2.0 beta version.
+
+3.  The driver runs only with GPS Map 1.8.5, GPS Map Lite  1.2.5 or later.
+
+4.  The driver installs as a system extension. You must start it
+    by tapping onto its icon for changing the settings. If you are using
+    a GPS Map (Lite) 2.0 beta you may also select and setup the driver
+    through the GPS Map preferences window (Interface settings).
+
+4.1 Select the hardware interface you want to use. The serial option
+    may be of interest for connecting to an external Rockwell receiver.
+
+4.2 Select the desired update rate. One update per second is fine
+    but needs 2 watts of Newton's batteries. One update per five
+    seconds my be enough and reduces the power consumption to around
+    0.75 watts.
+
+4.3 As the receiver itself has no battery buffered realtime clock it
+    must be initialised with the Universal Time (UTC) by the host
+    computer, otherwise it will need up to 15 minutes for getting
+    the first fix. UTC is the time at zero longitude. The driver uses
+    Newton's system time, the offset time at your location as set
+    within the "Time Zones" application and the summertime setting
+    for that location for automatically calculating UTC. You may
+    check the calculated offset and in unusual cases you may need
+    to correct it.
+
