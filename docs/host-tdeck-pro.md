@@ -546,6 +546,10 @@ maker's own way, all of it:
   `0xD7`, the OTP waveform at the forced temperature `0x79` (0.65 s), **over
   only the rectangle that changed** (PTIN/PTL - the waveform drives every
   pixel it covers: over the whole screen, the whole screen blinked);
+  0x79 is already in the OTP's fastest temperature band - a sweep of
+  `partialTemperature` 0x79 to 0x7F with `tools/tdeck/panelprobe.py`
+  (2026-10-13) passed the test pattern and took 650 ms at every value, so
+  the forced temperature has nothing more to give;
 - **the controller reset (PSR's RST_N) and set up again before every
   refresh**, which GxEPD2's driver for this panel does with the comment
   "needed, reason unknown": without it the first partial refresh after a
