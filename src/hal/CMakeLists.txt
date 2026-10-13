@@ -72,6 +72,25 @@ if(Threads_FOUND)
     target_link_libraries(hal_host_cellular PUBLIC Threads::Threads)
 endif()
 
+# The LoRa mesh engine (host/HostMesh.h): a MeshCore chat node
+# (thirdparty/meshcore) on the radio the host gives it - a board's SX1262,
+# or a desktop's pretend one whose air is a UDP multicast group
+# (HostMeshAir.cpp, newton --mesh-air).  Built as the cellular engine is,
+# without the Newton include paths' sources around it.
+add_library(hal_host_mesh STATIC
+    host/HostMesh.cpp
+    host/HostMeshAir.cpp
+)
+target_link_libraries(hal_host_mesh PUBLIC newton_config hal_host_sockets meshcore)
+target_include_directories(hal_host_mesh PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/host)
+if(Threads_FOUND)
+    target_link_libraries(hal_host_mesh PUBLIC Threads::Threads)
+endif()
+# meshpeer: a node on that air for the Mesh application and the tests to
+# talk to (host/MeshPeer.cpp; tools/mesh/meshrun.py runs nodes together)
+add_executable(meshpeer host/MeshPeer.cpp)
+target_link_libraries(meshpeer PRIVATE hal_host_mesh)
+
 # The serial chips' seam (HALSerialChip.h): the TSerialChip and
 # PSerialChipRegistry protocols and the ROM's registry, PTheSerChipRegistry;
 # the serial tools find their chip here (docs/comms/README.md, "The desktop

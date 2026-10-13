@@ -32,3 +32,16 @@ set_tests_properties(hal.HostCard PROPERTIES TIMEOUT 60)
 add_executable(test_BankControl test_BankControl.cpp)
 target_link_libraries(test_BankControl PRIVATE hal_host)
 add_test(NAME hal.BankControl COMMAND test_BankControl)
+
+# the mesh engine (host/HostMesh.h): two meshpeers on one pretend air - one
+# hears the other's advert, sends it a message, is acknowledged and gets the
+# echo back (tools/mesh/meshrun.py picks the air's port)
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_FOUND)
+    add_test(NAME hal.MeshPeers
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/mesh/meshrun.py --seconds 60
+                     --peer "$<TARGET_FILE:meshpeer> --air lan:{port} --name Echo --echo --seconds 60"
+                     -- $<TARGET_FILE:meshpeer> --air lan:{port} --name Asker --send-to Echo --text hello --until "echo: hello" --seconds 50)
+    set_tests_properties(hal.MeshPeers PROPERTIES TIMEOUT 90
+                         PASS_REGULAR_EXPRESSION "sent delivered.*from Echo: echo: hello|from Echo: echo: hello.*sent delivered")
+endif()

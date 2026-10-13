@@ -3,3 +3,7 @@
 # it matters, frames/PackageNatives.h; anything else falls back on the ARM
 # interpreter).
 add_subdirectory(nie)
+
+# Vendored third-party libraries (each with its licence and provenance):
+# MeshCore and what it needs, for the hosts' LoRa mesh (hal/host/HostMesh.h).
+add_subdirectory(meshcore)
