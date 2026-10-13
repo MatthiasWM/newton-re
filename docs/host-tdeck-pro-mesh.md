@@ -36,14 +36,26 @@ announce itself as a contact; a flood's acknowledgement is waited for
 12 s + 12 airtimes, a direct one's 6 s + 2 airtimes a hop; the Public
 channel (the key every MeshCore node has, `izOH6cXN6mrJ5e26oRXNcg==`); an
 advert ten minutes apart, and one after starting, retuning or the radio
-coming back on.  The presets are lilyphone1's:
+coming back on.
 
-| Preset | MHz | kHz | SF | CR |
-|---|---|---|---|---|
-| **Victoria AU** (the default) | 916.575 | 62.5 | 7 | 8 |
-| Aus / NZ | 915.800 | 250 | 10 | 5 |
-| EU / UK | 869.525 | 250 | 10 | 5 |
-| US / Canada | 910.525 | 250 | 10 | 5 |
+**The radio's settings are values** - frequency, bandwidth, spreading
+factor, coding rate, power, and the mesh's path hash size (bytes of each
+hop's hash in a flood's path, 1-3: MeshCore's network setting, used for
+every flood this node sends) - kept by the engine (`KeptSettings` version
+2) and changeable to anything the radio takes (`HostMeshSetRadio`:
+150-960 MHz, a LoRa bandwidth, SF 5-12, CR 4/5-4/8, -9 to 22 dBm).  **The
+presets only fill them in**: MeshCore's community-suggested settings, the
+list its own apps offer, from https://api.meshcore.nz/api/v1/config
+(`suggested_radio_settings`), kept in `tools/mesh/meshcore-presets.json`
+and made into `src/hal/host/HostMeshPresets.inc` by
+`tools/mesh/meshpresets.py` (`--fetch` to refresh; 26 presets on
+2026-10-13).  The default is **Australia (Narrow)**: 916.575 MHz, 62.5
+kHz, SF 7, CR 4/7.  The status names the preset the settings match, or
+says "Custom".  Version 1 of the kept settings named one of lilyphone1's
+four presets by index: its "Victoria AU" becomes the community's Australia
+(Narrow) (CR 4/7 where lilyphone1 had 4/8 - the coding rate travels in
+each packet's header, so either hears the other), the others keep their
+values exactly.
 
 The radio is set up as lilyphone1's build flags have it: the private sync
 word (0x12), the TCXO on DIO3 at 1.8 V, a 140 mA current limit, the DC-DC
@@ -135,9 +147,24 @@ module (`--cell-port`).  A reMarkable has neither.  ctests
 
 ## Settings
 
-On the Host preferences page (`docs/host-settings.md`): **The LoRa radio
-on** (`loraPower`, where the board can switch it: GPIO 46, kept in NVS as
-`loraOff`) and **Mesh radio** (`meshRegion`, the preset).
+In the Mesh application, as other Newton applications have them: the
+**i** button in its status bar (`protoInfoButton`, @478), whose only item
+is **Prefs** (the application's `DoInfoPrefs`), opens the Mesh
+Preferences slip:
+
+- **Name** - this node's name on the mesh (taken, and announced, when the
+  slip closes);
+- **Preset** - fills in the settings below it; shows which preset they
+  are, or "Custom";
+- **Frequency** (MHz, typed), **Bandwidth**, **Spreading**, **Coding**,
+  **Power** (dBm, typed), **Path hash** - the settings themselves, taken
+  when the slip closes (settings the radio cannot take are told, and left
+  as they were);
+- **The radio on** - where the board can switch it (GPIO 46, kept in NVS
+  as `loraOff`), at once.
+
+They were Host preferences (`loraPower`, `meshRegion`) until 2026-10-13;
+the owner wanted them in the application.
 
 ## The board
 

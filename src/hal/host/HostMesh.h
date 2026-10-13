@@ -78,9 +78,26 @@
 					HostMeshAdvertise()		this node announced now
 					HostMeshSetName(name)	this node's name, announced
 					HostMeshRegions()		the radio presets' names
-					HostMeshRegion()		the one in use (an index)
+					HostMeshRegion()		the one in use (an index), or nil
+											(the radio set otherwise)
 					HostMeshSetRegion(index)
 											the radio retuned to that preset
+					HostMeshRegionSettings(index)
+											a preset's {frequency, bandwidth,
+											spreadingFactor, codingRate,
+											pathHashSize}
+					HostMeshRadio()			the radio's {frequency (MHz, a
+											real), bandwidth (kHz),
+											spreadingFactor, codingRate (5-8),
+											txPower (dBm), pathHashSize (1-3:
+											the mesh's, a flood path's bytes
+											per hop)}
+					HostMeshSetRadio(frame)	the radio set so (==> whether the
+											radio takes it)
+					HostMeshBandwidths()	the bandwidths it takes (kHz)
+					HostMeshPowerSwitchable(), HostMeshPowered(),
+					HostMeshSetPower(on)	the radio's power, where the board
+											can switch it
 */
 
 #ifndef __HOSTMESH_H
@@ -107,6 +124,7 @@ struct HostMeshRadioSettings
 	int		spreadingFactor;
 	int		codingRate;		// 5..8 (4/5 .. 4/8)
 	int		txPower;		// dBm
+	int		pathHashSize;	// (the mesh's, not the radio's: bytes of each hop's hash in a flood's path, 1-3)
 };
 
 // What the host gives the engine (each call from the engine's thread only)
@@ -190,8 +208,17 @@ bool		HostMeshSetName(const char* name);
 
 long		HostMeshRegionCount(void);
 const char*	HostMeshRegionName(long index);
-long		HostMeshRegion(void);
-bool		HostMeshSetRegion(long index);
+long		HostMeshRegion(void);					// the preset the radio is on, or -1 (its own settings)
+bool		HostMeshSetRegion(long index);			// the preset's settings (the power kept)
+bool		HostMeshRegionSettings(long index, HostMeshRadioSettings* settings);	// a preset's (the power left)
+
+// The radio's settings themselves: any the radio takes - 150-960 MHz, one of
+// a LoRa radio's bandwidths (HostMeshBandwidth), SF 5-12, CR 5-8 (4/5-4/8),
+// -9-22 dBm; kept, the radio retuned, this node announced on a new channel
+void		HostMeshGetRadio(HostMeshRadioSettings* settings);
+bool		HostMeshSetRadio(const HostMeshRadioSettings* settings);	// ==> whether they were taken
+long		HostMeshBandwidthCount(void);
+float		HostMeshBandwidth(long index);			// kHz
 
 // The radio's power, which a board can switch (the T-Deck Pro's GPIO 46):
 // the board gives the switch and whether it is on (kept off from before);

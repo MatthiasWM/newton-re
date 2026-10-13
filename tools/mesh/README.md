@@ -28,6 +28,20 @@ By hand, a newton and a peer to talk to:
     build/host/hal/meshpeer --air lan --name Ada --echo --seconds 0
     build/host/host/newton --mesh-air lan --store my.store
 
+## meshpresets.py - the radio's presets
+
+    python tools/mesh/meshpresets.py [--fetch] [--json FILE] [-o FILE]
+
+Makes `src/hal/host/HostMeshPresets.inc`, the engine's table of radio
+presets, from `tools/mesh/meshcore-presets.json`: MeshCore's
+community-suggested radio settings, the list its own apps offer, published
+at https://api.meshcore.nz/api/v1/config (`suggested_radio_settings`).
+`--fetch` refreshes the kept copy from that URL first (and records when).
+One `{name, MHz, kHz, SF, CR, path hash size}` per preset, in the list's
+order; a preset without `network_settings` gets a path hash size of 1,
+MeshCore's default.  Regenerate after a fetch; never edit the `.inc`.
+Standard library only.
+
 ## meshrun.py - nodes run together
 
     python tools/mesh/meshrun.py [--seconds N] [--port P]

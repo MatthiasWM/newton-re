@@ -58,6 +58,7 @@
 
 		folderTab: nil, headerView: nil, listView: nil, threadView: nil, replyLine: nil,
 		sendButton: nil, statusBar: nil,
+		prefsSlip: nil,							// (the Prefs slip, while it is open)
 		replyLines: 1,							// (the lines its text wraps to, as last laid out)
 
 		viewSetupFormScript: func()
@@ -82,6 +83,9 @@
 
 		viewQuitScript: func()
 		begin
+			if prefsSlip and prefsSlip.viewCObject then
+				prefsSlip:Close();
+			prefsSlip := nil;
 			folderTab := headerView := listView := threadView := replyLine := sendButton := statusBar := nil;
 		end,
 
@@ -357,6 +361,295 @@
 			if HostMeshAdvertise() then
 				GetRoot():Notify(3, "Mesh", "Announced as " & (HostMeshStatus()).name & ".");
 		end,
+
+		/*------------------------------------------------------------------
+			The Prefs slip (the "i" button's Prefs, as other applications
+			have): this node's name, the radio's preset, and its power
+			where the board can switch it - each taken as it is changed,
+			the name when the slip is closed (a name set is announced)
+		------------------------------------------------------------------*/
+
+		DoInfoPrefs: func()
+		begin
+			if prefsSlip and prefsSlip.viewCObject then begin
+				prefsSlip:Close();
+				prefsSlip := nil;
+				return nil;
+			end;
+			local box := :GlobalBox();
+			local width := Min(box.right - box.left - 12, 260);
+			local switchable := HostMeshPowerSwitchable();
+			local height := 230 + (if switchable then 20 else 0);
+			height := Min(height, box.bottom - box.top - 8);
+			prefsSlip := BuildContext({_proto: prefsTemplate, meshApp: self, switchable: switchable,
+				viewBounds: RelBounds(box.left + (box.right - box.left - width) div 2,
+					box.top + (box.bottom - box.top - height) div 2, width, height)});
+			prefsSlip:Open();
+		end,
+
+		// The Prefs slip: the node's name; a preset, which fills in the
+		// radio's settings below it (MeshCore's community presets:
+		// HostMeshRegions); the settings themselves - frequency, bandwidth,
+		// spreading factor, coding rate, power, and the mesh's path hash
+		// size - each changeable by hand, the preset then saying which one
+		// they are ("Custom" when none); the radio's power where the board
+		// can switch it.  The name and the radio's settings are taken when
+		// the slip is closed (settings the radio cannot take are told, and
+		// left as they were); the power at once.
+		prefsTemplate: {
+			_proto: @179,						// protoFloatNGo
+			meshApp: nil,
+			switchable: nil,
+			theSlip: nil,
+			nameShown: nil,						// (the name when the slip opened)
+			radio: nil,							// (the settings as they are being changed)
+			kRow: 20,
+			viewSetupFormScript: func()
+			begin
+				theSlip := self;
+				local status := HostMeshStatus();
+				nameShown := if status and status.name then status.name else "";
+				radio := HostMeshRadio();
+				if not radio then
+					radio := {frequency: 916.575, bandwidth: 62.5, spreadingFactor: 7, codingRate: 7, txPower: 22, pathHashSize: 1};
+				inherited:?viewSetupFormScript();
+			end,
+			viewSetupDoneScript: func()
+			begin
+				inherited:?viewSetupDoneScript();
+				foreach v in :ChildViewFrames() do
+					if v.role then
+						self.(v.role) := v;
+			end,
+			viewQuitScript: func()
+			begin
+				local name := if nameLine then TrimString(Clone(nameLine.entryLine.text));
+				if name and StrLen(name) > 0 and not StrEqual(name, nameShown) then
+					HostMeshSetName(name);
+				:TakeTyped();
+				if :RadioChanged() and not HostMeshSetRadio(radio) then
+					GetRoot():Notify(3, "Mesh", "The radio cannot be set so: the frequency must be 150 to 960 MHz, the power -9 to 22 dBm. Its settings are as they were.");
+				if meshApp then begin
+					meshApp.prefsSlip := nil;
+					meshApp:Redraw();
+					// (again once the engine has the new settings: the list's foot)
+					local app := meshApp;
+					AddDelayedCall(func() if app.viewCObject then app:Redraw(), [], 1000);
+				end;
+				nameLine := presetPicker := frequencyLine := bandwidthPicker := spreadingPicker := codingPicker := powerLine := hashPicker := nil;
+				inherited:?viewQuitScript();
+			end,
+			nameLine: nil, presetPicker: nil, frequencyLine: nil, bandwidthPicker: nil, spreadingPicker: nil,
+			codingPicker: nil, powerLine: nil, hashPicker: nil,
+
+			// a number's text with no more decimals than it needs (at most places)
+			NumText: func(x, places)
+			begin
+				local s := FormattedNumberStr(x, "%." & NumberStr(places) & "f");
+				if StrPos(s, ".", 0) then begin
+					while EndsWith(s, "0") do
+						s := SubStr(s, 0, StrLen(s) - 1);
+					if EndsWith(s, ".") then
+						s := SubStr(s, 0, StrLen(s) - 1);
+				end;
+				s;
+			end,
+
+			// the preset the settings are, or nil
+			PresetIndex: func()
+			begin
+				local names := HostMeshRegions();
+				if names then
+					foreach i, n in names do begin
+						local p := HostMeshRegionSettings(i);
+						if p and Abs(p.frequency - radio.frequency) < 0.0005 and Abs(p.bandwidth - radio.bandwidth) < 0.01
+							and p.spreadingFactor = radio.spreadingFactor and p.codingRate = radio.codingRate
+							and p.pathHashSize = radio.pathHashSize then
+							return i;
+					end;
+				nil;
+			end,
+			PresetText: func()
+			begin
+				local i := :PresetIndex();
+				if i then HostMeshRegions()[i] else "Custom";
+			end,
+
+			// the typed frequency and power taken into the settings (left as
+			// they were when they do not read as numbers)
+			TakeTyped: func()
+			begin
+				local n;
+				if frequencyLine and (n := StringToNumber(frequencyLine.entryLine.text)) then
+					radio.frequency := n;
+				if powerLine and (n := StringToNumber(powerLine.entryLine.text)) then
+					radio.txPower := RIntToL(n);
+			end,
+
+			RadioChanged: func()
+			begin
+				local now := HostMeshRadio();
+				now and (Abs(now.frequency - radio.frequency) >= 0.0005 or Abs(now.bandwidth - radio.bandwidth) >= 0.01
+					or now.spreadingFactor <> radio.spreadingFactor or now.codingRate <> radio.codingRate
+					or now.txPower <> radio.txPower or now.pathHashSize <> radio.pathHashSize);
+			end,
+
+			// every line and picker showing the settings (after a preset)
+			ShowRadio: func()
+			begin
+				if frequencyLine then SetValue(frequencyLine.entryLine, 'text, :NumText(radio.frequency, 3));
+				if powerLine then SetValue(powerLine.entryLine, 'text, NumberStr(radio.txPower));
+				foreach picker in [bandwidthPicker, spreadingPicker, codingPicker, hashPicker] do
+					if picker then picker:UpdateText(picker:TextSetup());
+				:ShowPreset();
+			end,
+			ShowPreset: func()
+				if presetPicker then presetPicker:UpdateText(:PresetText()),
+
+			stepChildren: [
+				{_proto: @218,					// protoStaticText
+				 viewBounds: {left: 10, top: 6, right: -10, bottom: 22}, viewJustify: 48,
+				 viewFont: 1058816, text: "Mesh Preferences"},
+				{_proto: @189,					// protoLabelInputLine
+				 role: 'nameLine,
+				 viewBounds: {left: 10, top: 24, right: -10, bottom: 44}, viewJustify: 48,
+				 label: "Name", labelFont: 1058816, entryFont: 10240, indent: 76,
+				 TextSetup: func() Clone(theSlip.nameShown)},
+				{_proto: @190,					// protoLabelPicker
+				 role: 'presetPicker,
+				 viewBounds: {left: 10, top: 52, right: -10, bottom: 68}, viewJustify: 48,
+				 text: "Preset", indent: 76,
+				 labelCommands: [""],
+				 viewSetupFormScript: func()
+				 begin
+					labelCommands := HostMeshRegions();
+					if not labelCommands or Length(labelCommands) = 0 then
+						labelCommands := [""];
+					inherited:?viewSetupFormScript();
+				 end,
+				 TextSetup: func() theSlip:PresetText(),
+				 // (a preset fills the settings in; the power is left)
+				 LabelActionScript: func(index)
+				 begin
+					local p := HostMeshRegionSettings(index);
+					if p then begin
+						foreach slot, value in p do
+							theSlip.radio.(slot) := value;
+						theSlip:ShowRadio();
+					end;
+				 end},
+				{_proto: @189,					// protoLabelInputLine
+				 role: 'frequencyLine,
+				 viewBounds: {left: 10, top: 70, right: -40, bottom: 90}, viewJustify: 48,
+				 label: "Frequency", labelFont: 1058816, entryFont: 10240, indent: 76,
+				 entryFlags: 0x2A01,			// (numbers and punctuation)
+				 TextSetup: func() theSlip:NumText(theSlip.radio.frequency, 3),
+				 textChanged: func()
+				 begin
+					inherited:?textChanged();
+					theSlip:TakeTyped();
+					theSlip:ShowPreset();
+				 end},
+				{_proto: @218,					// protoStaticText (the frequency's unit)
+				 viewBounds: {left: -36, top: 74, right: -8, bottom: 90}, viewJustify: 32, text: "MHz"},
+				{_proto: @190,					// protoLabelPicker
+				 role: 'bandwidthPicker,
+				 viewBounds: {left: 10, top: 98, right: -10, bottom: 114}, viewJustify: 48,
+				 text: "Bandwidth", indent: 76,
+				 labelCommands: [""],
+				 bandwidths: nil,
+				 viewSetupFormScript: func()
+				 begin
+					bandwidths := HostMeshBandwidths();
+					if not bandwidths or Length(bandwidths) = 0 then
+						bandwidths := [62.5];
+					labelCommands := foreach b in bandwidths collect theSlip:NumText(b, 2) & " kHz";
+					inherited:?viewSetupFormScript();
+				 end,
+				 TextSetup: func() theSlip:NumText(theSlip.radio.bandwidth, 2) & " kHz",
+				 LabelActionScript: func(index)
+				 begin
+					theSlip.radio.bandwidth := bandwidths[index];
+					theSlip:ShowPreset();
+				 end},
+				{_proto: @190,					// protoLabelPicker
+				 role: 'spreadingPicker,
+				 viewBounds: {left: 10, top: 120, right: -10, bottom: 136}, viewJustify: 48,
+				 text: "Spreading", indent: 76,
+				 labelCommands: ["5", "6", "7", "8", "9", "10", "11", "12"],
+				 TextSetup: func() NumberStr(theSlip.radio.spreadingFactor),
+				 LabelActionScript: func(index)
+				 begin
+					theSlip.radio.spreadingFactor := index + 5;
+					theSlip:ShowPreset();
+				 end},
+				{_proto: @190,					// protoLabelPicker
+				 role: 'codingPicker,
+				 viewBounds: {left: 10, top: 142, right: -10, bottom: 158}, viewJustify: 48,
+				 text: "Coding", indent: 76,
+				 labelCommands: ["4/5", "4/6", "4/7", "4/8"],
+				 TextSetup: func() "4/" & NumberStr(theSlip.radio.codingRate),
+				 LabelActionScript: func(index)
+				 begin
+					theSlip.radio.codingRate := index + 5;
+					theSlip:ShowPreset();
+				 end},
+				{_proto: @189,					// protoLabelInputLine
+				 role: 'powerLine,
+				 viewBounds: {left: 10, top: 160, right: -40, bottom: 180}, viewJustify: 48,
+				 label: "Power", labelFont: 1058816, entryFont: 10240, indent: 76,
+				 entryFlags: 0x2A01,			// (numbers and punctuation)
+				 TextSetup: func() NumberStr(theSlip.radio.txPower),
+				 textChanged: func()
+				 begin
+					inherited:?textChanged();
+					theSlip:TakeTyped();
+				 end},
+				{_proto: @218,					// protoStaticText (the power's unit)
+				 viewBounds: {left: -36, top: 164, right: -8, bottom: 180}, viewJustify: 32, text: "dBm"},
+				{_proto: @190,					// protoLabelPicker
+				 role: 'hashPicker,
+				 viewBounds: {left: 10, top: 188, right: -10, bottom: 204}, viewJustify: 48,
+				 text: "Path hash", indent: 76,
+				 labelCommands: ["1 byte", "2 bytes", "3 bytes"],
+				 TextSetup: func() labelCommands[Max(0, Min(2, theSlip.radio.pathHashSize - 1))],
+				 LabelActionScript: func(index)
+				 begin
+					theSlip.radio.pathHashSize := index + 1;
+					theSlip:ShowPreset();
+				 end},
+				{_proto: @164,					// protoCheckbox
+				 role: 'powerBox,
+				 viewBounds: {left: 10, top: 208, right: -10, bottom: 226}, viewJustify: 48,
+				 text: "The radio on",
+				 buttonValue: true,
+				 viewValue: nil,
+				 viewSetupFormScript: func()
+				 begin
+					// (only where the board can switch the radio)
+					if not theSlip.switchable then
+						viewFlags := BAnd(viewFlags, BNot(1));
+					viewValue := HostMeshPowered();
+					inherited:?viewSetupFormScript();
+				 end,
+				 valueChanged: func()
+				 begin
+					if not HostMeshSetPower(viewValue) then
+						SetValue(self, 'viewValue, HostMeshPowered());
+				 end},
+				{_proto: @218,					// protoStaticText
+				 viewBounds: {left: 10, top: -22, right: -40, bottom: -6}, viewJustify: 176,
+				 viewFont: 9216,
+				 text: "",
+				 viewSetupFormScript: func()
+				 begin
+					local status := HostMeshStatus();
+					text := if status and status.id then "This node: " & status.id else "";
+					inherited:?viewSetupFormScript();
+				 end},
+				{_proto: @166}					// protoClosebox
+			]
+		},
 
 		viewScrollUpScript: func()
 		begin
@@ -658,11 +951,13 @@
 				buttonClickScript: func() :Parent():SendTyped()
 			},
 
-			// the status bar: New, All, Announce; the close box
+			// the status bar: the "i" button (Prefs), New, All, Announce;
+			// the close box
 			{
 				_proto: @73,						// protoStatusBar
 				role: 'statusBar,
 				menuLeftButtons: [
+					{_proto: @478},					// protoInfoButton (DoInfoPrefs)
 					{_proto: @226, text: "New", buttonClickScript: func() base:Compose()},
 					{_proto: @226, text: "All", buttonClickScript: func() base:ShowList()},
 					{_proto: @226, text: "Announce", buttonClickScript: func() base:Announce()}

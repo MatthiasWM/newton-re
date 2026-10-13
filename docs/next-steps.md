@@ -52,8 +52,9 @@ the way are all in `docs/work-log.md`.
 ported from lilyphone1) with a desktop's pretend air (`newton --mesh-air`,
 `meshpeer`, ctest `hal.MeshPeers`); the natives and the Mesh application
 (`comms/host/HostMesh.ns`, ctests `host.NewtonMesh.<size>`); the board's
-SX1262 (`tdeck_lora.cpp`), set up as lilyphone1's Victoria AU preset; the
-Host settings "The LoRa radio on" and "Mesh radio".  On the board: up,
+SX1262 (`tdeck_lora.cpp`); the radio's settings as values, MeshCore's
+community presets filling them in (`tools/mesh/meshpresets.py`), in the
+Mesh application's Prefs (its "i" button) with the radio's power.  On the board: up,
 announcing, switched off and on.  Next: a message with a real node on the
 board (the owner's other MeshCore devices); then the WiFi companion
 (MeshCore's companion protocol on TCP 5000) if wanted.

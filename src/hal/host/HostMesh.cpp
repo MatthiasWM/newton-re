@@ -24,6 +24,7 @@
 #include <mutex>
 #include <random>
 #include <thread>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -37,26 +38,44 @@ extern "C" void esp_fill_random(void* buf, size_t len);
 
 
 // ----------------------------------------------------------------------
-// The presets (lilyphone1's): the wide ones are what the MeshCore
-// community publishes per region; the narrow one is what the mesh in
-// Victoria runs - all four settings have to match a mesh's to hear it.
+// The presets: MeshCore's community-suggested radio settings, the list its
+// own apps offer (HostMeshPresets.inc, made by tools/mesh/meshpresets.py) -
+// the frequency, bandwidth and spreading factor have to match a mesh's to
+// hear it (the coding rate travels in each packet's header).  A preset only
+// fills the settings in: they are kept as values, and may be set to any the
+// radio takes (HostMeshSetRadio).
 
 struct Preset
 {
 	const char*		name;
 	float			frequency, bandwidth;
 	int				spreadingFactor, codingRate;
+	int				pathHashSize;
 };
 
 static const Preset kPresets[] =
 {
-	{ "Victoria AU",	916.575f,	62.5f,	7,	8 },
-	{ "Aus / NZ",		915.800f,	250.0f,	10,	5 },
-	{ "EU / UK",		869.525f,	250.0f,	10,	5 },
-	{ "US / Canada",	910.525f,	250.0f,	10,	5 },
+#include "HostMeshPresets.inc"
 };
 const long		kPresetCount = (long) (sizeof(kPresets) / sizeof(kPresets[0]));
+static const char	kDefaultPreset[] = "Australia (Narrow)";	// (the owner's mesh; else the first)
+
+// version 1 of the kept settings named one of these presets (lilyphone1's)
+// by its index; its settings are taken over as they were, except that its
+// narrow Australian one becomes the community's (CR 4/7 rather than 4/8)
+static const Preset kVersion1Presets[] =
+{
+	{ "Australia (Narrow)",	916.575f,	62.5f,	7,	8,	1 },
+	{ "Aus / NZ",			915.800f,	250.0f,	10,	5,	1 },
+	{ "EU / UK",			869.525f,	250.0f,	10,	5,	1 },
+	{ "US / Canada",		910.525f,	250.0f,	10,	5,	1 },
+};
 const int		kTxPowerMax = 22;
+const int		kTxPowerMin = -9;			// (the SX1262's range, dBm)
+
+// the bandwidths a LoRa radio takes (the SX126x's), kHz
+static const float	kBandwidths[] = { 7.8f, 10.4f, 15.6f, 20.8f, 31.25f, 41.7f, 62.5f, 125.0f, 250.0f, 500.0f };
+const long			kBandwidthCount = (long) (sizeof(kBandwidths) / sizeof(kBandwidths[0]));
 
 // Every MeshCore node has the same key for the public channel: it is the
 // open conversation on the frequency, not a secret
@@ -181,7 +200,8 @@ static long						gNextSendId = 1;
 static bool					gAdvertAsked = false;
 static bool					gNameAsked = false;
 static char					gNameWanted[kHostMeshNameSize];
-static long					gRegionWanted = -1;
+static bool					gRadioAsked = false;
+static HostMeshRadioSettings	gRadioWanted;
 
 // the power
 static bool					(*gPowerSwitch)(bool on) = NULL;
@@ -247,10 +267,17 @@ struct KeptSettings
 {
 	uint32_t	version;
 	char		name[kHostMeshNameSize];
-	int32_t		region;
+	int32_t		region;				// (version 1's preset: read, then kept as -1)
 	int32_t		txPower;
+	// version 2: the radio's settings themselves (a preset only fills them in)
+	float		frequency;			// MHz
+	float		bandwidth;			// kHz
+	int32_t		spreadingFactor;
+	int32_t		codingRate;
+	int32_t		pathHashSize;		// the mesh's: bytes of each hop's hash in a flood's path
 };
-const uint32_t	kSettingsVersion = 1;
+const uint32_t	kSettingsVersion = 2;
+const long		kSettingsVersion1Size = 4 + kHostMeshNameSize + 4 + 4;
 
 // a contact as kept: MeshCore's ContactInfo without its cached secret or
 // its route (learnt again: the first message to it floods), the newest
@@ -499,7 +526,18 @@ public:
 	{
 		mesh::Packet* advert = createSelfAdvert(gSettings.name);
 		if (advert != NULL)
-			sendFlood(advert);
+			sendFlood(advert, 0, (uint8_t) gSettings.pathHashSize);
+	}
+
+	// floods with the mesh's path hash size (a preset's network setting)
+	void sendFloodScoped(const ContactInfo&, mesh::Packet* pkt, uint32_t delay_millis) override
+	{
+		sendFlood(pkt, delay_millis, (uint8_t) gSettings.pathHashSize);
+	}
+
+	void sendFloodScoped(const mesh::GroupChannel&, mesh::Packet* pkt, uint32_t delay_millis) override
+	{
+		sendFlood(pkt, delay_millis, (uint8_t) gSettings.pathHashSize);
 	}
 
 	// each send waiting for its turn, its acknowledgement or its timeout
@@ -600,9 +638,68 @@ static SimpleMeshTables	gTables;
 static HostMeshRadioSettings
 RadioSettings(void)
 {
-	const Preset& p = kPresets[gSettings.region];
-	HostMeshRadioSettings r = { p.frequency, p.bandwidth, p.spreadingFactor, p.codingRate, (int) gSettings.txPower };
+	HostMeshRadioSettings r = { gSettings.frequency, gSettings.bandwidth, (int) gSettings.spreadingFactor,
+								(int) gSettings.codingRate, (int) gSettings.txPower, (int) gSettings.pathHashSize };
 	return r;
+}
+
+
+// the preset these settings are (the frequency to the kHz), or -1
+static long
+PresetOf(const HostMeshRadioSettings& r)
+{
+	for (long k = 0; k < kPresetCount; k++)
+		if (fabsf(kPresets[k].frequency - r.frequency) < 0.0005f && fabsf(kPresets[k].bandwidth - r.bandwidth) < 0.01f
+		 && kPresets[k].spreadingFactor == r.spreadingFactor && kPresets[k].codingRate == r.codingRate
+		 && kPresets[k].pathHashSize == r.pathHashSize)
+			return k;
+	return -1;
+}
+
+
+// whether the radio takes these: 150-960 MHz (the SX1262's), one of a LoRa
+// radio's bandwidths, SF 5-12, CR 4/5-4/8, -9-22 dBm (and a path hash of 1-3
+// bytes, MeshCore's)
+static bool
+RadioValid(const HostMeshRadioSettings& r)
+{
+	bool bandwidth = false;
+	for (long k = 0; k < kBandwidthCount; k++)
+		if (fabsf(kBandwidths[k] - r.bandwidth) < 0.01f)
+			bandwidth = true;
+	return bandwidth && r.frequency >= 150.0f && r.frequency <= 960.0f
+		&& r.spreadingFactor >= 5 && r.spreadingFactor <= 12 && r.codingRate >= 5 && r.codingRate <= 8
+		&& r.txPower >= kTxPowerMin && r.txPower <= kTxPowerMax && r.pathHashSize >= 1 && r.pathHashSize <= 3;
+}
+
+
+static void
+UsePreset(const Preset& p)
+{
+	gSettings.frequency = p.frequency;
+	gSettings.bandwidth = p.bandwidth;
+	gSettings.spreadingFactor = p.spreadingFactor;
+	gSettings.codingRate = p.codingRate;
+	gSettings.pathHashSize = p.pathHashSize;
+}
+
+
+static const Preset&
+DefaultPreset(void)
+{
+	for (long k = 0; k < kPresetCount; k++)
+		if (strcmp(kPresets[k].name, kDefaultPreset) == 0)
+			return kPresets[k];
+	return kPresets[0];
+}
+
+
+// what the status says the radio is on: its preset's name, or "Custom"
+static const char*
+RadioName(const HostMeshRadioSettings& r)
+{
+	long k = PresetOf(r);
+	return k >= 0 ? kPresets[k].name : "Custom";
 }
 
 
@@ -618,7 +715,7 @@ StatusRadio(void)
 {
 	std::lock_guard<std::mutex> hold(gLock);
 	gStatus.radio = RadioSettings();
-	CopyUTF8(gStatus.region, kPresets[gSettings.region].name, sizeof(gStatus.region));
+	CopyUTF8(gStatus.region, RadioName(gStatus.radio), sizeof(gStatus.region));
 	CopyUTF8(gStatus.name, gSettings.name, sizeof(gStatus.name));
 }
 
@@ -636,16 +733,34 @@ HostMeshRun(const HostMeshPlatform* platform)
 	// the settings
 	memset(&gSettings, 0, sizeof(gSettings));
 	long size = sizeof(gSettings);
-	if (!platform->load(platform->ref, "settings", &gSettings, &size) || size != (long) sizeof(gSettings) || gSettings.version != kSettingsVersion)
+	bool loaded = platform->load(platform->ref, "settings", &gSettings, &size);
+	if (loaded && size == kSettingsVersion1Size && gSettings.version == 1)
+	{
+		// version 1 kept a preset: its settings filled in
+		long k = gSettings.region;
+		if (k == 0 || k < 0 || k >= (long) (sizeof(kVersion1Presets) / sizeof(kVersion1Presets[0])))
+			UsePreset(DefaultPreset());
+		else
+			UsePreset(kVersion1Presets[k]);
+		gSettings.version = kSettingsVersion;
+		gSettings.region = -1;
+		SaveSettings();
+	}
+	else if (!loaded || size != (long) sizeof(gSettings) || gSettings.version != kSettingsVersion)
 	{
 		memset(&gSettings, 0, sizeof(gSettings));
 		gSettings.version = kSettingsVersion;
 		CopyUTF8(gSettings.name, platform->defaultName != NULL ? platform->defaultName : "Newton", sizeof(gSettings.name));
-		gSettings.region = 0;
+		gSettings.region = -1;
 		gSettings.txPower = kTxPowerMax;
+		UsePreset(DefaultPreset());
 	}
-	if (gSettings.region < 0 || gSettings.region >= kPresetCount)
-		gSettings.region = 0;
+	if (!RadioValid(RadioSettings()))
+	{
+		UsePreset(DefaultPreset());
+		if (gSettings.txPower < kTxPowerMin || gSettings.txPower > kTxPowerMax)
+			gSettings.txPower = kTxPowerMax;
+	}
 
 	static StaticPoolPacketManager* manager = new StaticPoolPacketManager(16);
 	HostMeshNode* node = new HostMeshNode(*platform->radio, gMillis, gRNG, gRTC, *manager, gTables);
@@ -680,8 +795,8 @@ HostMeshRun(const HostMeshPlatform* platform)
 		std::lock_guard<std::mutex> hold(gLock);
 		gStatus.state = gPowered ? kHostMeshOn : kHostMeshOff;
 	}
-	fprintf(stderr, "[mesh] up as \"%s\" (%.8s), %s: %.3f MHz bw %.1f sf %d cr %d%s\n", gSettings.name, gStatus.key,
-			kPresets[gSettings.region].name, radio.frequency, radio.bandwidth, radio.spreadingFactor, radio.codingRate,
+	fprintf(stderr, "[mesh] up as \"%s\" (%.8s), %s: %.3f MHz bw %.2f sf %d cr %d %d dBm hash %d%s\n", gSettings.name, gStatus.key,
+			RadioName(radio), radio.frequency, radio.bandwidth, radio.spreadingFactor, radio.codingRate, radio.txPower, radio.pathHashSize,
 			gPowered ? (radioUp ? "" : " - the radio would not start") : " - the radio is off");
 
 	unsigned long nextAdvert = NowMs() + kFirstAdvertMs;
@@ -716,8 +831,8 @@ HostMeshRun(const HostMeshPlatform* platform)
 		}
 
 		// the requests
-		bool advert = false, rename = false;
-		long region = -1;
+		bool advert = false, rename = false, retune = false;
+		HostMeshRadioSettings wanted;
 		char name[kHostMeshNameSize];
 		{
 			std::lock_guard<std::mutex> hold(gLock);
@@ -726,8 +841,9 @@ HostMeshRun(const HostMeshPlatform* platform)
 			rename = gNameAsked;
 			gNameAsked = false;
 			memcpy(name, gNameWanted, sizeof(name));
-			region = gRegionWanted;
-			gRegionWanted = -1;
+			retune = gRadioAsked;
+			gRadioAsked = false;
+			wanted = gRadioWanted;
 		}
 		if (rename)
 		{
@@ -736,15 +852,24 @@ HostMeshRun(const HostMeshPlatform* platform)
 			StatusRadio();
 			advert = true;
 		}
-		if (region >= 0 && region < kPresetCount && region != gSettings.region)
+		if (retune && RadioValid(wanted))
 		{
-			gSettings.region = (int32_t) region;
+			HostMeshRadioSettings was = RadioSettings();
+			gSettings.frequency = wanted.frequency;
+			gSettings.bandwidth = wanted.bandwidth;
+			gSettings.spreadingFactor = wanted.spreadingFactor;
+			gSettings.codingRate = wanted.codingRate;
+			gSettings.txPower = wanted.txPower;
+			gSettings.pathHashSize = wanted.pathHashSize;
 			SaveSettings();
 			StatusRadio();
 			radio = RadioSettings();
 			platform->radioStart(platform->ref, &radio);
-			fprintf(stderr, "[mesh] %s: %.3f MHz bw %.1f sf %d cr %d\n", kPresets[region].name, radio.frequency, radio.bandwidth, radio.spreadingFactor, radio.codingRate);
-			advert = true;										// nobody there has heard this node
+			fprintf(stderr, "[mesh] %s: %.3f MHz bw %.2f sf %d cr %d %d dBm hash %d\n", RadioName(radio), radio.frequency, radio.bandwidth,
+					radio.spreadingFactor, radio.codingRate, radio.txPower, radio.pathHashSize);
+			if (was.frequency != radio.frequency || was.bandwidth != radio.bandwidth
+			 || was.spreadingFactor != radio.spreadingFactor || was.codingRate != radio.codingRate)
+				advert = true;									// nobody there has heard this node
 		}
 
 		node->CheckSends();
@@ -909,25 +1034,69 @@ HostMeshRegionName(long index)
 }
 
 
+bool
+HostMeshRegionSettings(long index, HostMeshRadioSettings* settings)
+{
+	if (index < 0 || index >= kPresetCount)
+		return false;
+	settings->frequency = kPresets[index].frequency;
+	settings->bandwidth = kPresets[index].bandwidth;
+	settings->spreadingFactor = kPresets[index].spreadingFactor;
+	settings->codingRate = kPresets[index].codingRate;
+	settings->pathHashSize = kPresets[index].pathHashSize;
+	return true;
+}
+
+
 long
 HostMeshRegion(void)
 {
 	std::lock_guard<std::mutex> hold(gLock);
-	for (long k = 0; k < kPresetCount; k++)
-		if (strcmp(gStatus.region, kPresets[k].name) == 0)
-			return k;
-	return 0;
+	return PresetOf(gStatus.radio);
 }
 
 
 bool
 HostMeshSetRegion(long index)
 {
-	if (!HostMeshStarted() || index < 0 || index >= kPresetCount)
+	HostMeshRadioSettings r;
+	HostMeshGetRadio(&r);
+	return HostMeshRegionSettings(index, &r) && HostMeshSetRadio(&r);
+}
+
+
+void
+HostMeshGetRadio(HostMeshRadioSettings* settings)
+{
+	std::lock_guard<std::mutex> hold(gLock);
+	*settings = gStatus.radio;
+}
+
+
+long
+HostMeshBandwidthCount(void)
+{
+	return kBandwidthCount;
+}
+
+
+float
+HostMeshBandwidth(long index)
+{
+	return index >= 0 && index < kBandwidthCount ? kBandwidths[index] : 0;
+}
+
+
+bool
+HostMeshSetRadio(const HostMeshRadioSettings* settings)
+{
+	if (!HostMeshStarted() || settings == NULL || !RadioValid(*settings))
 		return false;
 	std::lock_guard<std::mutex> hold(gLock);
-	gRegionWanted = index;
-	CopyUTF8(gStatus.region, kPresets[index].name, sizeof(gStatus.region));	// (as the natives will read it)
+	gRadioWanted = *settings;
+	gRadioAsked = true;
+	gStatus.radio = *settings;									// (as the natives will read it)
+	CopyUTF8(gStatus.region, RadioName(*settings), sizeof(gStatus.region));
 	gWake.notify_one();
 	return true;
 }

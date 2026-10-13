@@ -14,7 +14,6 @@
 #include "HostWindow.h"
 #include "hal/host/HostIRChip.h"
 #include "hal/host/HostCellular.h"
-#include "hal/host/HostMesh.h"
 #include "hal/host/HostSerialChip.h"
 #include "NewtWorld.h"
 #include "Frames.h"
@@ -214,22 +213,8 @@ FHostSettingsList(RefArg /*rcvr*/)
 		AddArraySlot(list, RefVar(Item("docking", "Dock over the network", kCheck, HostSerialChipListening())));
 	if (HostCellularPowerSwitchable())
 		AddArraySlot(list, RefVar(Item("cellPower", "The 4G module on", kCheck, HostCellularPowered())));
-	// the LoRa mesh node (hal/host/HostMesh.h): its radio's power, which a
-	// board can switch, and the preset it is tuned to
-	if (HostMeshPowerSwitchable())
-		AddArraySlot(list, RefVar(Item("loraPower", "The LoRa radio on", kCheck, HostMeshPowered())));
-	if (HostMeshStarted())
-	{
-		RefVar item(Item("meshRegion", "Mesh radio", kChoice, HostMeshRegion()));
-		const char* names[16];
-		long count = HostMeshRegionCount();
-		if (count > 16)
-			count = 16;
-		for (long k = 0; k < count; k++)
-			names[k] = HostMeshRegionName(k);
-		Choices(item, names, (int) count);
-		AddArraySlot(list, item);
-	}
+	// (the LoRa mesh node's settings - its radio's power and preset, its
+	// name - are the Mesh application's Prefs: comms/host/HostMesh.ns)
 	if (HostWindowOption("waveform", &value))
 	{
 		RefVar item(Item("waveform", "Ink", kChoice, value));
@@ -348,16 +333,6 @@ FHostSetSetting(RefArg /*rcvr*/, RefArg setting, RefArg value)
 		fprintf(stderr, "[host] the 4G module %s%s\n", on ? "on" : "off", taken ? "" : " - it could not be switched");
 		return MAKEBOOLEAN(taken);
 	}
-	if (strcmp(name, "loraPower") == 0)
-	{
-		if (!HostMeshPowerSwitchable())
-			return NILREF;
-		bool taken = HostMeshSetPower(on);
-		fprintf(stderr, "[host] the LoRa radio %s%s\n", on ? "on" : "off", taken ? "" : " - it could not be switched");
-		return MAKEBOOLEAN(taken);
-	}
-	if (strcmp(name, "meshRegion") == 0)
-		return MAKEBOOLEAN(ISINT(value) && HostMeshSetRegion(RINT(value)));
 	if (strcmp(name, "waveform") == 0)
 		return MAKEBOOLEAN(ISINT(value) && HostWindowSetOption("waveform", RINT(value)));
 	if (strcmp(name, "screenScale") == 0)

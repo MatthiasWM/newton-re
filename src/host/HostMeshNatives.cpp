@@ -14,6 +14,8 @@
 #include "Frames.h"
 #include "ObjectHeap.h"
 #include "Interpreter.h"
+#include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 const long	kSecondsFrom1904To1970 = 2082844800L;
@@ -163,7 +165,8 @@ FHostMeshRegions(RefArg /*rcvr*/)
 static Ref
 FHostMeshRegion(RefArg /*rcvr*/)
 {
-	return HostMeshStarted() ? MAKEINT(HostMeshRegion()) : NILREF;
+	long index = HostMeshStarted() ? HostMeshRegion() : -1;
+	return index >= 0 ? MAKEINT(index) : NILREF;
 }
 
 
@@ -171,6 +174,124 @@ static Ref
 FHostMeshSetRegion(RefArg /*rcvr*/, RefArg index)
 {
 	return ISINT(index) && HostMeshSetRegion(RINT(index)) ? TRUEREF : NILREF;
+}
+
+
+// a radio's settings as a frame: {frequency (MHz, a real), bandwidth (kHz,
+// a real), spreadingFactor, codingRate, txPower} (a preset's have no
+// txPower)
+static Ref
+RadioFrame(const HostMeshRadioSettings& r, bool power)
+{
+	RefVar frame(AllocateFrame());
+	// (to the kHz, so that 916.575 reads back as itself, not 916.57501...)
+	SetSlot(frame, "frequency", RefVar(MakeReal(floor(r.frequency * 1000.0 + 0.5) / 1000.0)));
+	SetSlot(frame, "bandwidth", RefVar(MakeReal(floor(r.bandwidth * 100.0 + 0.5) / 100.0)));
+	SetSlot(frame, "spreadingFactor", RefVar(MAKEINT(r.spreadingFactor)));
+	SetSlot(frame, "codingRate", RefVar(MAKEINT(r.codingRate)));
+	SetSlot(frame, "pathHashSize", RefVar(MAKEINT(r.pathHashSize)));
+	if (power)
+		SetSlot(frame, "txPower", RefVar(MAKEINT(r.txPower)));
+	return frame;
+}
+
+
+// a number slot of a frame (an integer or a real), or nil
+static bool
+NumberSlot(RefArg frame, const char* name, double* value)
+{
+	RefVar v(GetFrameSlot(frame, RefVar(Intern((char*) name))));
+	if (ISINT(v))
+		*value = (double) RINT(v);
+	else if (NOTNIL(v) && IsReal(v))
+		*value = CoerceToDouble(v);
+	else
+		return false;
+	return true;
+}
+
+
+static Ref
+FHostMeshRegionSettings(RefArg /*rcvr*/, RefArg index)
+{
+	HostMeshRadioSettings r;
+	if (!ISINT(index) || !HostMeshRegionSettings(RINT(index), &r))
+		return NILREF;
+	return RadioFrame(r, false);
+}
+
+
+static Ref
+FHostMeshRadio(RefArg /*rcvr*/)
+{
+	if (!HostMeshStarted())
+		return NILREF;
+	HostMeshRadioSettings r;
+	HostMeshGetRadio(&r);
+	return RadioFrame(r, true);
+}
+
+
+// HostMeshSetRadio({frequency, bandwidth, spreadingFactor, codingRate,
+// txPower, pathHashSize}): any left out as they are now
+static Ref
+FHostMeshSetRadio(RefArg /*rcvr*/, RefArg settings)
+{
+	if (!HostMeshStarted() || !IsFrame(settings))
+		return NILREF;
+	HostMeshRadioSettings r;
+	HostMeshGetRadio(&r);
+	double v;
+	if (NumberSlot(settings, "frequency", &v))
+		r.frequency = (float) v;
+	if (NumberSlot(settings, "bandwidth", &v))
+		r.bandwidth = (float) v;
+	if (NumberSlot(settings, "spreadingFactor", &v))
+		r.spreadingFactor = (int) v;
+	if (NumberSlot(settings, "codingRate", &v))
+		r.codingRate = (int) v;
+	if (NumberSlot(settings, "txPower", &v))
+		r.txPower = (int) v;
+	if (NumberSlot(settings, "pathHashSize", &v))
+		r.pathHashSize = (int) v;
+	return HostMeshSetRadio(&r) ? TRUEREF : NILREF;
+}
+
+
+static Ref
+FHostMeshBandwidths(RefArg /*rcvr*/)
+{
+	RefVar list(MakeArray(0));
+	for (long k = 0; k < HostMeshBandwidthCount(); k++)
+		AddArraySlot(list, RefVar(MakeReal(floor(HostMeshBandwidth(k) * 100.0 + 0.5) / 100.0)));
+	return list;
+}
+
+
+// the radio's power (the Mesh application's Prefs): whether the board can
+// switch it, whether it is on, and switched (==> whether it was taken)
+static Ref
+FHostMeshPowerSwitchable(RefArg /*rcvr*/)
+{
+	return HostMeshPowerSwitchable() ? TRUEREF : NILREF;
+}
+
+
+static Ref
+FHostMeshPowered(RefArg /*rcvr*/)
+{
+	return HostMeshPowered() ? TRUEREF : NILREF;
+}
+
+
+static Ref
+FHostMeshSetPower(RefArg /*rcvr*/, RefArg on)
+{
+	if (!HostMeshPowerSwitchable())
+		return NILREF;
+	bool taken = HostMeshSetPower(NOTNIL(on));
+	fprintf(stderr, "[host] the LoRa radio %s%s\n", NOTNIL(on) ? "on" : "off", taken ? "" : " - it could not be switched");
+	return taken ? TRUEREF : NILREF;
 }
 
 
@@ -189,4 +310,11 @@ HostRegisterMeshFunctions(void)
 	SetSlot(functions, "HostMeshRegions", RefVar(MakeCFunction((void*) FHostMeshRegions, 0, nil)));
 	SetSlot(functions, "HostMeshRegion", RefVar(MakeCFunction((void*) FHostMeshRegion, 0, nil)));
 	SetSlot(functions, "HostMeshSetRegion", RefVar(MakeCFunction((void*) FHostMeshSetRegion, 1, nil)));
+	SetSlot(functions, "HostMeshRegionSettings", RefVar(MakeCFunction((void*) FHostMeshRegionSettings, 1, nil)));
+	SetSlot(functions, "HostMeshRadio", RefVar(MakeCFunction((void*) FHostMeshRadio, 0, nil)));
+	SetSlot(functions, "HostMeshSetRadio", RefVar(MakeCFunction((void*) FHostMeshSetRadio, 1, nil)));
+	SetSlot(functions, "HostMeshBandwidths", RefVar(MakeCFunction((void*) FHostMeshBandwidths, 0, nil)));
+	SetSlot(functions, "HostMeshPowerSwitchable", RefVar(MakeCFunction((void*) FHostMeshPowerSwitchable, 0, nil)));
+	SetSlot(functions, "HostMeshPowered", RefVar(MakeCFunction((void*) FHostMeshPowered, 0, nil)));
+	SetSlot(functions, "HostMeshSetPower", RefVar(MakeCFunction((void*) FHostMeshSetPower, 1, nil)));
 }
