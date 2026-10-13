@@ -102,10 +102,10 @@ NewtonErr	THostFlashDriver::InitializeDriverData(TFlashRange& range, TMemoryAllo
 void		THostFlashDriver::CleanUpDriverData(TFlashRange& range, TMemoryAllocator&)		{ range.fDriverData = nil; }
 void		THostFlashDriver::StartReadingArray(TFlashRange&)						{ }
 void		THostFlashDriver::DoneReadingArray(TFlashRange&)						{ }
-void		THostFlashDriver::BeginWrite(TFlashRange&, ULong, ULong)				{ }
+void		THostFlashDriver::BeginWrite(TFlashRange&, ULong, ULong)				{ HostFlashBeginRun(); }
 void		THostFlashDriver::ResetBlockStatus(TFlashRange&, ULong)					{ }
 NewtonErr	THostFlashDriver::LockBlock(TFlashRange&, ULong)						{ return noErr; }
-NewtonErr	THostFlashDriver::ReportWriteResult(TFlashRange&, ULong)				{ return noErr; }
+NewtonErr	THostFlashDriver::ReportWriteResult(TFlashRange&, ULong)				{ HostFlashEndRun(); return noErr; }
 
 
 void

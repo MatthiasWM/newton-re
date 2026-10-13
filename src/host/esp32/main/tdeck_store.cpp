@@ -14,8 +14,13 @@
 				is in internal RAM: a task whose stack is in PSRAM, as the
 				Newton's are, must not write the flash (the cache, PSRAM's
 				way in, is off while it does).  The Newton's task hands each
-				write or erase over and waits for it; ESP-IDF refreshes the
-				mapping's cache for what it changed.  A word is written as
+				write or erase over and waits for it, and the mapping's cache
+				lines over what it changed are forgotten.  A write is a whole
+				run of words (hal/host/HostFlash.h HostFlashBeginRun: what the
+				store's driver writes between its BeginWrite and its
+				ReportWriteResult), copied into internal RAM a sector at a
+				time and programmed in one go - one hand-over a run, not one
+				a word.  A word is written as
 				the chips' rules have already made it (only bits cleared:
 				the SPI flash programs the same way); an erase of whole 4 KB
 				sectors and all lanes is an erase, and one of some of the
@@ -57,7 +62,7 @@ struct StoreRequest
 	unsigned long	offset;
 	unsigned long	size;
 	unsigned long	lanes;
-	unsigned char	bytes[16];
+	const unsigned char* bytes;			// (anywhere: copied to gSector)
 };
 static StoreRequest			gRequest;
 static SemaphoreHandle_t	gGo = NULL;			// a request is there
@@ -129,9 +134,18 @@ WriterTask(void*)
 		}
 		else
 		{
-			esp_err_t err = esp_partition_write(gPart, gRequest.offset, gRequest.bytes, gRequest.size);
-			if (err != ESP_OK && gFailures++ < 8)
-				printf("newton: the store partition would not be written at 0x%lx: %s\n", gRequest.offset, esp_err_to_name(err));
+			// (a sector's worth at a time, through internal RAM: the bytes
+			//  may be in PSRAM, which is out of reach while the flash is
+			//  written)
+			for (unsigned long done = 0; done < gRequest.size; )
+			{
+				unsigned long n = gRequest.size - done > kSectorSize ? kSectorSize : gRequest.size - done;
+				memcpy(gSector, gRequest.bytes + done, n);
+				esp_err_t err = esp_partition_write(gPart, gRequest.offset + done, gSector, n);
+				if (err != ESP_OK && gFailures++ < 8)
+					printf("newton: the store partition would not be written at 0x%lx: %s\n", gRequest.offset + done, esp_err_to_name(err));
+				done += n;
+			}
 			Refresh(gRequest.offset, gRequest.size);
 			gWrites++;
 		}
@@ -172,7 +186,7 @@ SelfTest(void)
 	r.offset = sector + 8;
 	r.size = 4;
 	const unsigned char w[4] = { 0x12, 0x34, 0x56, 0x78 };
-	memcpy(r.bytes, w, 4);
+	r.bytes = w;
 	Hand(r);
 	if (m[8] != 0x12 || m[9] != 0x34 || m[10] != 0x56 || m[11] != 0x78)
 	{
@@ -183,7 +197,7 @@ SelfTest(void)
 		failed++;
 	}
 	const unsigned char v[4] = { 0x10, 0x30, 0x50, 0x70 };	// (fewer bits: only clearing)
-	memcpy(r.bytes, v, 4);
+	r.bytes = v;
 	Hand(r);
 	if (m[8] != 0x10 || m[11] != 0x70)
 	{
@@ -297,18 +311,14 @@ HostDeviceStoreOpen(unsigned char** bytes, unsigned long* size, bool* existed)
 void
 HostDeviceStoreWrite(unsigned long offset, const unsigned char* bytes, unsigned long size)
 {
-	while (size > 0)
-	{
-		StoreRequest request;
-		request.erase = false;
-		request.offset = offset;
-		request.size = size > sizeof(request.bytes) ? sizeof(request.bytes) : size;
-		memcpy(request.bytes, bytes, request.size);
-		Hand(request);
-		offset += request.size;
-		bytes += request.size;
-		size -= request.size;
-	}
+	if (size == 0)
+		return;
+	StoreRequest request;
+	request.erase = false;
+	request.offset = offset;
+	request.size = size;
+	request.bytes = bytes;
+	Hand(request);
 }
 
 

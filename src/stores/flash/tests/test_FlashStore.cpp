@@ -281,11 +281,15 @@ TestLookupCache(void)
 // partition, read in place): its bytes change only through the backing's
 // write and erase, as a flash read through a memory mapping does
 static unsigned char*	gBacked = nil;
+static ULong			gBackedWrites = 0, gBackedLongest = 0;
 
 static void
 BackedWrite(ULong offset, const unsigned char* bytes, ULong size)
 {
 	memcpy(gBacked + offset, bytes, size);
+	gBackedWrites++;
+	if (size > gBackedLongest)
+		gBackedLongest = size;
 }
 
 static void
@@ -354,7 +358,12 @@ FlashStoreScenario(void)
 	backing.write = BackedWrite;
 	backing.erase = BackedErase;
 	HostFlashSetBacking(&backing);
+	ULong words = gHostFlashWrites;
 	Scenario();
+	words = gHostFlashWrites - words;
+	// (a driver's run of words given to the backing in one write: HostFlashBeginRun)
+	printf("test_FlashStore: %lu backing writes for %lu words, the longest %lu bytes\n", (unsigned long) gBackedWrites, (unsigned long) words, (unsigned long) gBackedLongest);
+	EXPECT(gBackedWrites > 0 && gBackedWrites < words && gBackedLongest > 4);
 	HostFlashSetBacking(nil);
 	free(gBacked);
 	HostStopTasks();

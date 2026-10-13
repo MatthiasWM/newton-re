@@ -612,7 +612,41 @@ after a reset.
   formatted word by word) brings the OS up in about 170 s; later ones in
   about 60 s, as before. Writes are synchronous and word by word - creating
   a soup and adding an entry took 2 s. Batching them is the obvious next
-  step if it matters.
+  step if it matters (done: "Batched store writes", below).
+
+## Batched store writes (2026-10-13)
+
+The store's driver wrote its flash a word at a time, and on the board each
+word was a hand-over to the writer task and an SPI program of its own.
+Now a run of words is written in one go:
+
+- **What a run is**: everything the store's driver writes between its
+  `BeginWrite` and its `ReportWriteResult` (`THostFlashDriver`, which now
+  calls `HostFlashBeginRun`/`HostFlashEndRun`, hal/host/HostFlash.h).
+  Nothing reads the flash in between - the ROM's `T32BitFlashRange::DoWrite`
+  (ROM 0x000c2abc) reads only its source - so the words can wait.
+- **Gathered in HostFlash.cpp**: with a backing, consecutive words collect
+  in a 1 KB buffer and go to the backing in one write; a word that is not
+  the next, a full buffer or an erase writes what was gathered first, and
+  a run that changes no bit is not written at all.  Without a backing
+  (the desktop's file or memory flash) nothing changes.  A host DEVIATION.
+- **On the board** (`tdeck_store.cpp`): a request carries the run's bytes
+  by pointer, not 16 bytes copied in; the writer copies them into its
+  internal-RAM sector buffer a sector at a time (the bytes may be in
+  PSRAM, out of reach while the flash is written) and programs each piece
+  with one `esp_partition_write`.  The start's self-test still passes.
+- **Measured** (`tools/tdeck/storebench.py COM4`: ten Names cards added,
+  then removed, timed by the Newton's `Ticks`, two runs each on a clean
+  soup):
+
+  | | word by word | batched |
+  |---|---|---|
+  | add 10 cards | 400-433 ms | 233-266 ms |
+  | remove 10 cards | 300-333 ms | 183-200 ms |
+
+  About 1.7x; what is left is mostly the store's own work, not the flash.
+  On the desktop's backed scenario (ctest `stores.FlashStore`) 1,262,950
+  words became 28,303 backing writes, the longest 1 KB.
 
 ## A faster start (2026-10-11)
 

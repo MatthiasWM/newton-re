@@ -169,6 +169,21 @@ tables searched linearly (78%), the ROM extensions' headers searched for in
 megabytes of flash at each call (half of what was left), and native
 functions registered by comparing each name with every entry.
 
+## storebench.py - how long the store takes to write
+
+    ~/.platformio/penv/Scripts/python tools/tdeck/storebench.py COM4 [--count 10]
+
+Ten (`--count`) Names cards named "Bench <n>" are added and removed again
+at the board's NewtonScript prompt, timed by the Newton's own `Ticks`;
+prints `add N: T ms` and `remove N: T ms`.  The Newton's sleep is turned
+off for the run and put back after.  Each statement is typed by
+serialcapture.py (one capture each, logs kept as
+`tmp/tdeck/storebench-<n>.log`) and kept short: the board's console reads
+a long line in pieces.  A run cut short leaves its cards behind, and the
+next run's remove takes them too (its count says so) - run it again for a
+clean figure.  It measured the batched store writes (docs/host-tdeck-pro.md,
+"Batched store writes").
+
 ## xtensa_compile.py - the tree with the ESP32-S3's compiler
 
     cmake -S src -B tmp/build-arm -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ...   # (src/cmake/zig-arm-linux.cmake)

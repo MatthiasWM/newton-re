@@ -34,6 +34,24 @@ namespace
 	Boolean						gBackingOpen = false;	// the banks are gBacking's bytes
 	Boolean						gExisted = false;
 
+	// a run of words a driver writes (HostFlashBeginRun .. HostFlashEndRun),
+	// gathered for a backing to write in one call
+	const ULong					kRunSize = 1024;
+	unsigned char				gRun[kRunSize] HOST_LARGE_STATIC;
+	ULong						gRunOffset = 0, gRunLength = 0;
+	Boolean						gRunOpen = false, gRunChanged = false;
+
+	// what was gathered of a run given to the backing (nothing when it
+	// changes nothing)
+	void
+	FlushRun(void)
+	{
+		if (gRunLength != 0 && gRunChanged)
+			gBacking->write(gRunOffset, gRun, gRunLength);
+		gRunLength = 0;
+		gRunChanged = false;
+	}
+
 	unsigned char*
 	FlashBase(void)
 	{
@@ -475,6 +493,23 @@ HostFlashContains(Ptr p)
 }
 
 
+// (HostFlash.h)
+void
+HostFlashBeginRun(void)
+{
+	gRunOpen = gBackingOpen;
+}
+
+
+void
+HostFlashEndRun(void)
+{
+	if (gRunOpen)
+		FlushRun();
+	gRunOpen = false;
+}
+
+
 // A chip programs by clearing bits: what the word becomes is what it was
 // AND what was written, the lanes the mask leaves out being written as ones.
 // (Einstein's own flash replaces the masked bits instead - the same thing
@@ -495,8 +530,25 @@ HostFlashWrite(Ptr word, ULong value, ULong mask)
 		unsigned char after[4] = { (unsigned char) (p[0] & (programmed >> 24)), (unsigned char) (p[1] & (programmed >> 16)),
 								   (unsigned char) (p[2] & (programmed >> 8)), (unsigned char) (p[3] & programmed) };
 		gHostFlashWrites++;
+		ULong offset = (ULong) (p - FlashBase());
+		if (gRunOpen)
+		{
+			// (gathered: a word that is not the next, or no room, writes what
+			// was gathered first; a word that changes nothing is written with
+			// the rest - writing a chip's bits as they are leaves them so -
+			// and a run that changes nothing is not written at all)
+			if (gRunLength != 0 && (offset != gRunOffset + gRunLength || gRunLength + 4 > kRunSize))
+				FlushRun();
+			if (gRunLength == 0)
+				gRunOffset = offset;
+			memcpy(gRun + gRunLength, after, 4);
+			gRunLength += 4;
+			if (memcmp(after, p, 4) != 0)
+				gRunChanged = true;
+			return;
+		}
 		if (memcmp(after, p, 4) != 0)
-			gBacking->write((ULong) (p - FlashBase()), after, 4);
+			gBacking->write(offset, after, 4);
 		return;
 	}
 	unsigned char before[4] = { p[0], p[1], p[2], p[3] };
@@ -519,6 +571,8 @@ HostFlashErase(Ptr start, ULong size, ULong lanes)
 	gHostFlashErases++;
 	if (gBackingOpen)
 	{
+		if (gRunOpen)
+			FlushRun();
 		gBacking->erase((ULong) (p - FlashBase()), size, lanes);
 		return;
 	}

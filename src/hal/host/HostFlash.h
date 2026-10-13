@@ -132,6 +132,16 @@ Boolean		HostFlashContains(Ptr p);
 void		HostFlashWrite(Ptr word, ULong value, ULong mask);
 void		HostFlashErase(Ptr start, ULong size, ULong lanes);
 
+// A run of words a driver writes one after the other (its BeginWrite to its
+// ReportWriteResult: nothing reads the flash in between - the ROM's
+// T32BitFlashRange::DoWrite, ROM 0x000c2abc, reads only its source).  With a
+// backing, the run's words are gathered and given to it in one write, not
+// one write a word - on the ESP32-S3 a word was an SPI program of its own
+// and a hand-over to the writer's task.  Without one (files and memory)
+// nothing changes.  DEVIATION: the host's own.
+void		HostFlashBeginRun(void);
+void		HostFlashEndRun(void);
+
 // A host whose flash is neither a file nor memory of its own but a store
 // it can read in place - the ESP32-S3 host's (src/host/esp32): a partition
 // of the board's own flash, memory-mapped, read through the cache, with no

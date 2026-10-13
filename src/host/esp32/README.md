@@ -23,7 +23,7 @@ line evaluated in the newt world.
 | `main/esp32main.cpp` | the board's side (ESP-IDF's headers only): the console made a blocking stdio stream read by a task of its own into a queue of lines, the `objects` partition mapped at 0x3d000000, the Newton's tasks' threads (FreeRTOS tasks with 48 KB stacks in PSRAM, all on core 1) |
 | `main/tdeck_panel.cpp` | the panel (a task on core 0): the display's grays watched and sent to the UC8253 once a change settles - a partial refresh (0.65 s) over the rectangle that changed, a full one (3 s, flashing) for a new page and to clean up after 30 s still; how the controller has to be driven, and how that was found, is its header's; settings changed while it runs: `DevicePanelSet(name, value)` |
 | `main/tdeck_input.cpp` | the CST328 touch panel and the TCA8418 keyboard (a task on core 0, a hundred times a second) into the window shims every host's window calls (`HostWindowPenDown/Move/Up`, `HostWindowKey`, host/HostKeyboard.cpp); the owner's keyboard layout (Shift, Sym's symbols, Alt's navigation keys or the Command key) |
-| `main/tdeck_store.cpp` | the Newton's internal flash on the `store` partition: mapped read-only and read in place by hal/host/HostFlash.h (its backing - no copy in RAM), each word written and each erase done by a writer task whose stack is in internal RAM (a task with a PSRAM stack must not write the flash), the mapping's cache refreshed after; erased whole the first time (NVS `storeVersion`); a self-test of write, lanes erase and sector erase at each start |
+| `main/tdeck_store.cpp` | the Newton's internal flash on the `store` partition: mapped read-only and read in place by hal/host/HostFlash.h (its backing - no copy in RAM), each run of words the store's driver writes (hal/host/HostFlash.h HostFlashBeginRun) and each erase done by a writer task whose stack is in internal RAM (a task with a PSRAM stack must not write the flash), the mapping's cache refreshed after; erased whole the first time (NVS `storeVersion`); a self-test of write, lanes erase and sector erase at each start |
 | `main/tdeck_wifi.cpp` | the WiFi: networks remembered in NVS (up to 8), the strongest remembered one in range joined (and again 30 s after it is lost or none is found), scans on request - the provider of host/HostWifi.h, which Internet Setup's Host network setup has a Wi-Fi line and slip for (comms/host/HostLink.ns); a task of its own with an internal stack does the work (NVS writes the flash) |
 | `main/tdeck_profile.cpp` | a sampling profiler of core 1 (the Newton's tasks), from the board's start: `DeviceProfileDump()` prints it for tools/tdeck/profile.py |
 | `main/newtonmain.cpp` | the Newton's side (the DDK's headers only): the kernel heap (3 MB, in PSRAM) with a 1 MB NewtonScript heap, the baked objects, the newt world configured (240x320x1, the store in RAM) and the OS booted; the kernel services task hands each console line to the newt world as a `'host/'eval` event, whose handler evaluates it and prints the result; `DeviceMilliseconds()`, `DeviceMemory()`, `DevicePanelSet(name, value)` and `DeviceStore()` ([words written to the store partition, erases]) for NewtonScript; every NewtonScript throw printed with its script stack (`NEWTON_TRACE_EXCEPTIONS`, set there) |
@@ -197,8 +197,12 @@ when new, kept between starts, as the desktop's `--store` file is.  The
 first start after the partition is made erases it (11 s) and formats the
 store; a later one finds it used before (with the start made faster, the
 OS up in about 3 s).  An entry added to a soup reads back after a reset.
-Writes are synchronous, word by word, from the Newton's task: about 2 s to
-create a soup and add an entry.
+Writes are synchronous from the Newton's task; since 2026-10-13 a whole
+run of words the store's driver writes goes over in one hand-over and one
+`esp_partition_write` a sector, not one a word - adding ten Names cards
+went from about 420 ms to 250 ms, removing them from about 315 ms to 190 ms
+(`tools/tdeck/storebench.py`; docs/host-tdeck-pro.md, "Batched store
+writes").
 
 ## The panel, touch and keyboard (2026-10-11)
 

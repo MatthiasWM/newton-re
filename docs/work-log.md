@@ -9,6 +9,21 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-13: the T-Deck's store writes batched
+
+The store's driver's run of words (its `BeginWrite` to its
+`ReportWriteResult`) gathered by hal/host/HostFlash.cpp and given to a
+backing in one write, and the board's writer programming a whole run
+through its internal-RAM sector buffer - one hand-over a run, not one a
+word: ten Names cards added in ~250 ms rather than ~420, removed in ~190
+rather than ~315 (`tools/tdeck/storebench.py`; docs/host-tdeck-pro.md,
+"Batched store writes").  On the way: the work machine crashed mid-link
+and left 22 test executables zero-filled that ninja thought up to date
+(found by "Not Run" in ctest; deleted and relinked); and the benchmark's
+first remove loop had no `begin`..`end` around its `while` body, so its
+`c:Next()` never ran and it spun on the first card - looking like a hung
+store, with each run's cards piling up behind it.
+
 ## 2026-10-12: Messages, the application
 
 Texts as conversations rather than In Box items (`docs/host-tdeck-pro-phone.md`,
