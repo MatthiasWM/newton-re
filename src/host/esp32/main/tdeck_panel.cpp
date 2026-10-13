@@ -44,7 +44,12 @@
 				    "cleanAfter", or, after "cleanCount" of them, at the
 				    first pause of "cleanPause" (so that a long run of
 				    typing or scrolling is cleaned up too, but never in
-				    the middle of it).
+				    the middle of it).  Either clean-up only once the
+				    partial ones since the last full one have between
+				    them redrawn "cleanArea" of the screen: a clock's
+				    minute alone is never cleaned up, so a screen nobody
+				    touches is not flashed every minute (the owner's ask,
+				    2026-10-13: the battery).
 				The settings can be changed while it runs
 				(HostDevicePanelSet, from NewtonScript DevicePanelSet(name,
 				value)); the set-up's own ones are kept so that others can
@@ -102,6 +107,7 @@ static volatile long	gBigChangePercent = 100;	// "bigChange": a change of more o
 static volatile long	gCleanAfterMs = 30000;		// "cleanAfter": partial refreshes cleaned up once the screen has been still this long (0: never)
 static volatile long	gCleanCount = 30;			// "cleanCount": ... or after this many of them (0: never) ...
 static volatile long	gCleanPauseMs = 2000;		// "cleanPause": ... once the screen has been still this long
+static volatile long	gCleanAreaPercent = 5;		// "cleanArea": ... and only once the partial ones have redrawn this much of the screen between them (0: any)
 static volatile long	gTrace = 0;					// "trace": each refresh printed with its time
 // (the set-up, to compare others on the panel while it runs - panelprobe.py)
 static volatile long	gPSR2 = 0x0D;				// "psr2": PSR's second byte (the device spike had 0x8D)
@@ -456,6 +462,9 @@ PanelTask(void*)
 	uint8_t* now = (uint8_t*) heap_caps_malloc(kFrameBytes, MALLOC_CAP_SPIRAM);
 	uint8_t* white = (uint8_t*) heap_caps_malloc(kFrameBytes, MALLOC_CAP_SPIRAM);
 	memset(white, 0xFF, kFrameBytes);
+	// the bytes partial refreshes have redrawn since the last full one
+	uint8_t* touched = (uint8_t*) heap_caps_calloc(kFrameBytes, 1, MALLOC_CAP_SPIRAM);
+	long touchedCount = 0;
 	// whatever the last run left, cleared
 	memcpy(shown, white, kFrameBytes);
 	Refresh(shown, shown, false);
@@ -492,6 +501,8 @@ PanelTask(void*)
 			memcpy(shown, now, kFrameBytes);
 			memcpy(pending, now, kFrameBytes);
 			partialsSinceFull = partial ? 2 : 0;
+			memset(touched, partial ? 1 : 0, kFrameBytes);
+			touchedCount = partial ? kFrameBytes : 0;
 			shownAt = esp_timer_get_time();
 			continue;
 		}
@@ -510,18 +521,33 @@ PanelTask(void*)
 			for (long k = 0; k < kFrameBytes; k++)
 				changed += shown[k] != pending[k];
 			bool partial = !first && gPartialTemperature != 0 && changed * 100 < kFrameBytes * gBigChangePercent;
+			if (!partial)
+			{
+				memset(touched, 0, kFrameBytes);
+				touchedCount = 0;
+			}
+			else
+				for (long k = 0; k < kFrameBytes; k++)
+					if (shown[k] != pending[k] && !touched[k])
+					{
+						touched[k] = 1;
+						touchedCount++;
+					}
 			Refresh(shown, pending, partial);
 			memcpy(shown, pending, kFrameBytes);
 			first = false;
 			partialsSinceFull = partial ? partialsSinceFull + 1 : 0;
 			shownAt = esp_timer_get_time();
 		}
-		else if ((partialsSinceFull > 0 && gCleanAfterMs > 0 && (t - shownAt) / 1000 >= gCleanAfterMs)
-				 || (gCleanCount > 0 && partialsSinceFull >= gCleanCount && (t - shownAt) / 1000 >= gCleanPauseMs))
+		else if (partialsSinceFull > 0 && touchedCount * 100 >= kFrameBytes * gCleanAreaPercent
+				 && ((gCleanAfterMs > 0 && (t - shownAt) / 1000 >= gCleanAfterMs)
+					 || (gCleanCount > 0 && partialsSinceFull >= gCleanCount && (t - shownAt) / 1000 >= gCleanPauseMs)))
 		{
 			// the screen still: the ghosts of the partial refreshes cleared
 			Refresh(shown, shown, false);
 			partialsSinceFull = 0;
+			memset(touched, 0, kFrameBytes);
+			touchedCount = 0;
 			shownAt = esp_timer_get_time();
 		}
 	}
@@ -576,6 +602,8 @@ HostDevicePanelSet(const char* name, long value)
 		gCleanCount = value;
 	else if (strcasecmp(name, "cleanPause") == 0)
 		gCleanPauseMs = value;
+	else if (strcasecmp(name, "cleanArea") == 0)
+		gCleanAreaPercent = value;
 	else if (strcasecmp(name, "trace") == 0)
 		gTrace = value;
 	else if (strcasecmp(name, "redraw") == 0)
@@ -598,6 +626,8 @@ HostWindowOption(const char* name, long* value)
 		*value = gCleanCount;
 	else if (strcmp(name, "cleanAfter") == 0)
 		*value = gCleanAfterMs;
+	else if (strcmp(name, "cleanArea") == 0)
+		*value = gCleanAreaPercent;
 	else if (strcmp(name, "clearGhosts") == 0)
 		*value = 0;
 	else

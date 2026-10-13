@@ -32,6 +32,7 @@ newton has no panel settings at all).
 | A new page drawn in full (`bigChange`) | a change of more than an eighth of the screen (a new page) drawn by a full refresh - clean, but 3 s and flashing; off (the default), every change is a quick partial one (0.65 s) | T-Deck Pro | `DevicePanelSet("bigChange", 12)` (100 off) |
 | Clean up (`cleanCount`, a picker) | after 10, 20, 30 (the default) or 50 quick updates, or never, the ghosts cleaned up by a full refresh at the first two-second pause | T-Deck Pro | `DevicePanelSet("cleanCount", n)` |
 | ... and when still (`cleanAfter`, a picker) | the ghosts cleaned up once the screen has been still 5 s, 10 s, 30 s (the default), a minute, or never | T-Deck Pro | `DevicePanelSet("cleanAfter", ms)` |
+| ... once (`cleanArea`, a picker) | either clean-up only once the quick updates since the last full refresh have between them redrawn any of the screen, 2 %, 5 % (the default), 10 % or a quarter of it - so a still screen whose only change is the clock's minute is not flashed every minute, sparing the battery | T-Deck Pro | `DevicePanelSet("cleanArea", percent)` |
 | Clear ghosts (a button) | one flashing redraw of the whole panel, as AppLoad's five-finger tap does (the T-Deck Pro: one full refresh) | reMarkable, T-Deck Pro | - |
 
 A setting changed on the panel takes effect at once (the screen size at the
