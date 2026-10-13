@@ -110,6 +110,17 @@ forgets them); the board's in NVS, namespace `mesh`.
   time, dir, state, sendId}`; a thread is a node's key or `"public"`);
   closed, a message is told with an alert; open, with a beep;
 - the node is named after the owner (Setup's name) the first time.
+- a message that cannot be filed is told on the console and the poll goes
+  on (a throw out of `Poll` used to end the polling until a restart).
+
+**A message heard by another node but not by this one** is most likely a
+collision: the radio is half-duplex, and a channel message is neither
+acknowledged nor sent again.  A long one is on the air for most of a
+second at SF7/62.5 kHz/CR 4/8, so a message sent at the same moment can
+deafen this node to it (MeshCore listens before it talks, which helps
+only when the other's preamble has already begun).  Found 2026-10-13:
+the board's counters (`HostMeshStatus()`'s `received`, `sent`) matched
+the soup exactly - the message never reached the engine.
 
 Laid out for any screen as Messages is (ctests at 240x320, 320x480,
 480x320, 810x1080).

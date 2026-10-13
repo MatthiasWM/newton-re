@@ -771,8 +771,14 @@
 	begin
 		local changed := nil;
 		local m;
+		// (each message filed on its own: one that cannot be is told on the
+		// console and the rest still are, and the poll goes on - a throw
+		// out of here would end the polling until the next restart)
 		while m := HostMeshNextMessage() do begin
-			:Received(m);
+			try
+				:Received(m)
+			onexception |evt.ex| do
+				Print("[mesh] a message from " & (if m.name then m.name else "?") & " could not be filed");
 			changed := true;
 		end;
 		if pending then begin
@@ -796,8 +802,12 @@
 				end;
 			end;
 		end;
-		if changed then
-			:Refresh();
+		if changed then begin
+			try
+				:Refresh()
+			onexception |evt.ex| do
+				nil;
+		end;
 		AddDelayedCall(func() GetGlobalVar('|HostMesh:host|):Poll(), [], kPollMs);
 	end,
 

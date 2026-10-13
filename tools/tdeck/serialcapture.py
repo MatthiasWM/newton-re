@@ -35,6 +35,10 @@ import serial
 
 
 def main(argv):
+    # (a board's text is UTF-8 - a station's name on the mesh often is not
+    # ASCII - and the Windows console's code page cannot print all of it)
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("port")
     parser.add_argument("seconds", type=float)
