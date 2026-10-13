@@ -9,6 +9,25 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-13: MeshCore on the T-Deck Pro (branch tdeck-meshcore)
+
+The owner's lilyphone1 MeshCore node brought over
+(`docs/host-tdeck-pro-mesh.md`): MeshCore, Crypto, ed25519, base64 and
+RadioLib's SX126x driver vendored with their licences; a portable engine
+(`hal/host/HostMesh.h`) on its own thread; a desktop's pretend LoRa air
+over UDP multicast and `meshpeer`, so the application is tested with no
+radio; the Mesh application, Messages' design; the board's radio through
+a RadioLib HAL of its own on ESP-IDF; the Host settings for the radio's
+power and preset.  On the way: lilyphone1's mesh clock was never ticked,
+its contacts were not kept, and it cut the power to a radio still
+listening (all fixed here); PlatformIO names objects by file name, so
+ed25519's `sha512.c` and Crypto's `SHA512.cpp` collided on a
+case-insensitive file system (each mesh source compiled through a
+forwarding file); RadioLib's `Module::init` starts a HAL by `init`, not
+`spiBegin`; `std::random_device` wants `getentropy`, which ESP-IDF's C
+library has not; a contact list saved at every advert would have worn
+the board's 24 KB NVS out, so it is saved only when it changes.
+
 ## 2026-10-13: the T-Deck's panel cleaned up only where it changed
 
 The panel's clean-up (a full, flashing refresh) ran 30 s after any partial

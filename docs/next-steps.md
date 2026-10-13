@@ -45,7 +45,18 @@ the way are all in `docs/work-log.md`.
 
 ## In progress
 
-Nothing at present.
+### MeshCore on the T-Deck Pro (branch `tdeck-meshcore`, 2026-10-13)
+
+`docs/host-tdeck-pro-mesh.md`.  Done: MeshCore and RadioLib vendored
+(`src/thirdparty/meshcore`); the mesh engine (`hal/host/HostMesh.h`,
+ported from lilyphone1) with a desktop's pretend air (`newton --mesh-air`,
+`meshpeer`, ctest `hal.MeshPeers`); the natives and the Mesh application
+(`comms/host/HostMesh.ns`, ctests `host.NewtonMesh.<size>`); the board's
+SX1262 (`tdeck_lora.cpp`), set up as lilyphone1's Victoria AU preset; the
+Host settings "The LoRa radio on" and "Mesh radio".  On the board: up,
+announcing, switched off and on.  Next: a message with a real node on the
+board (the owner's other MeshCore devices); then the WiFi companion
+(MeshCore's companion protocol on TCP 5000) if wanted.
 
 ### A small device: the T-Deck Pro (branch `tdeck-pro-investigation`, 2026-10-10)
 
