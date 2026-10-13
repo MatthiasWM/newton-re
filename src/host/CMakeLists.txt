@@ -13,7 +13,7 @@ target_include_directories(host_views PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(host_views PUBLIC hal_host_cellular)
 # ... and the LoRa mesh engine's (hal/host/HostMesh.h)
 target_link_libraries(host_views PUBLIC hal_host_mesh)
-# ... and the GPS receiver's (hal/host/HostGPS.h), on the serial port
+# ... and the GPS receiver's (hal/host/HostGPS.h), on serial port 2 or the external one
 target_link_libraries(host_views PUBLIC hal_host_gps hal_host_serial)
 
 add_executable(newtonscript newtonscript.cpp NSRoundTrip.cpp IMATool.cpp)

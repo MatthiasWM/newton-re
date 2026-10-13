@@ -16,6 +16,7 @@
 #include "hal/host/HostCellular.h"
 #include "hal/host/HostSerialChip.h"
 #include "hal/host/HostGPS.h"
+#include "HALOptions.h"
 #include "NewtWorld.h"
 #include "Frames.h"
 #include "ObjectHeap.h"
@@ -199,28 +200,32 @@ ChoiceIndex(const long* values, int count, long value)
 }
 
 
-// the GPS receiver on the serial port (hal/host/HostGPS.h): none, or one of
-// its kinds; and whether the panel has chosen yet (if not, newton plugs it
-// in when it starts the serial port - HostSettingsPlugGPS)
-static const char* const	kGPSChoices[3] = { "Not plugged in", "NMEA receiver", "DeLorme Tripmate" };
+// the GPS receiver (hal/host/HostGPS.h): the port it is plugged into - none,
+// serial port 2 ('mdem', a port of its own) or the external one - and its
+// kind; and whether the panel has chosen yet (if not, newton plugs it in
+// where it was told when it starts the serial port - HostSettingsPlugGPS)
+static const char* const	kGPSPortChoices[3] = { "Not plugged in", "Serial port 2", "Serial port" };
+static const ULong			kGPSPorts[3] = { 0, kHWLocBuiltInModem, kHWLocExternalSerial };
+static const char* const	kGPSKindChoices[2] = { "NMEA", "DeLorme Tripmate" };
 static bool					gGPSChosen = false;
 
-static bool
-SetGPS(long choice)
+static long
+GPSPortChoice(void)
 {
-	if (choice > 0)
-		HostGPSSetKind(choice == 2 ? kHostGPSTripmate : kHostGPSNMEA);
-	return HostSerialChipSetGPS(choice > 0) == noErr;
+	ULong port = HostSerialChipGPS();
+	return port == kHWLocBuiltInModem ? 1 : port == kHWLocExternalSerial ? 2 : 0;
 }
 
 
 void
-HostSettingsPlugGPS(void)
+HostSettingsPlugGPS(bool external)
 {
-	if (HostGPSStarted() && !gGPSChosen && !HostSerialChipGPS())
+	ULong port = external ? kHWLocExternalSerial : kHWLocBuiltInModem;
+	if (HostGPSStarted() && !gGPSChosen && HostSerialChipGPS() == 0)
 	{
-		bool taken = SetGPS(1 + HostGPSGetKind());
-		fprintf(stderr, "[host] the GPS receiver on the serial port%s\n", taken ? "" : " - it could not be plugged in");
+		bool taken = HostSerialChipSetGPS(port) == noErr;
+		fprintf(stderr, "[host] the GPS receiver on %s%s\n", port == kHWLocBuiltInModem ? "serial port 2" : "the serial port",
+				taken ? "" : " - it could not be plugged in");
 	}
 }
 
@@ -240,9 +245,12 @@ FHostSettingsList(RefArg /*rcvr*/)
 		AddArraySlot(list, RefVar(Item("docking", "Dock over the network", kCheck, HostSerialChipListening())));
 	if (HostGPSStarted())
 	{
-		RefVar item(Item("gps", "GPS on the serial port", kChoice, HostSerialChipGPS() ? 1 + HostGPSGetKind() : 0));
-		Choices(item, kGPSChoices, 3);
+		RefVar item(Item("gps", "GPS receiver on", kChoice, GPSPortChoice()));
+		Choices(item, kGPSPortChoices, 3);
 		AddArraySlot(list, item);
+		RefVar kind(Item("gpsKind", "GPS receiver", kChoice, HostGPSGetKind() == kHostGPSTripmate ? 1 : 0));
+		Choices(kind, kGPSKindChoices, 2);
+		AddArraySlot(list, kind);
 	}
 	if (HostCellularPowerSwitchable())
 		AddArraySlot(list, RefVar(Item("cellPower", "The 4G module on", kCheck, HostCellularPowered())));
@@ -363,9 +371,17 @@ FHostSetSetting(RefArg /*rcvr*/, RefArg setting, RefArg value)
 		if (!HostGPSStarted() || !ISINT(value) || RINT(value) < 0 || RINT(value) > 2)
 			return NILREF;
 		gGPSChosen = true;
-		bool taken = SetGPS(RINT(value));
-		fprintf(stderr, "[host] GPS on the serial port: %s%s\n", kGPSChoices[RINT(value)], taken ? "" : " - not taken");
+		bool taken = HostSerialChipSetGPS(kGPSPorts[RINT(value)]) == noErr;
+		fprintf(stderr, "[host] GPS receiver on: %s%s\n", kGPSPortChoices[RINT(value)], taken ? "" : " - not taken");
 		return MAKEBOOLEAN(taken);
+	}
+	if (strcmp(name, "gpsKind") == 0)
+	{
+		if (!HostGPSStarted() || !ISINT(value) || RINT(value) < 0 || RINT(value) > 1)
+			return NILREF;
+		HostGPSSetKind(RINT(value) == 1 ? kHostGPSTripmate : kHostGPSNMEA);
+		fprintf(stderr, "[host] GPS receiver: %s\n", kGPSKindChoices[RINT(value)]);
+		return TRUEREF;
 	}
 	if (strcmp(name, "cellPower") == 0)
 	{

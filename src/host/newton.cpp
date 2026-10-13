@@ -129,17 +129,21 @@
 	tools/modem/fakecell.py is the module (docs/host-tdeck-pro-phone.md).
 
 	--gps gives the machine a GPS receiver (hal/host/HostGPS.h), plugged
-	into the external serial port as GPS software expects one - NMEA 0183
-	sentences each second (GPS Map, GPS Monitor, GPS View in
-	fixtures/packages/apps): sim[:lat,lon[,knots]] a pretend one going
+	into a serial port as GPS software expects one - NMEA 0183 sentences
+	each second (GPS Map, GPS Monitor, GPS View in fixtures/packages/apps).
+	The port is serial port 2 ('mdem': GPS Map's "Serial Port 2", GPS
+	Monitor's "Internal Modem"), so the external one stays free for
+	docking; --gps-port 1 plugs it into the external port instead, for
+	software that never asks which port (GPS View).  The source:
+	sim[:lat,lon[,knots]] a pretend one going
 	round a circle, fixed:lat,lon[,alt] one standing still, nmea:file a
 	log replayed, tcp:host:port or gpsd[:host[:port]] a receiver on the
 	network, serial:device[@baud] one plugged into the host (COM3,
 	/dev/ttyUSB0).  --gps-kind tripmate makes it a DeLorme Tripmate (the
-	ASTRAL handshake first: GPS View).  While it is plugged in it is the
-	serial port's cable and nobody docks over the network; the Host
-	preferences panel's "GPS on the serial port" unplugs it or changes
-	its kind (docs/comms/gps.md).
+	ASTRAL handshake first: GPS View).  Plugged into the external port it
+	is the port's cable and nobody docks over the network.  The Host
+	preferences panel's "GPS receiver on" and "GPS receiver" move it,
+	unplug it or change its kind (docs/comms/gps.md).
 
 	--mesh-air lan[:port] makes this newton a LoRa mesh node
 	(hal/host/HostMesh.h: a MeshCore chat node, as the T-Deck Pro is)
@@ -303,6 +307,7 @@ static const char* gMeshAir = nil;			// --mesh-air: "lan[:port]"
 static const char* gMeshName = nil;			// --mesh-name
 static const char* gGPS = nil;				// --gps: the GPS receiver's source
 static const char* gGPSKind = nil;			// --gps-kind: nmea or tripmate
+static long gGPSPort = 2;					// --gps-port: 2 serial port 2 ('mdem'), 1 the external one
 static const char* gIRPeer = nil;			// --ir-peer, or the LAN medium's "lan[:PORT][@ADDRESS]"
 static char gIRLan[80];						// --ir-lan, --ir-lan-interface
 static const char* gIRLanPort = nil;
@@ -327,7 +332,7 @@ Usage(void)
 					"              [--ir-lan [port]] [--ir-lan-interface address] [--cell-port port]\n"
 					"              [--mesh-air lan[:port]] [--mesh-name name]\n"
 					"              [--gps sim[:lat,lon[,knots]]|fixed:lat,lon[,alt]|nmea:file|tcp:host:port|gpsd[:host[:port]]|serial:device[@baud]]\n"
-					"              [--gps-kind nmea|tripmate]\n"
+					"              [--gps-kind nmea|tripmate] [--gps-port 1|2]\n"
 					"              [--ipp-printer uri]\n"
 					"By default it boots the object file built from romsrc/ (NEWTON_OBJECTS overrides);\n"
 					"--rom boots a ROM image instead.\n"
@@ -408,7 +413,7 @@ NewtonBoot(void)
 		HostSettingsSetBeamPeers(gIRLanAsked ? gIRPeer : nil, gIRLanAsked ? nil : gIRPeer);
 		HostSettingsSetSerialPort(gSerialPort);
 		if (timerErr == noErr)
-			HostSettingsPlugGPS();
+			HostSettingsPlugGPS(gGPSPort == 1);
 		if (err == noErr)
 			err = HostIRChipInstall(gIRPeer);
 		if (err == noErr)
@@ -1155,6 +1160,8 @@ main(int argc, char** argv)
 			gGPS = argv[++i];
 		else if (strcmp(argv[i], "--gps-kind") == 0 && i + 1 < argc)
 			gGPSKind = argv[++i];
+		else if (strcmp(argv[i], "--gps-port") == 0 && i + 1 < argc)
+			gGPSPort = strtol(argv[++i], nil, 0) == 1 ? 1 : 2;
 		else if (strcmp(argv[i], "--serial-port") == 0 && i + 1 < argc)
 		{
 			i++;

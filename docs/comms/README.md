@@ -659,8 +659,8 @@ Newt's Cape's behaviour, kept as it is:
 
 ## A GPS receiver on the serial port
 
-`newton --gps` puts a GPS receiver at the far end of the external serial
-port - pretend, a log, gpsd or TCP, or one plugged into the host - for
+`newton --gps` puts a GPS receiver at the far end of serial port 2 (or
+the external one) - pretend, a log, gpsd or TCP, or one plugged into the host - for
 the GPS applications (GPS Map, GPS Monitor, GPS View) to read their NMEA
 sentences from: [gps.md](gps.md).
 

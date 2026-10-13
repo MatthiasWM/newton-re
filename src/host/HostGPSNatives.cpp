@@ -42,7 +42,9 @@ FHostGPSStatus(RefArg /*rcvr*/)
 	RefVar status(AllocateFrame());
 	SetSlot(status, "source", RefVar(MakeString(source)));
 	SetSlot(status, "kind", RefVar(Intern((char*) (HostGPSGetKind() == kHostGPSTripmate ? "tripmate" : "nmea"))));
-	SetSlot(status, "plugged", RefVar(MAKEBOOLEAN(HostSerialChipGPS())));
+	ULong port = HostSerialChipGPS();
+	SetSlot(status, "plugged", RefVar(MAKEBOOLEAN(port != 0)));
+	SetSlot(status, "port", port == 0 ? RefVar(NILREF) : RefVar(MakeString(port == 'mdem' ? "mdem" : "extr")));
 	SetSlot(status, "fix", RefVar(MAKEBOOLEAN(fix.valid)));
 	if (fix.valid)
 	{

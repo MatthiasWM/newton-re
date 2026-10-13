@@ -91,6 +91,7 @@ public:
 	unsigned short		fPort;
 	int					fListener;			// the listening socket, or -1
 	int					fClient;			// the desktop's connection, or -1
+	ULong				fLocation;			// 'extr', or 'mdem' (serial port 2: the GPS receiver's)
 	Boolean				fGPS;				// the GPS receiver is plugged in instead (HostGPS.h)
 	void*				fTool;				// the tool that has the chip, and its handlers
 	SCCChannelInts		fHandlers;
@@ -112,7 +113,8 @@ public:
 PROTOCOL_IMPL_SOURCE_MACRO(THostSerialChip)
 PROTOCOL_CLASSINFO(THostSerialChip, "TSerialChip", "v2.0", 0x30000, 0, nil)
 
-static THostSerialChip*	gHostSerialChip = nil;
+static THostSerialChip*	gHostSerialChip = nil;		// the external port, 'extr'
+static THostSerialChip*	gHostSerialChip2 = nil;		// serial port 2, 'mdem': the GPS receiver's only
 
 
 THostSerialChip*
@@ -121,6 +123,7 @@ THostSerialChip::New()
 	fPort = 0;
 	fListener = -1;
 	fClient = -1;
+	fLocation = kHWLocExternalSerial;
 	fGPS = false;
 	fTool = nil;
 	memset(&fHandlers, 0, sizeof(fHandlers));
@@ -291,7 +294,7 @@ THostSerialChip::ProcessOption(TOption* opt)
 	if (opt->Label() == kCMOSerialChipSpec)
 	{
 		TCMOSerialChipSpec* spec = (TCMOSerialChipSpec*) opt;
-		spec->fHWLoc = kHWLocExternalSerial;
+		spec->fHWLoc = fLocation;
 		spec->fSerFeatures = GetFeatures();
 		spec->fSerOutSupported = 0xff;
 		spec->fSerInSupported = 0xff;
@@ -464,17 +467,29 @@ THostSerialChip::Pace(void)
 }
 
 
+// the earlier of the chips' next looks
 static Boolean
 HostSerialDeadline(Int64* when)
 {
-	return gHostSerialChip != nil && gHostSerialChip->Due(when);
+	Boolean due = false;
+	THostSerialChip* chips[2] = { gHostSerialChip, gHostSerialChip2 };
+	for (THostSerialChip* chip : chips)
+	{
+		Int64 at;
+		if (chip != nil && chip->Due(&at))
+		{
+			if (!due || CompCompare(&at, when) < 0)
+				*when = at;
+			due = true;
+		}
+	}
+	return due;
 }
 
 
 static void
-HostSerialDeliver(void)
+Deliver(THostSerialChip* chip)
 {
-	THostSerialChip* chip = gHostSerialChip;
 	if (chip == nil || chip->fTool == nil || !chip->fIntEnabled)
 		return;
 	chip->Poll();
@@ -503,36 +518,51 @@ HostSerialDeliver(void)
 }
 
 
-// the chip made and registered as 'extr', listening on port unless listen is
-// false
+static void
+HostSerialDeliver(void)
+{
+	Deliver(gHostSerialChip);
+	Deliver(gHostSerialChip2);
+}
+
+
+// a chip made and registered at the location (gHostSerialChip for 'extr',
+// gHostSerialChip2 for 'mdem'), the external one listening on port unless
+// listen is false
 static NewtonErr
-MakeHostSerialChip(Boolean listen, unsigned short port)
+MakeHostSerialChip(ULong location, Boolean listen, unsigned short port)
 {
 	NewtonErr err = InitSerialChipRegistry();
 	if (err != noErr)
 		return err;
-	if (gHostSerialChip != nil)
+	THostSerialChip** slot = location == kHWLocBuiltInModem ? &gHostSerialChip2 : &gHostSerialChip;
+	if (*slot != nil)
 	{
 		// (made already for the GPS receiver, before newton listened)
-		if (listen && gHostSerialChip->fListener < 0)
-			return gHostSerialChip->Listen(port);
+		if (listen && (*slot)->fListener < 0)
+			return (*slot)->Listen(port);
 		return noErr;
 	}
-	THostSerialChip::ClassInfo()->Register();
+	static bool registered = false;
+	if (!registered)
+		THostSerialChip::ClassInfo()->Register();
 	THostSerialChip* chip = (THostSerialChip*) TSerialChip::New((char*) "THostSerialChip");
 	if (chip == nil)
 		return -10007;
+	chip->fLocation = location;
 	if (listen)
 		err = chip->Listen(port);
 	if (err == noErr)
-		err = GetSerialChipRegistry()->Register(chip, kHWLocExternalSerial);
+		err = GetSerialChipRegistry()->Register(chip, location);
 	if (err != noErr)
 	{
 		chip->Delete();
 		return err;
 	}
-	gHostSerialChip = chip;
-	HostRegisterInterruptSource(HostSerialDeadline, HostSerialDeliver);
+	*slot = chip;
+	if (!registered)
+		HostRegisterInterruptSource(HostSerialDeadline, HostSerialDeliver);
+	registered = true;
 	return noErr;
 }
 
@@ -540,7 +570,7 @@ MakeHostSerialChip(Boolean listen, unsigned short port)
 NewtonErr
 HostSerialChipInstall(unsigned short port)
 {
-	return MakeHostSerialChip(true, port);
+	return MakeHostSerialChip(kHWLocExternalSerial, true, port);
 }
 
 
@@ -574,22 +604,12 @@ HostSerialChipListening(void)
 }
 
 
-NewtonErr
-HostSerialChipSetGPS(Boolean on)
+// the receiver's cable plugged into the chip, or pulled out
+static void
+PlugGPS(THostSerialChip* chip, Boolean on)
 {
-	if (on && !HostGPSStarted())
-		return -1;
-	if (gHostSerialChip == nil)
-	{
-		if (!on)
-			return noErr;
-		NewtonErr err = MakeHostSerialChip(false, 0);
-		if (err != noErr)
-			return err;
-	}
-	THostSerialChip* chip = gHostSerialChip;
-	if (on == chip->fGPS)
-		return noErr;
+	if (chip == nil || on == chip->fGPS)
+		return;
 	if (on && chip->fClient >= 0)
 	{
 		HostSocketClose(chip->fClient);		// (the desktop's cable pulled out)
@@ -599,13 +619,37 @@ HostSerialChipSetGPS(Boolean on)
 	chip->fRxHead = chip->fRxCount = chip->fRxReady = 0;
 	chip->fTxCount = 0;
 	chip->fStatusChanged = true;			// (the carrier comes or goes)
-	HostGPSPlug(on);
+}
+
+
+NewtonErr
+HostSerialChipSetGPS(ULong location)
+{
+	if (location != 0 && location != kHWLocExternalSerial && location != kHWLocBuiltInModem)
+		return -1;
+	if (location != 0 && !HostGPSStarted())
+		return -1;
+	if (location != 0)
+	{
+		NewtonErr err = MakeHostSerialChip(location, false, 0);
+		if (err != noErr)
+			return err;
+	}
+	if (location == HostSerialChipGPS())
+		return noErr;
+	PlugGPS(gHostSerialChip, location == kHWLocExternalSerial);
+	PlugGPS(gHostSerialChip2, location == kHWLocBuiltInModem);
+	HostGPSPlug(location != 0);
 	return noErr;
 }
 
 
-Boolean
+ULong
 HostSerialChipGPS(void)
 {
-	return gHostSerialChip != nil && gHostSerialChip->fGPS;
+	if (gHostSerialChip != nil && gHostSerialChip->fGPS)
+		return kHWLocExternalSerial;
+	if (gHostSerialChip2 != nil && gHostSerialChip2->fGPS)
+		return kHWLocBuiltInModem;
+	return 0;
 }

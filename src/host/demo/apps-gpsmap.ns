@@ -4,8 +4,11 @@
 // asynchronous serial endpoint, its native ARM code on src/armcpu here).
 // It opens on the receiver's status - the satellites, track, position,
 // altitude and speed - saying it has no map for the place; the host's
-// receiver (hal/host/HostGPS.h) stands in Melbourne, is moved to
-// Greenwich and set going east at 5 knots.  ctest host.NewtonAppGPSMap:
+// receiver (hal/host/HostGPS.h) is on serial port 2, which GPS Map's
+// Interface Settings call "Serial Port 2" (on a machine with soft
+// buttons: GetRoot().Buttons.soft) - chosen there, it stands in
+// Melbourne, is moved to Greenwich and set going east at 5 knots.  ctest
+// host.NewtonAppGPSMap:
 //
 //   build/host/host/newton --display 320x480 --erase --store tmp/gpsmap.store \
 //       --headless 280 --gps fixed:-37.8136,144.9631,31 \
@@ -21,9 +24,12 @@ wtName := "gpsmap";
 gpSym := '|GPS Map:GESTAUD|;
 
 wtIndex := 0;
-wtSteps := [
-	call gpsPluggedStep with ('nmea),
+wtSteps := call gpsJoin with ([[
+	call gpsPluggedStep with ("mdem", 'nmea),
+	gpsDockingStep,
 	func(done) call openFromExtras with ("GPS Map", gpSym, done),
+	call gpsShowsStep with (gpSym, "waiting on the serial port", ["WAITING FOR GPS DATA"])],
+	call gpsPortSteps with (gpSym, true, "Serial Port 2"), [
 	call gpsShowsStep with (gpSym, "Melbourne from the receiver", ["GPS	: 8", "48.816' S", "57.786' E", "ALT	: 31 m"]),
 	call shotStep with ("gpsmap-1"),
 	call gpsMoveStep with (51.4779, -0.0015, 46, 0, 0),
@@ -34,7 +40,7 @@ wtSteps := [
 	func(done) begin
 		Print("gpsmap: done, " & wtFailures & " failed");
 		HostQuit();
-	end];
+	end]]);
 
 call walkSetup with ([2, 0, 45, 34, 14, 37], func()			// "Daniel"
 	call waitFor with ("gpsmap: installed", func() GetRoot().(gpSym), wtNext, 60));

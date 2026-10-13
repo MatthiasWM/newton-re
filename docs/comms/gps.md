@@ -1,14 +1,16 @@
-# GPS: a receiver on the serial port
+# GPS: a receiver on a serial port
 
 The MessagePad has no GPS and NewtonOS no location service.  Newton GPS
 software talks to a receiver plugged into a serial port - the built-in
 one, a PC card's, or the IR port - itself, reading NMEA 0183 sentences
 off an asynchronous serial endpoint.  So the host gives the machine a
-**receiver at the far end of its external serial port**
-(`hal/host/HostGPS.h`, `hal/host/HostSerialChip.h`'s
-`HostSerialChipSetGPS`), and the applications find it where they would
-have found a Garmin on a cable.  The owner's decision (2026-10-14): the
-serial interface only - no PC card GPS, no location API for scripts.
+**receiver at the far end of a serial port** (`hal/host/HostGPS.h`,
+`hal/host/HostSerialChip.h`'s `HostSerialChipSetGPS`) - serial port 2
+by default, a port of its own, so the external one stays free for
+docking - and the applications find it where they would have found a
+Garmin on a cable.  The owner's decisions (2026-10-14): the serial
+interface only - no PC card GPS, no location API for scripts - and a
+second serial port for the receiver, the main one left available.
 
 ## What the applications do
 
@@ -59,31 +61,54 @@ hears `ASTRAL`, then its sentences (GGA, GSA, GSV, RMC unless
 `$PRWIILOG,<type>,A|V` says otherwise); `$PRWIIRST` starts it over.  A
 real source behind a Tripmate is gated the same way.
 
-## On the serial port
+## Which port
 
-`HostSerialChipSetGPS(true)` makes the receiver the external port's cable
-(making the port if `--serial-port none` left none): DCD, DSR and CTS
-asserted, the receiver's bytes what the serial tool reads (still paced
-at the line's speed), what the tool puts sent to the receiver.  A desktop
-connected over TCP is cut off and none is taken while it is in;
-HostSerialChipListening then says no.  What the receiver said while no
-tool had the port is dropped when one takes it, as at a UART nobody
-serviced.  DEVIATION (hardware): the bytes arrive at whatever speed the
+The ROM knows a second serial port at `'mdem'` (`kHWLocBuiltInModem`):
+`ModemLocations` lists it as "Internal Modem", and the docking loader
+(`comms/SCPLoader.cpp`) looks for a device there after the external
+port.  The host registers a second `THostSerialChip` there for the
+receiver, made when it is first plugged in, so it is a port of its own
+and the external one (`'extr'`) keeps its TCP listener for docking.
+Whether an application can use it depends on whether it asks which port:
+
+| application | Serial Port 2 (`'mdem'`) | how |
+|---|---|---|
+| GPS Monitor | yes | its "i" > Prefs > Port: "Internal Modem" (ModemLocations' title for it) |
+| GPS Map | yes | "i" > Prefs > Interface Settings > Port: "Serial Port 2" - which it adds, as `'mdem'`, on a machine whose root has `Buttons.soft` (the host's has); "Internal Modem" is the same port; its driver restarts when Preferences closes |
+| SatNav driver (GPS Map) | offered ("Serial Port 2") | Rockwell binary only, which the receiver does not speak |
+| GPS View | **no** | it sends no `'schp'` option, so the serial tool gives it the default chip, the external port; with the receiver on port 2 it waits ("waiting for response") without end |
+
+So GPS View wants the receiver on the external port (the Host panel's
+"GPS receiver on: Serial port", or `--gps-port 1`), as a Tripmate.
+
+## On the port
+
+`HostSerialChipSetGPS(location)` - `'mdem'`, `'extr'` or 0 for none -
+makes the receiver that port's cable (making the chip if there was none:
+port 2 always, the external one with `--serial-port none`): DCD, DSR and
+CTS asserted, the receiver's bytes what the serial tool reads (still paced
+at the line's speed), what the tool puts sent to the receiver.  On the
+external port a desktop connected over TCP is cut off and none is taken
+while it is in (HostSerialChipListening then says no).  What the receiver
+said while no tool had the port is dropped when one takes it, as at a
+UART nobody serviced.  Both chips are one host interrupt source, polled
+in turn.  DEVIATION (hardware): the bytes arrive at whatever speed the
 tool sets; a real receiver talks at its own and a tool set to another
 reads noise.
 
-newton plugs the receiver in as an NMEA one when it makes the port
-(`HostSettingsPlugGPS`), unless `--gps-kind tripmate` says a Tripmate;
-the Host preferences panel's "GPS on the serial port" (`gps`: Not
-plugged in, NMEA receiver, DeLorme Tripmate - `docs/host-settings.md`)
-changes it while the machine runs, and is kept: a choice made there wins
-over the default at the next start.
+newton plugs the receiver into serial port 2 when it makes the serial
+port (`HostSettingsPlugGPS`; `--gps-port 1` the external port instead),
+an NMEA one unless `--gps-kind tripmate`.  The Host preferences panel's
+"GPS receiver on" (`gps`: Not plugged in, Serial port 2, Serial port)
+and "GPS receiver" (`gpsKind`: NMEA, DeLorme Tripmate) change them while
+the machine runs (`docs/host-settings.md`), and are kept: a choice made
+there wins over newton's options at the next start.
 
 ## For scripts
 
-`HostGPSAvailable()`, `HostGPSStatus()` - `{source, kind, plugged, fix,
+`HostGPSAvailable()`, `HostGPSStatus()` - `{source, kind, plugged, port, fix,
 latitude, longitude, altitude, speed, course, satellites, time,
-seconds}`, time in minutes since 1904 (UTC) - and
+seconds}`, port `"mdem"` or `"extr"`, time in minutes since 1904 (UTC) - and
 `HostGPSSetPosition(lat, lon, alt, knots, course)` for a pretend source
 (`host/HostGPSNatives.cpp`).
 
@@ -96,11 +121,14 @@ seconds}`, time in minutes since 1904 (UTC) - and
 - `hal.GPSReplay`: a log replayed a cycle a second, noise left out.
 - `host.NewtonAppGPSMonitor`, `host.NewtonAppGPSView`,
   `host.NewtonAppGPSMap` (`src/host/demo/apps-gps*.ns` over
-  `gpshelpers.ns`): each application opened from the Extras drawer with
-  the receiver standing in Melbourne, its display checked, the receiver
-  moved to Greenwich and set going, the display checked again; GPS View
-  after the receiver is made a Tripmate through the Host panel's setting
-  and its Connect button tapped.
+  `gpshelpers.ns`): the receiver on serial port 2 with docking still on;
+  GPS Monitor and GPS Map opened from the Extras drawer, waiting for data
+  until their own Prefs are set to that port (the pen through the "i"
+  button, the Port picker, the slips closed); then, the receiver standing
+  in Melbourne, the display checked, the receiver moved to Greenwich and
+  set going, the display checked again.  GPS View after the receiver is
+  moved to the external port and made a Tripmate through the Host
+  panel's settings, and its Connect button tapped.
 
 ## Not done
 

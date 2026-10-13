@@ -2,9 +2,18 @@
 // HostInclude("gpshelpers.ns") after common.ns, walkhelpers.ns and
 // apphelpers.ns.  newton is started with a GPS receiver standing still in
 // Melbourne (--gps fixed:-37.8136,144.9631,31: 37 48.816' S, 144
-// 57.786' E), which the host plugs into the serial port
-// (hal/host/HostGPS.h); a demo moves it with HostGPSSetPosition and waits
-// for the application's display to follow.
+// 57.786' E), which the host plugs into serial port 2 ('mdem',
+// hal/host/HostGPS.h) - an application is told that port in its own
+// Prefs (gpsPortSteps), or the receiver is moved to the external port with
+// the Host panel's setting; a demo moves the receiver with
+// HostGPSSetPosition and waits for the application's display to follow.
+
+// lists of steps run together
+gpsJoin := func(lists) begin
+	local all := [];
+	foreach list in lists do foreach step in list do AddArraySlot(all, step);
+	all
+end;
 
 // the text of the application's views that have one, run together
 gpsTexts := func(sym) begin
@@ -40,10 +49,70 @@ gpsMoveStep := func(lat, lon, alt, knots, course) func(done) begin
 	call done with ();
 end;
 
-// a step: the receiver on the serial port, of the kind given, with a fix
-gpsPluggedStep := func(kind) func(done) begin
+// a step: the receiver on the port given ("mdem" serial port 2, "extr" the
+// external one), of the kind given, with a fix
+gpsPluggedStep := func(port, kind) func(done) begin
 	local s := HostGPSStatus();
-	call wtCheck with ("the GPS receiver plugged in as " & kind, s and s.plugged and s.kind = kind and s.fix,
-		"(" & SPrintObject(s) & ")");
+	call wtCheck with ("the GPS receiver plugged into " & port & " as " & kind,
+		s and s.plugged and StrEqual(s.port, port) and s.kind = kind and s.fix, "(" & SPrintObject(s) & ")");
 	call done with ();
 end;
+
+// a step: docking over the network still on (the external port free while
+// the receiver is on serial port 2)
+gpsDockingStep := func(done) begin
+	local on := nil;
+	foreach item in HostSettingsList() do
+		if item.setting = 'docking then on := item.value;
+	call wtCheck with ("docking over the network still on", on, "(off)");
+	call done with ();
+end;
+
+// the slip whose title is `title`, closed with its close box
+gpsCloseSlip := func(title) begin
+	local t := call viewWithText with (title);
+	local slip := if t then t:Parent();
+	while slip and not slip.viewQuitScript do slip := slip:Parent();
+	local box := if slip then call findView with (slip, func(v) begin
+		local b := v:GlobalBox();
+		v.buttonClickScript and b.right - b.left < 20 and b.bottom - b.top < 20
+	end);
+	call wtCheck with ("the " & title & " slip closed", box, "(no close box)");
+	if box then call tapCentre with (box);
+end;
+
+// steps: the application told the receiver's port in its own Prefs, as its
+// user does - the "i" button, Prefs, (GPS Map: Interface Settings), the
+// Port picker, the port, the slips closed
+gpsPortSteps := func(sym, viaInterfaceSettings, port) [
+	func(done) begin
+		local info := call findView with (GetRoot().(sym), func(v) v.DoInfoPrefs);
+		call wtCheck with ("the i button", info, "(not found)");
+		if info then call tapCentre with (info);
+		call waitFor with (wtName & ": the i button's picker", pickerUp, done, 10);
+	end,
+	func(done) begin
+		call pickItem with ("Prefs");
+		call waitFor with (wtName & ": its Prefs", func() call viewWithText with (if viaInterfaceSettings then "Interface Settings" else "Port:"), done, 10);
+	end,
+	func(done) begin
+		if viaInterfaceSettings then call tapButtonText with (GetRoot(), "Interface Settings");
+		call waitFor with (wtName & ": the Port picker", func() call viewWithText with ("Port:"), done, 10);
+	end,
+	func(done) begin
+		call tapCentre with (call viewWithText with ("Port:"));
+		call waitFor with (wtName & ": the ports", pickerUp, done, 10);
+	end,
+	func(done) begin
+		call wtCheck with ("the port " & port & " offered", call pickItem with (port), "(not in the picker)");
+		AddDelayedCall(done, nil, 1000);
+	end,
+	func(done) begin
+		call wtCheck with ("the port " & port & " chosen", call viewWithText with (port), "(not shown)");
+		call gpsCloseSlip with ("Interface Options");
+		AddDelayedCall(done, nil, 1000);
+	end,
+	func(done) begin
+		if viaInterfaceSettings then call gpsCloseSlip with ("Preferences");
+		AddDelayedCall(done, nil, 1000);
+	end];

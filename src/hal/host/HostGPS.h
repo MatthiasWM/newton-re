@@ -2,7 +2,7 @@
 	File:		hal/host/HostGPS.h
 
 	Contains:	The host's GPS receiver: what a Newton GPS application
-				reads from a receiver plugged into the serial port.
+				reads from a receiver plugged into a serial port.
 
 				Newton GPS software (GPS Map, GPS Monitor, GPS View - the
 				fixtures under fixtures/packages/apps/GPS*) opens an
@@ -10,8 +10,9 @@
 				picks and reads NMEA 0183 sentences ($GPGGA, $GPRMC,
 				$GPGLL, $GPVTG, ...) off it, one burst a second at 4800
 				baud; there is no GPS service in the OS.  So the host's
-				GPS is a receiver at the far end of the external serial
-				port (HostSerialChip.h's HostSerialChipSetGPS), and this
+				GPS is a receiver at the far end of a serial port - serial
+				port 2 ('mdem', a port of its own) or the external one
+				(HostSerialChip.h's HostSerialChipSetGPS) - and this
 				is the receiver: a thread of its own that each second puts
 				a fix into sentences, and hears what the Newton sends it.
 
@@ -54,12 +55,14 @@
 				host/HostGPSNatives.cpp:
 
 					HostGPSAvailable()	true when newton has a GPS source
-					HostGPSStatus()		{source, kind, plugged, fix,
+					HostGPSStatus()		{source, kind, plugged, port, fix,
 										latitude, longitude, altitude,
 										speed, course, satellites, time}:
 										kind 'nmea or 'tripmate, plugged
-										true when it is on the serial
-										port, fix true when the receiver
+										true when it is on a serial port,
+										port which ("mdem" serial port 2,
+										"extr" the external one), fix
+										true when the receiver
 										has one; latitude and longitude in
 										degrees (reals), altitude in
 										metres, speed in knots, course in

@@ -28,6 +28,12 @@ unchanged, GPS Map's 38 KB of native code on armcpu (ctests
 missing from `HostOptionLayouts` (GPS Map sends it); GPS Monitor blanks
 its track at any speed with its default GGA+VTG sentences, the
 application's own bug (a VTG's speed test the wrong way round).
+Then, so the main port stays free for docking, the receiver went onto a
+serial port of its own: a second host chip at `'mdem'`, the port the ROM's
+ModemLocations call "Internal Modem" and GPS Map "Serial Port 2", where
+GPS Monitor and GPS Map are pointed in their own Prefs (the demos do it
+with the pen); GPS View never names a port and keeps the external one
+(the Host panel's "GPS receiver on", `--gps-port 1`).
 
 ## 2026-10-13: MeshCore on the T-Deck Pro (branch tdeck-meshcore)
 

@@ -74,7 +74,7 @@ endif()
 
 # The GPS receiver (host/HostGPS.h): NMEA 0183 from a pretend receiver, a
 # log, a TCP server or gpsd, or a receiver plugged into the host, on a
-# thread of its own - at the far end of the host's serial port while the
+# thread of its own - at the far end of serial port 2 or the external one while the
 # Host panel has it plugged in (newton --gps).  Built as the cellular
 # engine is, without the Newton include paths.
 add_library(hal_host_gps STATIC
@@ -119,7 +119,8 @@ target_include_directories(hal_serial PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # as the external port whose wire is a TCP socket - a desktop that connects
 # is a cable plugged in (Einstein's port, 3679, by default) - and the
 # built-in IR (host/HostIRChip.h), whose medium is a TCP connection to
-# another host Newton.
+# another host Newton; and serial port 2 ('mdem'), a second chip for the
+# GPS receiver (host/HostGPS.h).
 add_library(hal_host_serial STATIC
     host/HostSerialChip.cpp
     host/HostIRChip.cpp

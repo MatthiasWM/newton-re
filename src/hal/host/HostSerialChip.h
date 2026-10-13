@@ -56,15 +56,20 @@ unsigned short	HostSerialChipPort(void);
 NewtonErr	HostSerialChipSetListening(Boolean on, unsigned short port);
 Boolean		HostSerialChipListening(void);
 
-// The GPS receiver (HostGPS.h, newton --gps) plugged into the port, or taken
-// out again (the Host preferences panel's "GPS on the serial port"): while
-// it is in, it is the cable - DCD, DSR and CTS asserted, its sentences what
-// the tool reads, what the tool sends its - and a desktop connected is cut
-// off and none is taken.  DEVIATION (hardware): the receiver's bytes come
-// at whatever speed the tool sets (a real one talks at its own, 4800 baud,
-// and a tool set otherwise reads noise).  Made the chip if there was none
-// (--serial-port none).  ==> noErr, or why not (no GPS source).
-NewtonErr	HostSerialChipSetGPS(Boolean on);
-Boolean		HostSerialChipGPS(void);
+// The GPS receiver (HostGPS.h, newton --gps) plugged into a serial port, or
+// taken out again (the Host preferences panel's "GPS receiver on"): into
+// serial port 2 - a chip of its own registered at 'mdem', which GPS Map
+// calls "Serial Port 2" and GPS Monitor finds as ModemLocations' "Internal
+// Modem", made for it (HostSerialChipInstallSecond) - or into the external
+// port, 'extr', for software that never names a port (GPS View).  While
+// it is in, it is the port's cable - DCD, DSR and CTS asserted, its
+// sentences what the tool reads, what the tool sends its - and on the
+// external port a desktop connected is cut off and none is taken.
+// DEVIATION (hardware): the receiver's bytes come at whatever speed the
+// tool sets (a real one talks at its own, 4800 baud, and a tool set
+// otherwise reads noise).  location 0 unplugs it.  Makes the chip if there
+// was none (--serial-port none).  ==> noErr, or why not (no GPS source).
+NewtonErr	HostSerialChipSetGPS(ULong location);
+ULong		HostSerialChipGPS(void);		// where it is plugged in ('extr', 'mdem'), or 0
 
 #endif
