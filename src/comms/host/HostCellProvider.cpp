@@ -8,6 +8,7 @@
 
 #include "HostCellProvider.h"
 #include "HostCellular.h"
+#include "HostAppIcon.h"
 #include "Interpreter.h"
 #include "Compiler.h"
 #include "ObjectHeap.h"
@@ -44,7 +45,11 @@ void
 HostCellProviderStart(void)
 {
 	if (!HostCellularStarted())
+	{
+		// (no module: Messages nowhere to be seen, though the store had it)
+		HostRemoveAppIcon("Messages:host");
 		return;
+	}
 	StartSource(gHostCellSource, "HostCell:host", "the cellular provider");
 	StartSource(gHostTextSource, "HostText:host", "the text message transport");
 	StartSource(gHostMessagesSource, "HostMessages:host", "the Messages application");

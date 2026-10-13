@@ -560,6 +560,23 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../fixtures/packages/fonts/monac
                              PASS_REGULAR_EXPRESSION "meshpeer: channel Public [^:]*: Hello everyone.*mesh: done, 0 failed|mesh: done, 0 failed.*meshpeer: channel Public [^:]*: Hello everyone"
                              FAIL_REGULAR_EXPRESSION "waited in vain|FAILED|Traceback|Exception")
     endforeach()
+    # ... and neither application, nor its icon, on those stores once newton
+    # is started without the hardware (comms/host/HostAppIcon.h: the owner's
+    # ask - a host without the radio or the module shows neither)
+    set_tests_properties(host.NewtonMesh.240x320 PROPERTIES FIXTURES_SETUP mesh_store)
+    set_tests_properties(host.NewtonMessages.240x320 PROPERTIES FIXTURES_SETUP messages_store)
+    foreach(kind Mesh Messages)
+        string(TOLOWER ${kind} store)
+        add_test(NAME host.Newton${kind}.unplugged
+                 COMMAND $<TARGET_FILE:newton> --serial-port none --display 240x320
+                         --store ${CMAKE_CURRENT_BINARY_DIR}/${store}-240x320.store --headless 120
+                         --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/unplugged.ns
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+        set_tests_properties(host.Newton${kind}.unplugged PROPERTIES TIMEOUT 180
+                             FIXTURES_REQUIRED ${store}_store DEPENDS host.Newton${kind}.240x320
+                             PASS_REGULAR_EXPRESSION "unplugged: done, 0 failed"
+                             FAIL_REGULAR_EXPRESSION "waited in vain|FAILED|Exception")
+    endforeach()
     add_test(NAME host.NewtonModemAnswer
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/modem/fakemodem.py
                      --incoming echo

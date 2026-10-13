@@ -8,6 +8,7 @@
 
 #include "HostMeshApp.h"
 #include "HostMesh.h"
+#include "HostAppIcon.h"
 #include "Interpreter.h"
 #include "Compiler.h"
 #include "ObjectHeap.h"
@@ -23,7 +24,11 @@ void
 HostMeshAppStart(void)
 {
 	if (!HostMeshStarted())
+	{
+		// (no radio: Mesh nowhere to be seen, though the store had it)
+		HostRemoveAppIcon("Mesh:host");
 		return;
+	}
 	newton_try
 	{
 		RefVar fn(ParseString(RefVar(MakeString(gHostMeshSource))));

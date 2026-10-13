@@ -1,0 +1,44 @@
+// The hardware's applications nowhere to be seen without the hardware
+// (comms/host/HostAppIcon.h): newton started again on a store that had the
+// Mesh or Messages application (ctests host.NewtonMesh.unplugged,
+// host.NewtonMessages.unplugged, after host.NewtonMesh.240x320 and
+// host.NewtonMessages.240x320 on their stores) but without --mesh-air or
+// --cell-port: neither application is built, and neither icon is left in
+// the Extras drawer.
+//
+//   build/host/host/newton --display 240x320 --store build/host/host/mesh-240x320.store \
+//       --headless 120 --script src/host/demo/unplugged.ns
+
+HostInclude("common.ns");
+unFailures := 0;
+
+unCheck := func(what, ok, why) begin
+	if ok then
+		Print("unplugged: " & what & " ok")
+	else begin
+		Print("unplugged: " & what & " FAILED - " & why);
+		unFailures := unFailures + 1;
+	end;
+end;
+
+unIcons := func(app) begin
+	local n := 0;
+	local cursor := Query(GetUnionSoup(@307.name), {type: 'index});
+	local e;
+	while e := cursor:Entry() do begin
+		if e.app = app then n := n + 1;
+		cursor:Next();
+	end;
+	n;
+end;
+
+call waitFor with ("unplugged: the Extras drawer", func() GetUnionSoup(@307.name), func() begin
+	call unCheck with ("no mesh node", not HostMeshAvailable(), "there is one");
+	call unCheck with ("no cellular module", not HostCellAvailable(), "there is one");
+	call unCheck with ("no Mesh application", not GetRoot().|Mesh:host|, "it is built");
+	call unCheck with ("no Messages application", not GetRoot().|Messages:host|, "it is built");
+	call unCheck with ("no Mesh icon", call unIcons with ('|Mesh:host|) = 0, (call unIcons with ('|Mesh:host|)) & " of them");
+	call unCheck with ("no Messages icon", call unIcons with ('|Messages:host|) = 0, (call unIcons with ('|Messages:host|)) & " of them");
+	Print("unplugged: done, " & unFailures & " failed");
+	HostQuit();
+end, 60);

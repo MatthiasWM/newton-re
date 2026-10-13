@@ -74,6 +74,7 @@ set(NEWTON_SOURCES
     comms/fax/FaxToolPhases.cpp
     comms/fax/T4FaxLine.cpp
     comms/fax/T4Tables.cpp
+    comms/host/HostAppIcon.cpp
     comms/host/HostCellProvider.cpp
     comms/host/HostCellTool.cpp
     comms/host/HostDNSTool.cpp
@@ -898,6 +899,7 @@ set(NEWTON_GROUP_6_SOURCES
     comms/NewScriptEndpoint.cpp
     comms/StreamingEndpoint.cpp
     comms/Translators.cpp
+    comms/host/HostAppIcon.cpp
     comms/host/HostCellProvider.cpp
     comms/host/HostLink.cpp
     comms/host/HostMeshApp.cpp

@@ -278,6 +278,12 @@ an alert when a text comes.
 
 ## Messages: the application (2026-10-12)
 
+(Only on a host with a cellular module: without one, a store's Messages
+icon is taken out of Extras at boot - `comms/host/HostAppIcon.h`,
+2026-10-13; ctest `host.NewtonMessages.unplugged`.  A T-Deck Pro without
+the 4G variant still counts as having one: the board starts the engine
+before it knows whether a module answers - NOT YET.)
+
 The In Box is not how people text, so text messages have an application of
 their own, built in wherever the host has a cellular module
 (`src/comms/host/HostMessages.ns`, started with the provider and the

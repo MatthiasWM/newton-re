@@ -124,6 +124,7 @@ add_library(comms_script STATIC
     ${CMAKE_CURRENT_BINARY_DIR}/HostTextSource.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/HostMessagesSource.cpp
     host/HostMeshApp.cpp
+    host/HostAppIcon.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/HostMeshSource.cpp
 )
 # newt: ExceptionNotify and CheckForDeferredActions; views: the root view

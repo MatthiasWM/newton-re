@@ -103,6 +103,14 @@ forgets them); the board's in NVS, namespace `mesh`.
 Laid out for any screen as Messages is (ctests at 240x320, 320x480,
 480x320, 810x1080).
 
+**Only where there is a radio** (the owner's ask, 2026-10-13): the
+application is built only when the host has a mesh node - the T-Deck Pro,
+or a desktop started with `--mesh-air` - and a newton started without one
+on a store that had it takes its Extras icon out again
+(`comms/host/HostAppIcon.h`); Messages does the same without a cellular
+module (`--cell-port`).  A reMarkable has neither.  ctests
+`host.NewtonMesh.unplugged`, `host.NewtonMessages.unplugged`.
+
 ## Settings
 
 On the Host preferences page (`docs/host-settings.md`): **The LoRa radio
@@ -153,6 +161,11 @@ after the advert that follows a first packet was heard.
   setting's presets; snapshots `mesh-<w>x<h>-<n>.pgm`.
 
 ## Not yet
+
+- `host.NewtonMesh.810x1080` failed once in a full `ctest -j 8` run (the
+  peer received the message and both retries, but neither its
+  acknowledgements nor its echoes reached newton; the channel message
+  after did); it passes alone and four at a time.  Not yet understood.
 
 - A message exchanged with another real node on the board.
 - The WiFi companion (MeshCore's companion protocol on TCP port 5000, the
