@@ -68,6 +68,15 @@ void		HostDeviceWifiStatus(int* state, char* ssid, unsigned long* address, long*
 unsigned long	HostDeviceClockSyncs(void);		// how many times the board's clock has been set (from the network, or by hand)
 void		HostDeviceClockSetTo(long long seconds);	// the board's clock set by hand, in seconds from 1970 (GMT)
 
+// the SPI bus the panel and the LoRa radio share (tdeck_panel.cpp):
+// started once, before either, its chip selects parked (==> whether it is up)
+bool		HostDeviceSpiBusStart(void);
+
+// the LoRa radio (tdeck_lora.cpp): the SX1262 given to hal/host/HostMesh.h's
+// MeshCore node, run on a task of its own (==> whether it was started); the
+// mesh's natives then answer for it
+bool		HostDeviceLoraStart(void);
+
 // the cellular module (tdeck_modem.cpp): powered and started with the
 // board, its UART handed to hal/host/HostCellular.h's engine on a task of its
 // own (==> whether it was started); the engine's natives then answer for it

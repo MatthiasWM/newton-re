@@ -80,6 +80,7 @@ set(NEWTON_SOURCES
     comms/host/HostEchoServer.cpp
     comms/host/HostLink.cpp
     comms/host/HostLinkTool.cpp
+    comms/host/HostMeshApp.cpp
     comms/host/HostServices.cpp
     comms/host/HostTCPTool.cpp
     comms/irda/IrDATool.cpp
@@ -163,10 +164,12 @@ set(NEWTON_SOURCES
     host/HostCellularNatives.cpp
     host/HostInterconnect.cpp
     host/HostKeyboard.cpp
+    host/HostMeshNatives.cpp
     host/HostNatives.cpp
     host/HostOrientation.cpp
     host/HostPackages.cpp
     host/HostStores.cpp
+    host/HostUTF8.cpp
     host/HostViews.cpp
     host/HostWifi.cpp
     ink/CICCodeBook.cpp
@@ -897,6 +900,7 @@ set(NEWTON_GROUP_6_SOURCES
     comms/Translators.cpp
     comms/host/HostCellProvider.cpp
     comms/host/HostLink.cpp
+    comms/host/HostMeshApp.cpp
 )
 set(NEWTON_GROUP_6_INCLUDES
     comms
@@ -1329,8 +1333,10 @@ set(NEWTON_GROUP_22_SOURCES
     host/HostCards.cpp
     host/HostCellularNatives.cpp
     host/HostInterconnect.cpp
+    host/HostMeshNatives.cpp
     host/HostNatives.cpp
     host/HostStores.cpp
+    host/HostUTF8.cpp
     host/HostViews.cpp
     host/HostWifi.cpp
 )

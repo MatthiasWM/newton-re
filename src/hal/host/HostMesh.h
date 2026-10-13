@@ -42,10 +42,15 @@
 
 					HostMeshAvailable()		true when there is a mesh node
 					HostMeshStatus()		{state, name, id, region,
-											contacts, received, sent}: state
+											contacts, received, sent,
+											packetsHeard, packetsSent}: state
 											'starting, 'on or 'off (the radio
 											powered down), id the first 4
-											bytes of this node's key in hex
+											bytes of this node's key in hex;
+											received and sent are messages,
+											the packets everything on the air
+											(adverts, acknowledgements, others'
+											traffic: the radio is working)
 					HostMeshContacts()		the nodes heard from, newest first -
 											[{key, name, kind, hops, heard}]:
 											kind 'chat, 'repeater, 'room,
@@ -81,6 +86,7 @@
 #ifndef __HOSTMESH_H
 #define __HOSTMESH_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 namespace mesh { class Radio; }
@@ -126,8 +132,10 @@ void		HostMeshRun(const HostMeshPlatform* platform);	// never returns
 void		HostMeshWillRun(void);	// the host will run it (said early, before the world boots)
 bool		HostMeshStarted(void);
 
-// Random bytes, from the host (keys, packet nonces)
+// Random bytes, from the host (keys, packet nonces): the source a board
+// gives (its hardware's), or std::random_device
 extern "C" void	HostMeshRandom(void* bytes, size_t size);
+void		HostMeshSetRandomSource(void (*source)(void* bytes, size_t size));
 
 // The node's state
 enum HostMeshState { kHostMeshNone, kHostMeshStarting, kHostMeshOn, kHostMeshOff };
@@ -142,6 +150,8 @@ struct HostMeshStatusInfo
 	long					contacts;
 	long					received;	// messages
 	long					sent;
+	long					packetsHeard;	// on the air, anyone's (MeshCore's dispatcher counts)
+	long					packetsSent;
 };
 void		HostMeshGetStatus(HostMeshStatusInfo* status);
 

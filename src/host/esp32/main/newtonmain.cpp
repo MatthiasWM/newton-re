@@ -46,6 +46,7 @@
 #include "NewtonGestalt.h"
 #include "comms/host/HostLink.h"
 #include "comms/host/HostCellProvider.h"
+#include "comms/host/HostMeshApp.h"
 #include "host/HostSettings.h"
 #include "host/HostFontProvider.h"
 #include <stdio.h>
@@ -288,6 +289,7 @@ DevicePreMain(void)
 {
 	HostLinkStart();
 	HostCellProviderStart();			// (the 4G module, for the Phone transport: comms/host/HostCellProvider.h)
+	HostMeshAppStart();					// (the LoRa radio's mesh node, for the Mesh application: comms/host/HostMeshApp.h)
 	HostInstallSettings();				// (the Host preferences panel: the panel's quick updates and clean-ups)
 }
 

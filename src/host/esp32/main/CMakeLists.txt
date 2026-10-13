@@ -11,7 +11,7 @@ endforeach()
 list(APPEND sources ${NEWTON_FORWARDED})
 # (the DDK's own directory as -I too: three of its headers include others
 #  with <...>, and none of its file names is a system header's)
-idf_component_register(SRCS esp32main.cpp newtonmain.cpp tdeck_panel.cpp tdeck_input.cpp tdeck_store.cpp tdeck_profile.cpp tdeck_wifi.cpp tdeck_modem.cpp ${sources}
+idf_component_register(SRCS esp32main.cpp newtonmain.cpp tdeck_panel.cpp tdeck_input.cpp tdeck_store.cpp tdeck_profile.cpp tdeck_wifi.cpp tdeck_modem.cpp tdeck_lora.cpp ${sources}
                        INCLUDE_DIRS . ${NEWTON_SRC}/ddk
                        REQUIRES driver esp_partition spi_flash esp_timer esp_psram vfs freertos lwip nvs_flash esp_wifi esp_netif esp_event)
 
@@ -56,6 +56,97 @@ set_source_files_properties(newtonmain.cpp PROPERTIES COMPILE_OPTIONS "${all_quo
 #  which is plain C++ - none of the Newton's headers)
 set_source_files_properties(tdeck_modem.cpp PROPERTIES COMPILE_OPTIONS "-iquote${NEWTON_SRC}/hal/host")
 
+# The LoRa mesh (docs/host-tdeck-pro-mesh.md): MeshCore and what it needs
+# (thirdparty/meshcore, as its CMakeLists.txt lists them for the desktops),
+# RadioLib's SX126x driver and MeshCore's wrapper for it, and the engine
+# over them (hal/host/HostMesh.cpp) - left out of newton_sources.cmake
+# (tools/tdeck/idf_sources.py) and compiled here with their own include
+# directories, as -I: MeshCore includes its headers with <...>.  MeshCore's
+# contact and channel counts change BaseChatMesh's layout, and RadioLib's
+# GODMODE and STATIC_ONLY its classes', so every one of these files is
+# built with the same definitions; the radio's (LORA_*, SX126X_*) are
+# lilyphone1's build flags.
+set(MESHCORE ${NEWTON_SRC}/thirdparty/meshcore)
+set(mesh_sources
+    ${MESHCORE}/MeshCore/src/Dispatcher.cpp
+    ${MESHCORE}/MeshCore/src/Identity.cpp
+    ${MESHCORE}/MeshCore/src/Mesh.cpp
+    ${MESHCORE}/MeshCore/src/Packet.cpp
+    ${MESHCORE}/MeshCore/src/Utils.cpp
+    ${MESHCORE}/MeshCore/src/helpers/AdvertDataHelpers.cpp
+    ${MESHCORE}/MeshCore/src/helpers/BaseChatMesh.cpp
+    ${MESHCORE}/MeshCore/src/helpers/StaticPoolPacketManager.cpp
+    ${MESHCORE}/MeshCore/src/helpers/TxtDataHelpers.cpp
+    ${MESHCORE}/Crypto/src/AES128.cpp
+    ${MESHCORE}/Crypto/src/AES192.cpp
+    ${MESHCORE}/Crypto/src/AES256.cpp
+    ${MESHCORE}/Crypto/src/AESCommon.cpp
+    ${MESHCORE}/Crypto/src/BigNumberUtil.cpp
+    ${MESHCORE}/Crypto/src/BlockCipher.cpp
+    ${MESHCORE}/Crypto/src/Crypto.cpp
+    ${MESHCORE}/Crypto/src/Curve25519.cpp
+    ${MESHCORE}/Crypto/src/Ed25519.cpp
+    ${MESHCORE}/Crypto/src/Hash.cpp
+    ${MESHCORE}/Crypto/src/SHA256.cpp
+    ${MESHCORE}/Crypto/src/SHA512.cpp
+    ${MESHCORE}/ed25519/src/add_scalar.c
+    ${MESHCORE}/ed25519/src/fe.c
+    ${MESHCORE}/ed25519/src/ge.c
+    ${MESHCORE}/ed25519/src/key_exchange.c
+    ${MESHCORE}/ed25519/src/keypair.c
+    ${MESHCORE}/ed25519/src/sc.c
+    ${MESHCORE}/ed25519/src/sha512.c
+    ${MESHCORE}/ed25519/src/sign.c
+    ${MESHCORE}/ed25519/src/verify.c
+    ${MESHCORE}/compat/CryptoRNG.cpp
+    ${NEWTON_SRC}/hal/host/HostMesh.cpp)
+file(GLOB radiolib_sources
+    ${MESHCORE}/RadioLib/src/*.cpp
+    ${MESHCORE}/RadioLib/src/utils/*.cpp
+    ${MESHCORE}/RadioLib/src/protocols/PhysicalLayer/*.cpp
+    ${MESHCORE}/RadioLib/src/modules/SX126x/*.cpp)
+set(radio_wrapper ${MESHCORE}/MeshCore/src/helpers/radiolib/RadioLibWrappers.cpp)
+# (PlatformIO names an object by its source's file name alone, and these
+#  have names other sources have - ed25519's sha512.c and Crypto's
+#  SHA512.cpp, on a case-insensitive file system - so each is compiled
+#  through a file of its own name, made here, that includes it: as
+#  idf_sources.py's forwarded/ does for the tree's)
+function(mesh_forward out_var)
+    set(forwarded)
+    foreach(f ${ARGN})
+        file(RELATIVE_PATH rel ${NEWTON_SRC} ${f})
+        string(REPLACE "/" "_" name ${rel})
+        set(out ${CMAKE_CURRENT_BINARY_DIR}/meshfwd/${name})
+        set(content "// made by src/host/esp32/main/CMakeLists.txt: ${rel} under a name of its own\n#include \"${f}\"\n")
+        set(old "")
+        if(EXISTS ${out})
+            file(READ ${out} old)
+        endif()
+        if(NOT old STREQUAL content)
+            file(WRITE ${out} "${content}")
+        endif()
+        list(APPEND forwarded ${out})
+    endforeach()
+    set(${out_var} ${forwarded} PARENT_SCOPE)
+endfunction()
+mesh_forward(mesh_sources ${mesh_sources})
+mesh_forward(radiolib_sources ${radiolib_sources})
+mesh_forward(radio_wrapper ${radio_wrapper})
+target_sources(${COMPONENT_LIB} PRIVATE ${mesh_sources} ${radiolib_sources} ${radio_wrapper})
+set(mesh_includes -I${MESHCORE}/compat -I${MESHCORE}/MeshCore/src -I${MESHCORE}/Crypto/src -I${MESHCORE}/ed25519/src
+                  -I${MESHCORE}/base64/src -I${MESHCORE}/RadioLib/src)
+set(mesh_definitions MAX_CONTACTS=64 MAX_GROUP_CHANNELS=4 ED25519_NO_SEED=1 RADIOLIB_GODMODE=1 RADIOLIB_STATIC_ONLY=1
+                     MESHCORE_RADIOLIB=1 LORA_FREQ=916.575 LORA_BW=62.5 LORA_SF=7 LORA_CR=8 LORA_TX_POWER=22
+                     SX126X_DIO3_TCXO_VOLTAGE=1.8 SX126X_CURRENT_LIMIT=140)
+set_source_files_properties(${mesh_sources} ${radiolib_sources} PROPERTIES
+                            COMPILE_OPTIONS "${mesh_includes};-iquote${NEWTON_SRC}/hal/host"
+                            COMPILE_DEFINITIONS "${mesh_definitions}")
+# (the wrapper and the board's radio want Arduino's few names: compat/Arduino.h
+#  forced in)
+set_source_files_properties(${radio_wrapper} tdeck_lora.cpp PROPERTIES
+                            COMPILE_OPTIONS "${mesh_includes};-iquote${NEWTON_SRC}/hal/host;-include;${MESHCORE}/compat/Arduino.h"
+                            COMPILE_DEFINITIONS "${mesh_definitions}")
+
 # comms/host/HostLink.ns, the host's link for the NIE, compiled in as a
 # string as the desktop build does it (src/comms/CMakeLists.txt) - made
 # when CMake configures, not by a custom command: PlatformIO builds with
@@ -88,6 +179,13 @@ set(NAME gHostMessagesSource)
 include(${NEWTON_SRC}/cmake/EmbedText.cmake)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
 target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostMessagesSource.cpp)
+# comms/host/HostMesh.ns, the Mesh application
+set(INPUT ${NEWTON_SRC}/comms/host/HostMesh.ns)
+set(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostMeshSource.cpp)
+set(NAME gHostMeshSource)
+include(${NEWTON_SRC}/cmake/EmbedText.cmake)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
+target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostMeshSource.cpp)
 # host/HostSettings.ns, the Host preferences panel (host/HostSettings.cpp,
 # beside it: the panel's settings - tdeck_panel.cpp answers them)
 set(INPUT ${NEWTON_SRC}/host/HostSettings.ns)

@@ -307,11 +307,13 @@ app_main(void)
 	// the OS leaves little of
 	_Unwind_SetEnableExceptionFdeSorting(1);
 	HostDeviceProfileStart();
+	HostDeviceSpiBusStart();				// (the panel's and the radio's)
 	HostDevicePanelStart();
 	HostDeviceInputStart();
 	HostDeviceStoreStart();
 	gHostDeviceWifi = HostDeviceWifiStart();
 	HostDeviceCellStart();
+	HostDeviceLoraStart();
 	gLines = xQueueCreate(8, kLineSize);
 	xTaskCreatePinnedToCore(ConsoleReader, "console", 4096, NULL, 4, NULL, 0);
 	// the boot runs here, and the run's end is waited for here (the task

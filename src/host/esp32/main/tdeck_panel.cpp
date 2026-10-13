@@ -79,9 +79,10 @@
 #include "esp32host.h"
 
 // pins (LilyGO's schematic): the SPI bus is shared with the LoRa radio
-// and the SD card, kept deselected
+// (tdeck_lora.cpp) and the SD card, kept deselected
 #define PIN_SCK		36
 #define PIN_MOSI	33
+#define PIN_MISO	47		// (the radio's: the panel only writes)
 #define PIN_CS		34
 #define PIN_DC		35
 #define PIN_BUSY	37		// low while busy
@@ -214,13 +215,40 @@ PanelReset(void)
 }
 
 
+// The SPI bus the panel, the LoRa radio and the SD card share (SPI2), every
+// chip select parked high first, as LilyGO's examples do: started once, by
+// app_main before the panel's task and the radio's start, each of which adds
+// its own device (==> whether it is up)
+bool
+HostDeviceSpiBusStart(void)
+{
+	static bool started = false;
+	if (started)
+		return true;
+	const int selects[] = { PIN_CS, PIN_LORA_CS, PIN_SD_CS };
+	for (int pin : selects)
+	{
+		gpio_set_direction((gpio_num_t) pin, GPIO_MODE_OUTPUT);
+		gpio_set_level((gpio_num_t) pin, 1);
+	}
+	spi_bus_config_t bus;
+	memset(&bus, 0, sizeof(bus));
+	bus.mosi_io_num = PIN_MOSI;
+	bus.miso_io_num = PIN_MISO;
+	bus.sclk_io_num = PIN_SCK;
+	bus.quadwp_io_num = -1;
+	bus.quadhd_io_num = -1;
+	bus.max_transfer_sz = 4096;
+	started = spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO) == ESP_OK;
+	if (!started)
+		printf("newton: the SPI bus would not start\n");
+	return started;
+}
+
+
 static bool
 PanelInit(void)
 {
-	gpio_set_direction((gpio_num_t) PIN_LORA_CS, GPIO_MODE_OUTPUT);
-	gpio_set_level((gpio_num_t) PIN_LORA_CS, 1);
-	gpio_set_direction((gpio_num_t) PIN_SD_CS, GPIO_MODE_OUTPUT);
-	gpio_set_level((gpio_num_t) PIN_SD_CS, 1);
 	gpio_set_direction((gpio_num_t) PIN_DC, GPIO_MODE_OUTPUT);
 	gpio_set_direction((gpio_num_t) PIN_BUSY, GPIO_MODE_INPUT);
 	gpio_set_pull_mode((gpio_num_t) PIN_BUSY, GPIO_PULLUP_ONLY);
@@ -228,15 +256,7 @@ PanelInit(void)
 	gBounce = (uint8_t*) heap_caps_malloc(4000, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
 	if (gBounce == NULL)
 		return false;
-	spi_bus_config_t bus;
-	memset(&bus, 0, sizeof(bus));
-	bus.mosi_io_num = PIN_MOSI;
-	bus.miso_io_num = -1;
-	bus.sclk_io_num = PIN_SCK;
-	bus.quadwp_io_num = -1;
-	bus.quadhd_io_num = -1;
-	bus.max_transfer_sz = 4096;
-	if (spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO) != ESP_OK)
+	if (!HostDeviceSpiBusStart())
 		return false;
 	spi_device_interface_config_t dev;
 	memset(&dev, 0, sizeof(dev));

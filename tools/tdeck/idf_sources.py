@@ -32,7 +32,12 @@ import os
 import shlex
 import sys
 
-LEFT_OUT = set()
+# the LoRa mesh: MeshCore and the engine over it, which the board's
+# CMakeLists.txt compiles itself (its headers are -isystem in the desktop
+# build, which this does not copy, and it wants RadioLib's flags), and the
+# desktop's pretend air and meshpeer
+LEFT_OUT = {"hal/host/HostMesh.cpp", "hal/host/HostMeshAir.cpp", "hal/host/MeshPeer.cpp"}
+MESH_PREFIX = "thirdparty/meshcore/"
 # the portable parts of src/host/: every area's natives, the newt world's
 # host boot and display (HostViews.cpp, with the card and interconnect
 # natives it registers), the stores (HostStores.cpp, FactorySoups.cpp)
@@ -78,7 +83,7 @@ def main(argv):
             continue
         if rel.startswith("host/") and rel not in KEPT_IN_HOST:
             continue
-        if rel in LEFT_OUT:
+        if rel in LEFT_OUT or rel.startswith(MESH_PREFIX):
             continue
         sources.add(rel)
         ordered = []

@@ -60,6 +60,8 @@ FHostMeshStatus(RefArg /*rcvr*/)
 	SetSlot(status, "contacts", RefVar(MAKEINT(info.contacts)));
 	SetSlot(status, "received", RefVar(MAKEINT(info.received)));
 	SetSlot(status, "sent", RefVar(MAKEINT(info.sent)));
+	SetSlot(status, "packetsHeard", RefVar(MAKEINT(info.packetsHeard)));
+	SetSlot(status, "packetsSent", RefVar(MAKEINT(info.packetsSent)));
 	return status;
 }
 

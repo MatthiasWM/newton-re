@@ -27,6 +27,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#if defined(ESP_PLATFORM)
+extern "C" void esp_fill_random(void* buf, size_t len);
+#endif
 
 #ifndef HOST_LARGE_STATIC
 #define HOST_LARGE_STATIC
@@ -116,6 +119,13 @@ public:
 
 static void (*gRandomSource)(void* bytes, size_t size) = NULL;
 
+void
+HostMeshSetRandomSource(void (*source)(void* bytes, size_t size))
+{
+	gRandomSource = source;
+}
+
+
 extern "C" void
 HostMeshRandom(void* bytes, size_t size)
 {
@@ -124,10 +134,15 @@ HostMeshRandom(void* bytes, size_t size)
 		gRandomSource(bytes, size);
 		return;
 	}
+#if defined(ESP_PLATFORM)
+	// (ESP-IDF's C library has no getentropy for std::random_device)
+	esp_fill_random(bytes, size);
+#else
 	static std::random_device device;
 	unsigned char* p = (unsigned char*) bytes;
 	for (size_t k = 0; k < size; k++)
 		p[k] = (unsigned char) (device() & 0xFF);
+#endif
 }
 
 
@@ -237,18 +252,26 @@ struct KeptSettings
 };
 const uint32_t	kSettingsVersion = 1;
 
-// a contact as kept: MeshCore's ContactInfo without its cached secret
+// a contact as kept: MeshCore's ContactInfo without its cached secret or
+// its route (learnt again: the first message to it floods), the newest
+// kKeptContacts of them (a board's NVS is small: 32 are 2.8 KB), written
+// only when the list itself changes - who is in it, by what name - not each
+// time one of them announces itself again
 struct KeptContact
 {
 	uint8_t		key[PUB_KEY_SIZE];
 	char		name[32];
-	uint8_t		type, flags, outPathLength, unused;
-	uint8_t		outPath[MAX_PATH_SIZE];
+	uint8_t		type, flags, unused[2];
 	uint32_t	lastAdvert, lastmod;
 	int32_t		latitude, longitude;
 	uint32_t	syncSince;
 };
-const long		kContactsMagic = 0x4D43431;		// "MCC" 1
+const long		kContactsMagic = 0x4D43432;		// "MCC" 2
+const long		kKeptContacts = 32;
+// (file statics, not a function's: a function's static in an inline member
+// function and a file's in the PSRAM section conflict on the board)
+static HOST_LARGE_STATIC KeptContact	gKept[kHostMeshContactsMax];
+static HOST_LARGE_STATIC uint8_t		gContactsBlob[8 + kKeptContacts * sizeof(KeptContact)];
 
 
 // ----------------------------------------------------------------------
@@ -260,6 +283,7 @@ static const HostMeshPlatform*	gPlatform = NULL;
 static KeptSettings				gSettings;
 static bool						gContactsChanged = false;
 static unsigned long			gContactsChangedAt = 0;
+static uint32_t					gContactsSignature = 0;		// the list as last kept
 
 static void		RecordMessage(const char* key, const char* name, const char* channel, const char* text, uint32_t sent);
 
@@ -272,18 +296,41 @@ public:
 	// a node in a pocket is a poor repeater and forwarding costs battery
 	bool	allowPacketForward(const mesh::Packet*) override { return false; }
 
-	void onDiscoveredContact(ContactInfo& contact, bool isNew, uint8_t, const uint8_t*) override
+	void onDiscoveredContact(ContactInfo&, bool, uint8_t, const uint8_t*) override
 	{
-		gContactsChanged = true;
-		gContactsChangedAt = NowMs();
 		Mirror();
+		uint32_t signature = Signature();
+		if (signature != gContactsSignature)
+		{
+			gContactsSignature = signature;
+			gContactsChanged = true;
+			gContactsChangedAt = NowMs();
+		}
 	}
 
 	void onContactPathUpdated(const ContactInfo&) override
 	{
-		gContactsChanged = true;
-		gContactsChangedAt = NowMs();
 		Mirror();
+	}
+
+	// who is in the list, by what name and kind (a hash: FNV-1a)
+	uint32_t Signature()
+	{
+		uint32_t h = 2166136261u;
+		ContactsIterator walk = startContactsIterator();
+		ContactInfo c;
+		while (walk.hasNext(this, c))
+		{
+			if (c.type == ADV_TYPE_NONE)
+				continue;
+			const uint8_t* parts[2] = { c.id.pub_key, (const uint8_t*) c.name };
+			const size_t sizes[2] = { PUB_KEY_SIZE, strnlen(c.name, sizeof(c.name)) };
+			for (int p = 0; p < 2; p++)
+				for (size_t k = 0; k < sizes[p]; k++)
+					h = (h ^ parts[p][k]) * 16777619u;
+			h = (h ^ c.type) * 16777619u;
+		}
+		return h;
 	}
 
 	ContactInfo* processAck(const uint8_t* data) override
@@ -378,7 +425,7 @@ public:
 
 	void SaveContacts()
 	{
-		static HOST_LARGE_STATIC KeptContact kept[kHostMeshContactsMax];
+		KeptContact* kept = gKept;
 		long count = 0;
 		ContactsIterator walk = startContactsIterator();
 		ContactInfo c;
@@ -392,15 +439,23 @@ public:
 			memcpy(k.name, c.name, sizeof(k.name));
 			k.type = c.type;
 			k.flags = c.flags;
-			k.outPathLength = c.out_path_len;
-			memcpy(k.outPath, c.out_path, MAX_PATH_SIZE);
 			k.lastAdvert = c.last_advert_timestamp;
 			k.lastmod = c.lastmod;
 			k.latitude = c.gps_lat;
 			k.longitude = c.gps_lon;
 			k.syncSince = c.sync_since;
 		}
-		static HOST_LARGE_STATIC uint8_t blob[8 + sizeof(kept)];
+		// the newest kept
+		for (long i = 1; i < count; i++)
+			for (long j = i; j > 0 && kept[j].lastmod > kept[j - 1].lastmod; j--)
+			{
+				KeptContact t = kept[j];
+				kept[j] = kept[j - 1];
+				kept[j - 1] = t;
+			}
+		if (count > kKeptContacts)
+			count = kKeptContacts;
+		uint8_t* blob = gContactsBlob;
 		uint32_t magic = kContactsMagic, n = (uint32_t) count;
 		memcpy(blob, &magic, 4);
 		memcpy(blob + 4, &n, 4);
@@ -410,14 +465,14 @@ public:
 
 	void LoadContacts()
 	{
-		static HOST_LARGE_STATIC uint8_t blob[8 + kHostMeshContactsMax * sizeof(KeptContact)];
-		long size = sizeof(blob);
+		uint8_t* blob = gContactsBlob;
+		long size = sizeof(gContactsBlob);
 		if (!gPlatform->load(gPlatform->ref, "contacts", blob, &size) || size < 8)
 			return;
 		uint32_t magic, n;
 		memcpy(&magic, blob, 4);
 		memcpy(&n, blob + 4, 4);
-		if (magic != kContactsMagic || 8 + n * (long) sizeof(KeptContact) > size)
+		if (magic != kContactsMagic || n > kKeptContacts || 8 + n * (long) sizeof(KeptContact) > size)
 			return;
 		for (uint32_t i = 0; i < n; i++)
 		{
@@ -430,8 +485,7 @@ public:
 			c.name[sizeof(c.name) - 1] = 0;
 			c.type = k.type;
 			c.flags = k.flags;
-			c.out_path_len = k.outPathLength;
-			memcpy(c.out_path, k.outPath, MAX_PATH_SIZE);
+			c.out_path_len = OUT_PATH_UNKNOWN;
 			c.last_advert_timestamp = k.lastAdvert;
 			c.lastmod = k.lastmod;
 			c.gps_lat = k.latitude;
@@ -620,6 +674,7 @@ HostMeshRun(const HostMeshPlatform* platform)
 	node->addChannel(PUBLIC_CHANNEL_NAME, PUBLIC_CHANNEL_KEY);
 	node->LoadContacts();
 	node->Mirror();
+	gContactsSignature = node->Signature();
 	gNode = node;
 	{
 		std::lock_guard<std::mutex> hold(gLock);
@@ -694,6 +749,11 @@ HostMeshRun(const HostMeshPlatform* platform)
 
 		node->CheckSends();
 		node->loop();
+		{
+			std::lock_guard<std::mutex> hold(gLock);
+			gStatus.packetsHeard = (long) (node->getNumRecvFlood() + node->getNumRecvDirect());
+			gStatus.packetsSent = (long) (node->getNumSentFlood() + node->getNumSentDirect());
+		}
 
 		unsigned long now = NowMs();
 		if (advert || (long) (now - nextAdvert) >= 0)
