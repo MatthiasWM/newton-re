@@ -28,7 +28,10 @@ newton has no panel settings at all).
 | A finger is the pen (`touch`) | one finger taps and drags as the pen, with the palm rejection of `docs/host-remarkable.md` | reMarkable | `NEWTON_RM_TOUCH=off` to turn off |
 | Screen (next start) (`screenScale`, a picker) | the Newton's screen the panel over 1, 2, 3 or 4 ("2x: 810 x 1080") when newton next starts - AppLoad fixes the framebuffer's size when it is asked for; kept beside the store (below), and the pen's calibration reset to the factory one when the size changes | reMarkable | `--display` |
 | Colour screen (next start) (`colourScreen`) | the screen eight bits whose values a palette's, so applications' colours are drawn in colour (`docs/qd/colour.md`) when newton next starts - the depth is fixed when the screen is made; kept beside the store.  Behind `--colour`: listed only once colour has been asked for (started with `--colour`, or the setting already kept), so it can be turned off here; nothing among the usual packages draws in colour | every host with a store file, once asked for | `--colour` |
-| Clear ghosts (a button) | one flashing redraw of the whole panel, as AppLoad's five-finger tap does | reMarkable | - |
+| A new page drawn in full (`bigChange`) | a change of more than an eighth of the screen (a new page) drawn by a full refresh - clean, but 3 s and flashing; off (the default), every change is a quick partial one (0.65 s) | T-Deck Pro | `DevicePanelSet("bigChange", 12)` (100 off) |
+| Clean up (`cleanCount`, a picker) | after 10, 20, 30 (the default) or 50 quick updates, or never, the ghosts cleaned up by a full refresh at the first two-second pause | T-Deck Pro | `DevicePanelSet("cleanCount", n)` |
+| ... and when still (`cleanAfter`, a picker) | the ghosts cleaned up once the screen has been still 5 s, 10 s, 30 s (the default), a minute, or never | T-Deck Pro | `DevicePanelSet("cleanAfter", ms)` |
+| Clear ghosts (a button) | one flashing redraw of the whole panel, as AppLoad's five-finger tap does (the T-Deck Pro: one full refresh) | reMarkable, T-Deck Pro | - |
 
 A setting changed on the panel takes effect at once (the screen size at the
 next start) and is kept; one never touched stays as newton was started.

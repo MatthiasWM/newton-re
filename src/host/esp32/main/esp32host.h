@@ -27,6 +27,10 @@ int			HostDeviceReadLine(char* line, size_t size);		// a line the console has ty
 void		HostDevicePanelStart(void);
 void		HostDevicePanelShow(const unsigned char* grays, long width, long height);
 bool		HostDevicePanelSet(const char* name, long value);
+// (and the Host preferences panel's settings of it, host/HostWindow.h's
+// HostWindowOption and HostWindowSetOption, are answered there)
+bool		HostWindowOption(const char* name, long* value);
+bool		HostWindowSetOption(const char* name, long value);
 // (the display followed as it changes shape - the Newton turned - by asking
 // for it each time: the grays, their width and height now)
 void		HostDevicePanelFollow(void (*now)(const unsigned char** grays, long* width, long* height));

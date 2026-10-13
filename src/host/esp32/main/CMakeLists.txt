@@ -88,6 +88,15 @@ set(NAME gHostMessagesSource)
 include(${NEWTON_SRC}/cmake/EmbedText.cmake)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
 target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostMessagesSource.cpp)
+# host/HostSettings.ns, the Host preferences panel (host/HostSettings.cpp,
+# beside it: the panel's settings - tdeck_panel.cpp answers them)
+set(INPUT ${NEWTON_SRC}/host/HostSettings.ns)
+set(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostSettingsSource.cpp)
+set(NAME gHostSettingsSource)
+include(${NEWTON_SRC}/cmake/EmbedText.cmake)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
+target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostSettingsSource.cpp ${NEWTON_SRC}/host/HostSettings.cpp)
+set_source_files_properties(${NEWTON_SRC}/host/HostSettings.cpp PROPERTIES COMPILE_OPTIONS "${all_quoted};-iquote${NEWTON_SRC}/host")
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE forQ=1 NDEBUG)
 target_compile_options(${COMPONENT_LIB} PRIVATE

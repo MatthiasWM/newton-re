@@ -167,6 +167,28 @@ Choices(RefArg item, const char* const* choices, int count)
 }
 
 
+// an e-paper panel's clean-ups: after so many quick updates, and after the
+// screen has been still so long (ms) - 0 never
+const int		kCleanChoices = 5;
+static const long			kCleanCounts[kCleanChoices] = { 10, 20, 30, 50, 0 };
+static const char* const	kCleanCountNames[kCleanChoices] = { "After 10 updates", "After 20 updates", "After 30 updates", "After 50 updates", "Never" };
+static const long			kCleanAfters[kCleanChoices] = { 5000, 10000, 30000, 60000, 0 };
+static const char* const	kCleanAfterNames[kCleanChoices] = { "After 5 seconds", "After 10 seconds", "After 30 seconds", "After a minute", "Never" };
+
+// the choice nearest value (one set otherwise - DevicePanelSet - shown as
+// the nearest)
+static long
+ChoiceIndex(const long* values, int count, long value)
+{
+	int best = -1;
+	for (int i = 0; i < count; i++)
+		if ((values[i] == 0) == (value == 0)
+		 && (best < 0 || labs(values[i] - value) < labs(values[best] - value)))
+			best = i;
+	return best < 0 ? 0 : best;
+}
+
+
 // HostSettingsList(): the settings this host has, each {setting, label,
 // kind, value} - kind 'check (value true or nil), 'button, or 'choice
 // (value the index of one of its choices, an array of strings); nextStart
@@ -226,6 +248,22 @@ FHostSettingsList(RefArg /*rcvr*/)
 		RefVar chooser(Item("hostFontChooser", "Choose fonts...", kButton, 0));
 		SetFrameSlot(chooser, RefVar(Intern((char*) "action")), RefVar(Intern((char*) "OpenFontChooser")));
 		AddArraySlot(list, chooser);
+	}
+	// an e-paper panel's quick (partial) updates and the full ones that
+	// clean up their ghosts (the T-Deck Pro's: host/esp32/main/tdeck_panel.cpp)
+	if (HostWindowOption("bigChange", &value))
+		AddArraySlot(list, RefVar(Item("bigChange", "A new page drawn in full", kCheck, value < 100)));
+	if (HostWindowOption("cleanCount", &value))
+	{
+		RefVar item(Item("cleanCount", "Clean up", kChoice, ChoiceIndex(kCleanCounts, kCleanChoices, value)));
+		Choices(item, kCleanCountNames, kCleanChoices);
+		AddArraySlot(list, item);
+	}
+	if (HostWindowOption("cleanAfter", &value))
+	{
+		RefVar item(Item("cleanAfter", "... and when still", kChoice, ChoiceIndex(kCleanAfters, kCleanChoices, value)));
+		Choices(item, kCleanAfterNames, kCleanChoices);
+		AddArraySlot(list, item);
 	}
 	if (HostWindowOption("clearGhosts", &value))
 		AddArraySlot(list, RefVar(Item("clearGhosts", "Clear ghosts", kButton, 0)));
@@ -297,6 +335,15 @@ FHostSetSetting(RefArg /*rcvr*/, RefArg setting, RefArg value)
 			fprintf(stderr, "[host] the host's font families taken out\n");
 		}
 		return TRUEREF;
+	}
+	if (strcmp(name, "bigChange") == 0)
+		return MAKEBOOLEAN(HostWindowSetOption(name, on ? 12 : 100));
+	if (strcmp(name, "cleanCount") == 0 || strcmp(name, "cleanAfter") == 0)
+	{
+		const long* values = strcmp(name, "cleanCount") == 0 ? kCleanCounts : kCleanAfters;
+		if (!ISINT(value) || RINT(value) < 0 || RINT(value) >= kCleanChoices)
+			return NILREF;
+		return MAKEBOOLEAN(HostWindowSetOption(name, values[RINT(value)]));
 	}
 	if (strcmp(name, "directPen") == 0 || strcmp(name, "touch") == 0 || strcmp(name, "clearGhosts") == 0)
 	{

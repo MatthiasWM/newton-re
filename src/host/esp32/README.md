@@ -211,7 +211,10 @@ changed.  Settings (`DevicePanelSet`, while it runs; tdeck_panel.cpp lists
 them): `trace` (each refresh's kind, time and rectangle on the console),
 `bigChange`, `cleanAfter`, `cleanCount`, `cleanPause`, `partialTemperature`, `fullTemperature`,
 `redraw`, `test` (a test pattern - tools/tdeck/panelprobe.py photographs
-it), and the controller's set-up ones kept for comparing.  Touch arrives in
+it), and the controller's set-up ones kept for comparing.  The ones a user
+would change - a new page drawn in full, the two clean-ups, Clear ghosts -
+are on the Newton's own Prefs, Host page too (host/HostSettings.cpp,
+docs/host-settings.md; kept in the System soup).  Touch arrives in
 the panel's pixels; the Newton's own pen calibration takes out a finger's
 offset.
 

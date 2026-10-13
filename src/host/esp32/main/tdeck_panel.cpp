@@ -586,6 +586,36 @@ HostDevicePanelSet(const char* name, long value)
 }
 
 
+// The settings the Host preferences panel offers (host/HostSettings.cpp),
+// as host/HostWindow.h's window options: a new page drawn in full, the
+// clean-ups, and "clearGhosts" (one full refresh of the whole screen)
+bool
+HostWindowOption(const char* name, long* value)
+{
+	if (strcmp(name, "bigChange") == 0)
+		*value = gBigChangePercent;
+	else if (strcmp(name, "cleanCount") == 0)
+		*value = gCleanCount;
+	else if (strcmp(name, "cleanAfter") == 0)
+		*value = gCleanAfterMs;
+	else if (strcmp(name, "clearGhosts") == 0)
+		*value = 0;
+	else
+		return false;
+	return true;
+}
+
+
+bool
+HostWindowSetOption(const char* name, long value)
+{
+	if (strcmp(name, "clearGhosts") == 0)
+		return HostDevicePanelSet("redraw", 2);
+	long now;
+	return HostWindowOption(name, &now) && HostDevicePanelSet(name, value);
+}
+
+
 void
 HostDevicePanelFollow(void (*now)(const unsigned char** grays, long* width, long* height))
 {

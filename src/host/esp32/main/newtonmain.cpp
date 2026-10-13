@@ -46,6 +46,8 @@
 #include "NewtonGestalt.h"
 #include "comms/host/HostLink.h"
 #include "comms/host/HostCellProvider.h"
+#include "host/HostSettings.h"
+#include "host/HostFontProvider.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -286,6 +288,23 @@ DevicePreMain(void)
 {
 	HostLinkStart();
 	HostCellProviderStart();			// (the 4G module, for the Phone transport: comms/host/HostCellProvider.h)
+	HostInstallSettings();				// (the Host preferences panel: the panel's quick updates and clean-ups)
+}
+
+
+// The host's fonts (host/HostFontProvider.h): the board has no font engine
+// of its own to give the Newton, so the Host panel offers none
+bool
+HostFontsAvailable(void)
+{
+	return false;
+}
+
+
+const char*
+HostFontsChosen(void)
+{
+	return nil;
 }
 
 
