@@ -191,8 +191,13 @@ meSteps := [
 		foreach s in HostSettingsList() do
 			if s.setting = 'meshRegion then hostItem := s;
 		call meCheck with ("the radio no longer a Host setting", not hostItem, "it is there");
-		meApp:DoInfoPrefs();
+		// (as the menu's Prefs does: the button sends itself DoInfoPrefs)
+		Perform(info, 'DoInfoPrefs, []);
 		local slip := meApp.prefsSlip;
+		local slipBox := if slip then slip:GlobalBox();
+		call meCheck with ("the Prefs slip from the i button, full size", slipBox and slipBox.right - slipBox.left >= 200
+			and slipBox.bottom - slipBox.top >= 200,
+			"it is " & (if slipBox then (slipBox.right - slipBox.left) & " x " & (slipBox.bottom - slipBox.top) else "missing"));
 		call meCheck with ("the Prefs slip", slip and StrEqual(slip.nameLine.entryLine.text, HostMeshStatus().name)
 			and StrEqual(slip.presetPicker.entryLine.text, "Australia (Narrow)")
 			and StrEqual(slip.frequencyLine.entryLine.text, "916.575"),
@@ -220,7 +225,7 @@ meSteps := [
 			and radio.bandwidth = 250 and radio.spreadingFactor = 10 and not HostMeshRegion(),
 			"it is " & radio.frequency & " " & radio.bandwidth & " " & radio.spreadingFactor);
 		// a frequency the radio cannot take: told, and left as it was
-		meApp:DoInfoPrefs();
+		Perform(meApp.statusBar:ChildViewFrames()[0], 'DoInfoPrefs, []);
 		SetValue(meApp.prefsSlip.frequencyLine.entryLine, 'text, Clone("1200"));
 		meApp.prefsSlip:Close();
 		call meCheck with ("1200 MHz not taken", Abs(HostMeshRadio().frequency - 917.125) < 0.0005,

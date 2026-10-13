@@ -369,7 +369,14 @@
 			the name when the slip is closed (a name set is announced)
 		------------------------------------------------------------------*/
 
+		// (the "i" button sends DoInfoPrefs to itself, which finds this
+		// by inheritance: self is then the button, so the slip is made by
+		// the application itself, base - sized from the button, it was
+		// too small to see)
 		DoInfoPrefs: func()
+			base:TogglePrefs(),
+
+		TogglePrefs: func()
 		begin
 			if prefsSlip and prefsSlip.viewCObject then begin
 				prefsSlip:Close();
