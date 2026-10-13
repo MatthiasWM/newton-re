@@ -58,6 +58,7 @@
 
 		folderTab: nil, headerView: nil, listView: nil, threadView: nil, replyLine: nil,
 		sendButton: nil, statusBar: nil,
+		replyLines: 1,							// (the lines its text wraps to, as last laid out)
 
 		viewSetupFormScript: func()
 		begin
@@ -99,22 +100,28 @@
 			local h := box.bottom - box.top;
 			local barTop := h - (if statusBar then (statusBar:LocalBox()).bottom else 24);
 			local headerH := FontHeight(kBold) + 6;
-			local replyH := FontHeight(kFont) + 14;
 			local wide := w >= kSideBySideWidth;
 			local listW := if wide then Min(w * 2 div 5, 300) else w;
 			local showList := wide or mode = 'list;
 			local showThread := wide or mode <> 'list;
 			local tx := if wide then listW + 1 else 0;
 			local tabH := (folderTab:LocalBox()).bottom - 5;
+			local sendW := StrFontWidth(sendButton.text, kBold) + 20;
+			// the reply line as tall as its text wrapped (at most half the
+			// conversation), the Send button beside its last line
+			local spacing := :ReplySpacing();
+			local maxLines := Max(1, (barTop - tabH - headerH) div 2 div spacing);
+			replyLines := :ReplyLineCount(w - tx - sendW - 18);
+			local replyH := FontHeight(kFont) + 14 + (Min(replyLines, maxLines) - 1) * spacing;
 			folderTab:Show();
 			if showThread then headerView:Show() else headerView:Hide();
 			SetValue(headerView, 'viewBounds, RelBounds(tx, tabH, w - tx, headerH));
 			SetValue(listView, 'viewBounds, RelBounds(0, tabH, listW, barTop - tabH));
 			local threadTop := tabH + headerH;
 			SetValue(threadView, 'viewBounds, RelBounds(tx, threadTop, w - tx, barTop - threadTop - replyH));
-			local sendW := StrFontWidth(sendButton.text, kBold) + 20;
 			SetValue(replyLine, 'viewBounds, RelBounds(tx + 6, barTop - replyH + 4, w - tx - sendW - 18, replyH - 8));
-			SetValue(sendButton, 'viewBounds, RelBounds(w - sendW - 6, barTop - replyH + 4, sendW, replyH - 8));
+			local sendH := FontHeight(kFont) + 6;
+			SetValue(sendButton, 'viewBounds, RelBounds(w - sendW - 6, barTop - 4 - sendH, sendW, sendH));
 			if showList then listView:Show() else listView:Hide();
 			if showThread and currentThread then begin
 				threadView:Show();
@@ -296,13 +303,53 @@
 		SendTyped: func()
 		begin
 			local text := replyLine.entryLine.text;
-			if not StrFilled(text) or not currentThread then
+			// (nothing to send: Send does nothing - StrFilled is only
+			// "not empty", spaces count)
+			if not text or StrLen(TrimString(Clone(text))) = 0 or not currentThread then
 				return nil;
+			// emptied first, so that the line is empty however the sending
+			// goes; with a string of its own, as typing changes the line's
+			// string in place (a literal "" would become the next message)
+			SetValue(replyLine.entryLine, 'text, Clone(""));
+			:ReplyChanged();
 			local t := :ThreadFor(currentThread);
 			:Mesh():SendText(currentThread, if t then t.name, text);
-			SetValue(replyLine.entryLine, 'text, "");
 			:Reload();
 			:Redraw();
+		end,
+
+		// the reply line's spacing between lines
+		ReplySpacing: func()
+			if replyLine and replyLine.entryLine and replyLine.entryLine.viewLineSpacing then
+				replyLine.entryLine.viewLineSpacing
+			else FontHeight(kFont) + 6,
+
+		// how many lines the reply line's text wraps to in a line this wide
+		// (its label's indent taken off; a little narrower than the
+		// paragraph's own wrapping, so as to give a line too many rather
+		// than one too few)
+		ReplyLineCount: func(width)
+		begin
+			local entry := if replyLine then replyLine.entryLine;
+			if not entry or not entry.text or StrLen(entry.text) = 0 then
+				return 1;
+			local font := if entry.viewFont then entry.viewFont else kFont;
+			local textW := width - (if replyLine.indent then replyLine.indent else 0) - 8;
+			Max(1, Length(:WrapText(entry.text, Max(textW, 20), font)));
+		end,
+
+		// the reply line's text changed: laid out again when it wraps to
+		// more lines or fewer
+		ReplyChanged: func()
+		begin
+			if not replyLine then return nil;
+			local box := :LocalBox();
+			local wide := box.right - box.left >= kSideBySideWidth;
+			local tx := if wide then Min((box.right - box.left) * 2 div 5, 300) + 1 else 0;
+			local sendW := StrFontWidth(sendButton.text, kBold) + 20;
+			local lines := :ReplyLineCount(box.right - box.left - tx - sendW - 18);
+			if lines <> replyLines then
+				:Layout();
 		end,
 
 		Announce: func()
@@ -588,7 +635,20 @@
 				viewBounds: {left: 6, top: 270, right: 180, bottom: 290},
 				label: "Say",
 				labelFont: 1058816,
-				entryFont: 10240
+				entryFont: 10240,
+				// the entry wraps (the proto's is one line only), the
+				// reply area growing to fit it
+				viewSetupChildrenScript: func()
+				begin
+					inherited:viewSetupChildrenScript();
+					if BAnd(entryLine.viewJustify, 0x800000) <> 0 then
+						entryLine.viewJustify := entryLine.viewJustify - 0x800000;
+				end,
+				textChanged: func()
+				begin
+					inherited:?textChanged();
+					base:ReplyChanged();
+				end
 			},
 			{
 				_proto: @226,						// protoTextButton

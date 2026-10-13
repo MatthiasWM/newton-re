@@ -89,7 +89,18 @@ forgets them); the board's in NVS, namespace `mesh`.
   is (name, id, preset) or that the radio is off;
 - **New** picks from the nodes heard (`HostMeshContacts`), not the Names
   file - a mesh node has a key, not a number; **Announce** sends this
-  node's advert; **Say** and **Send** below a conversation;
+  node's advert; **Say** and **Send** below a conversation: the Say line
+  wraps and grows with what is written (up to half the conversation's
+  height; the ROM's `protoLabelInputLine` is one line only, so its entry
+  loses `vjOneLineOnly`, and its `textChanged` lays the application out
+  again when the line count changes), Send empties it and does nothing
+  when it holds nothing but spaces (`StrFilled` is only "not empty", as
+  the ROM's is);
+- **an entry line is emptied with `Clone("")`, never a literal `""`**:
+  typing changes the line's string in place, so a literal set once
+  becomes the next message typed, and the next `SetValue` with it changes
+  nothing (the first send emptied the line, the later ones did not;
+  Messages and the Wi-Fi password line had the same);
 - a message sent is *Sending*, then *Sent* (a channel's: on the air),
   *Delivered* (acknowledged) or *Not sent*; on a channel each bubble says
   who said it;
@@ -157,7 +168,9 @@ after the advert that follows a first packet was heard.
   the retry: ~17 s).
 - `host.NewtonMesh.<size>`: `src/host/demo/mesh.ns` against a `meshpeer`
   "Ada" - her channel hello filed under Public, a conversation begun from
-  New, delivered and echoed, a message to the Public channel, the Host
+  New, delivered and echoed; on Public, Send with only spaces doing
+  nothing, the Say line growing and emptied by Send (typed text too); a
+  message to the Public channel, the Host
   setting's presets; snapshots `mesh-<w>x<h>-<n>.pgm`.
 
 ## Not yet

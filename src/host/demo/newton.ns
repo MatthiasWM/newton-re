@@ -42,7 +42,7 @@ clearButton := AddView(GetRoot(), {
 	viewClass: 98, viewFlags: 1 + 0x200 + 0x800, viewBounds: {left: 160, top: 230, right: 230, bottom: 252},
 	viewFormat: 0x4000551, viewJustify: 0x800006, viewFont: kBold12, text: "Clear",
 	viewClickScript: func(unit) begin :TrackButton(unit); true end,
-	buttonClickScript: func() begin SetValue(para, 'text, ""); SetKeyView(para, 0) end });
+	buttonClickScript: func() begin SetValue(para, 'text, Clone("")); SetKeyView(para, 0) end });
 clearButton:Dirty();
 slipButton := AddView(GetRoot(), {		// the slip hidden and shown with its effect
 	viewClass: 98, viewFlags: 1 + 0x200 + 0x800, viewBounds: {left: 240, top: 230, right: 300, bottom: 252},

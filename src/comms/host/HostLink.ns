@@ -187,7 +187,7 @@
 				t.wifiNetwork := n.ssid;
 				if IsSoupEntry(t) then EntryChangeXmit(t, nil);
 			end;
-			if wifiPassword and wifiPassword.entryLine then SetValue(wifiPassword.entryLine, 'text, "");
+			if wifiPassword and wifiPassword.entryLine then SetValue(wifiPassword.entryLine, 'text, Clone(""));
 			:Say("Joining " & n.ssid & "...");
 			AddDelayedCall(func() if viewCObject then :Scan(), nil, 6000);
 		end,

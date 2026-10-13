@@ -4,8 +4,10 @@
 // someone and answers each message to it with "echo: <text>": its icon in
 // the Extras drawer; Ada heard and her channel message filed under the
 // Public channel; a conversation begun with her from New, the message
-// acknowledged ('delivered) and her echo filed beside it; a message on the
-// Public channel ('sent); each screen snapshotted
+// acknowledged ('delivered) and her echo filed beside it; on the Public
+// channel, Send doing nothing with only spaces to send, the reply line
+// growing with a long message and emptied by Send (typed text too), a
+// message to everyone ('sent); each screen snapshotted
 // (mesh-<width>x<height>-<n>.pgm).  The ctests host.NewtonMesh.<size>:
 //
 //   python tools/mesh/meshrun.py \
@@ -143,8 +145,26 @@ meSteps := [
 		call meSnap with ();
 		// the Public channel: a message to everyone
 		meApp:OpenThread("public");
-		SetValue(meApp.replyLine.entryLine, 'text, "Hello everyone");
+		// Send with nothing (or only spaces) to send does nothing
+		local count := Length(call meEntries with ());
+		SetValue(meApp.replyLine.entryLine, 'text, Clone("   "));
 		meApp.sendButton:buttonClickScript();
+		call meCheck with ("Send with only spaces does nothing", Length(call meEntries with ()) = count,
+			Length(call meEntries with ()) - count & " sent");
+		// the reply line grows with a long message
+		local oneLine := meApp.replyLine:LocalBox().bottom;
+		SetValue(meApp.replyLine.entryLine, 'text, Clone("A message long enough to wrap onto several lines of the reply area, which grows to fit it"));
+		call meCheck with ("the reply line grown", meApp.replyLines > 1 and meApp.replyLine:LocalBox().bottom > oneLine,
+			"it is " & meApp.replyLines & " lines");
+		meApp.sendButton:buttonClickScript();
+		call meCheck with ("the reply line emptied and one line again", StrLen(meApp.replyLine.entryLine.text) = 0
+			and meApp.replyLine:LocalBox().bottom = oneLine, "it is \"" & meApp.replyLine.entryLine.text & "\"");
+		// typed (the line's string changed in place), sent, emptied again
+		SetKeyView(meApp.replyLine.entryLine, 0);
+		PostKeyString(meApp.replyLine.entryLine, "Hello everyone");
+		meApp.sendButton:buttonClickScript();
+		call meCheck with ("the line emptied after a typed message", StrLen(meApp.replyLine.entryLine.text) = 0,
+			"it is \"" & meApp.replyLine.entryLine.text & "\"");
 		call waitFor with ("mesh: the channel message sent", func() begin
 			local e := call meEntryWith with ("Hello everyone");
 			e and e.state = 'sent;

@@ -305,13 +305,13 @@
 				local name := GetDataDefs('|nameRef.phone|):GetRoutingInfo(refs[0])[0].name;
 				foreach number in numbers do
 					messages:SendText(number, name, text);
-				SetValue(replyLine.entryLine, 'text, "");
+				SetValue(replyLine.entryLine, 'text, Clone(""));
 				:OpenThread(messages:ThreadKey(numbers[0]));
 			end else if currentThread then begin
 				local t := :ThreadFor(currentThread);
 				if t then
 					messages:SendText(t.number, t.name, text);
-				SetValue(replyLine.entryLine, 'text, "");
+				SetValue(replyLine.entryLine, 'text, Clone(""));
 				:Reload();
 				:Redraw();
 			end;
