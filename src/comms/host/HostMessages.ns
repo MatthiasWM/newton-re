@@ -51,11 +51,10 @@
 		kBold: 1058816,							// bold (face 1: 1 << 20)
 		kSmall: 9216,							// 9 point
 
-		// (the folder tab's: what its picker calls all of them and the unfiled)
+		// (the folder tab's: its picker the conversations - ConversationPicker -
+		// not the folders; labelsFilter always '_all, which the tab looks at)
 		appAll: "All Messages",
-		appObjectUnfiled: "Unfiled Messages",
-		labelsFilter: '_all,					// the folder shown: '_all, nil the unfiled, or a folder
-		storesFilter: nil,
+		labelsFilter: '_all,
 
 		mode: 'list,							// 'list, 'thread or 'compose
 		currentThread: nil,						// the thread shown
@@ -78,6 +77,13 @@
 			foreach v in :ChildViewFrames() do
 				if v.role then
 					self.(v.role) := v;
+			// the folder tab's picker: the conversations (the button's own
+			// scripts, which its proto would find before the tab's)
+			if folderTab and folderTab.showBarText then begin
+				folderTab.showBarText.buttonClickScript := ConversationPicker;
+				folderTab.showBarText.pickActionScript := ConversationPicked;
+				folderTab.showBarText.pickThreads := nil;	// (the conversations it lists)
+			end;
 			:Reload();
 			:Layout();
 		end,
@@ -133,6 +139,9 @@
 				sendButton:Hide();
 			end;
 			toPicker:Hide();
+			// (the tab's title: the conversation shown, or All Messages)
+			if folderTab and folderTab.showBarText then
+				folderTab.showBarText:SyncView();
 			:Redraw();
 		end,
 
@@ -159,21 +168,19 @@
 				local cursor := Query(soup, {type: 'index});
 				local e;
 				while e := cursor:Entry() do begin
-					if :InFolder(e) then begin
-						local key := Intern("t" & e.thread);
-						local t := byThread.(key);
-						if not t then begin
-							t := {thread: e.thread, number: e.number, name: e.name, text: e.text, time: e.time,
-								dir: e.dir, state: e.state, unread: 0};
-							byThread.(key) := t;
-							AddArraySlot(list, t);
-						end else if e.time >= t.time then begin
-							t.text := e.text; t.time := e.time; t.dir := e.dir; t.state := e.state;
-							if e.name then t.name := e.name;
-						end;
-						if e.state = 'unread then
-							t.unread := t.unread + 1;
+					local key := Intern("t" & e.thread);
+					local t := byThread.(key);
+					if not t then begin
+						t := {thread: e.thread, number: e.number, name: e.name, text: e.text, time: e.time,
+							dir: e.dir, state: e.state, unread: 0};
+						byThread.(key) := t;
+						AddArraySlot(list, t);
+					end else if e.time >= t.time then begin
+						t.text := e.text; t.time := e.time; t.dir := e.dir; t.state := e.state;
+						if e.name then t.name := e.name;
 					end;
+					if e.state = 'unread then
+						t.unread := t.unread + 1;
 					cursor:Next();
 				end;
 			end;
@@ -221,25 +228,45 @@
 			if replyLine then SetKeyView(replyLine.entryLine, 0);
 		end,
 
-		// the folder tab's picker chose a folder (or a store)
-		NewFilingFilter: func(what)
-		begin
-			listScroll := 0;
-			:Reload();
-			:Layout();
-		end,
-
-		// a message in the folder shown (a message's labels are its folder)
-		InFolder: func(e)
-		begin
-			if labelsFilter = '_all then true
-			else if not labelsFilter then not e.labels
-			else e.labels = labelsFilter;
-		end,
-
-		// what the folder tab files and filters: the application itself
+		// what the folder tab looks at: the application itself
 		GetTargetInfo: func(reason)
 			{target: nil, targetView: self, targetStore: GetDefaultStore()},
+
+		// a conversation's name: its card's, or its number
+		ThreadName: func(t) if t.name then t.name else t.number,
+
+		// the conversation shown, if one is (the tab's title)
+		ShownThread: func()
+			if mode = 'thread and currentThread then :ThreadFor(currentThread),
+
+		// The folder tab's picker (its button's buttonClickScript, self the
+		// button): All Messages, then the conversations, newest first, the one
+		// shown checked - in place of the ROM's folders and stores
+		ConversationPicker: func()
+		begin
+			local shown := base:ShownThread();
+			pickThreads := if base.threads then Clone(base.threads) else [];
+			local items := [{item: base.appAll, mark: if shown then $  else $\uFC0B}];
+			if Length(pickThreads) > 0 then
+				AddArraySlot(items, 'pickseparator);
+			foreach t in pickThreads do
+				AddArraySlot(items, {item: base:ThreadName(t), mark: if shown and StrEqual(shown.thread, t.thread) then $\uFC0B else $ });
+			DoPopup(items, 0, 2, self);
+		end,
+
+		// ... and its choice (its pickActionScript): the list, or a conversation
+		ConversationPicked: func(index)
+		begin
+			local chosen := if index >= 2 and pickThreads and index - 2 < Length(pickThreads) then pickThreads[index - 2];
+			pickThreads := nil;
+			:hilite(nil);
+			if chosen then
+				base:OpenThread(chosen.thread)
+			else if index = 0 then begin
+				base.currentThread := nil;
+				base:ShowList();
+			end;
+		end,
 
 		ShowList: func()
 		begin
@@ -398,11 +425,24 @@
 
 		stepChildren: [
 			// the folder tab, the clock beside it, as the Extras drawer's
-			// (protoClockFolderTab: its picker the filing filter, which
-			// NewFilingFilter is told of)
+			// (protoClockFolderTab: its picker the conversations - the
+			// button given ConversationPicker in viewSetupDoneScript)
 			{
 				_proto: @670,						// protoClockFolderTab (on protoNewFolderTab @669, on @211)
-				role: 'folderTab
+				role: 'folderTab,
+				// its title the conversation shown, or All Messages (in place of
+				// @669's RedoText - the folder - placed as @669 places it; self
+				// is the button, whose viewSetupFormScript calls it)
+				RedoText: func()
+				begin
+					local t := base:ShownThread();
+					local text := Stringer([$\uFC01, if t then base:ThreadName(t) else base.appAll]);
+					showBarText.text := StrTruncate(text, 137);
+					showBarText.width := StrFontWidth(showBarText.text, showBarText.viewFont) + 16;
+					showBarText.viewBounds := SetBounds(-showBarText.width - 4, 3, -4, 17);
+					showBarText.viewJustify := 8388646;
+					:Dirty();
+				end
 			},
 
 			// the header over a conversation: its name and number - a new

@@ -106,7 +106,20 @@ msSteps := [
 		call msCheck with ("two conversations", Length(msApp.threads) = 2, Length(msApp.threads) & " of them");
 		call msCheck with ("none left in the In Box", Length(call msInBox with ()) = 0, "some");
 		call msSnap with ();
-		msApp:OpenThread("00000002");
+		// the folder tab's picker: All Messages and the two conversations (not
+		// folders); its title All Messages; choosing Alice opens hers
+		local tab := msApp.folderTab.showBarText;
+		call msCheck with ("the tab's title", StrPos(tab.text, "All Messages", 0), "it is " & tab.text);
+		local popup := tab:buttonClickScript();
+		call msCheck with ("the tab's picker", tab.pickThreads and Length(tab.pickThreads) = 2,
+			"it lists " & (if tab.pickThreads then Length(tab.pickThreads)));
+		local alice := 2;
+		if tab.pickThreads and not StrEqual(tab.pickThreads[0].thread, "00000002") then alice := 3;
+		if popup and popup.viewCObject then popup:Close();
+		tab:pickActionScript(alice);
+		call msCheck with ("a conversation chosen from the tab", msApp.mode = 'thread
+			and StrEqual(msApp.currentThread, "00000002"), "the mode is " & msApp.mode);
+		call msCheck with ("the tab's title the conversation", StrPos(tab.text, "Alice Ng", 0), "it is " & tab.text);
 		AddDelayedCall(next, nil, 500);
 	end,
 	func(next) begin

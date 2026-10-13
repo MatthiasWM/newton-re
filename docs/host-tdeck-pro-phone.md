@@ -314,13 +314,16 @@ host gives it**.
   asked for it): `protoClockFolderTab` @670 (on `protoNewFolderTab` @669,
   on the folder tab @211 - told apart by their slots: @670 has
   `TimeString` and `viewIdleScript`, @669 a `title`), across the top of
-  the list (across the whole application when wide); its picker is the
-  filing filter - the application gives `appAll` "All Messages",
-  `appObjectUnfiled` "Unfiled Messages", `labelsFilter` (`'_all`, nil
-  the unfiled, or a folder: a message's `labels`), `GetTargetInfo` (the
-  tab finds the application through it: without one it threw -48811,
-  labelsFilter) and `NewFilingFilter`.  NOT YET: filing a conversation
-  into a folder.
+  the list (across the whole application when wide).  Its picker lists
+  the conversations, not folders (the owner asked for it): "All Messages"
+  and each conversation, newest first, the one shown checked; choosing one
+  opens it, "All Messages" goes back to the list.  The tab's button
+  (`showBarText`) is given the application's `ConversationPicker` and
+  `ConversationPicked` as its `buttonClickScript`/`pickActionScript`, and
+  the tab its own `RedoText` (the title: the conversation shown, or
+  "All Messages", placed as @669 places it).  The tab still wants
+  `appAll`, `labelsFilter` (always `'_all`) and `GetTargetInfo` (it finds
+  the application through it: without one it threw -48811, labelsFilter).
 - **The protos**, from the ROM's 1.x name table (`@269`: protoApp @157,
   protoStatus @219, protoClosebox @166, protoInputLine @185,
   protoLabelInputLine @189, protoTextButton @226, protoGlance @183, ...) and
@@ -342,7 +345,8 @@ ctests `host.NewtonMessages.240x320`, `.320x480`, `.480x320`,
 `messages-<w>x<h>-<n>.pgm`): its icon; texts filed into conversations
 (unread, read once opened; none left in the In Box); a reply from the
 Reply line, `'sent`; an answer arriving into the open conversation; a new
-message to a card.
+message to a card; the tab's picker listing the two conversations, one
+chosen from it opened and its name the tab's title.
 
 NOT YET: the Action picker on a message (Reply, Forward, Copy to Notes,
 Delete); scrolling by the status bar's arrows (the application has
