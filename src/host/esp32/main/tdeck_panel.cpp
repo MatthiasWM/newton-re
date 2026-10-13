@@ -33,11 +33,18 @@
 				line only a power cycle wakes it.
 
 				Which refresh:
-				  - the first picture, a change of more than "bigChange"
-				    of the screen (a new page) and a clean-up once the
-				    screen has been still for "cleanAfter" after partial
-				    ones: full (clears the ghosts; it flashes);
-				  - every other change: partial.
+				  - every change: partial, a new page too (a partial
+				    refresh over the whole screen takes no longer than
+				    one over a word - the waveform's time, 0.65 s - and
+				    came out clean, 2026-10-13);
+				  - full (clears the ghosts; 3 s, and it flashes): the
+				    first picture, a change of more than "bigChange" of
+				    the screen (100: none), and a clean-up after partial
+				    ones - once the screen has been still for
+				    "cleanAfter", or, after "cleanCount" of them, at the
+				    first pause of "cleanPause" (so that a long run of
+				    typing or scrolling is cleaned up too, but never in
+				    the middle of it).
 				The settings can be changed while it runs
 				(HostDevicePanelSet, from NewtonScript DevicePanelSet(name,
 				value)); the set-up's own ones are kept so that others can
@@ -91,8 +98,10 @@ const long		kFrameBytes = kRowBytes * kPanelHeight;
 // the settings (HostDevicePanelSet)
 static volatile long	gPartialTemperature = 0x79;	// "partialTemperature": TSSET for a partial refresh; 0: every refresh full
 static volatile long	gFullTemperature = 0;		// "fullTemperature": TSSET for a full one (0x5A: about a second); 0: the OTP's own (3 s)
-static volatile long	gBigChangePercent = 12;		// "bigChange": a change of more of the screen than this is drawn full
+static volatile long	gBigChangePercent = 100;	// "bigChange": a change of more of the screen than this is drawn full (100: none)
 static volatile long	gCleanAfterMs = 30000;		// "cleanAfter": partial refreshes cleaned up once the screen has been still this long (0: never)
+static volatile long	gCleanCount = 30;			// "cleanCount": ... or after this many of them (0: never) ...
+static volatile long	gCleanPauseMs = 2000;		// "cleanPause": ... once the screen has been still this long
 static volatile long	gTrace = 0;					// "trace": each refresh printed with its time
 // (the set-up, to compare others on the panel while it runs - panelprobe.py)
 static volatile long	gPSR2 = 0x0D;				// "psr2": PSR's second byte (the device spike had 0x8D)
@@ -507,7 +516,8 @@ PanelTask(void*)
 			partialsSinceFull = partial ? partialsSinceFull + 1 : 0;
 			shownAt = esp_timer_get_time();
 		}
-		else if (partialsSinceFull > 0 && gCleanAfterMs > 0 && (t - shownAt) / 1000 >= gCleanAfterMs)
+		else if ((partialsSinceFull > 0 && gCleanAfterMs > 0 && (t - shownAt) / 1000 >= gCleanAfterMs)
+				 || (gCleanCount > 0 && partialsSinceFull >= gCleanCount && (t - shownAt) / 1000 >= gCleanPauseMs))
 		{
 			// the screen still: the ghosts of the partial refreshes cleared
 			Refresh(shown, shown, false);
@@ -562,6 +572,10 @@ HostDevicePanelSet(const char* name, long value)
 		gBigChangePercent = value;
 	else if (strcasecmp(name, "cleanAfter") == 0)
 		gCleanAfterMs = value;
+	else if (strcasecmp(name, "cleanCount") == 0)
+		gCleanCount = value;
+	else if (strcasecmp(name, "cleanPause") == 0)
+		gCleanPauseMs = value;
 	else if (strcasecmp(name, "trace") == 0)
 		gTrace = value;
 	else if (strcasecmp(name, "redraw") == 0)
