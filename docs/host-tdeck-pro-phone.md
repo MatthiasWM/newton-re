@@ -314,7 +314,9 @@ host gives it**.
   asked for it): `protoClockFolderTab` @670 (on `protoNewFolderTab` @669,
   on the folder tab @211 - told apart by their slots: @670 has
   `TimeString` and `viewIdleScript`, @669 a `title`), across the top of
-  the list (across the whole application when wide).  Its picker lists
+  the application whatever it shows - over a conversation alone on a
+  narrow screen too, so the top stays the same (the owner asked for it).
+  Its picker lists
   the conversations, not folders (the owner asked for it): "All Messages"
   and each conversation, newest first, the one shown checked; choosing one
   opens it, "All Messages" goes back to the list.  The tab's button

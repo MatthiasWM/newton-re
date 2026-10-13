@@ -114,10 +114,11 @@
 			local showList := wide or mode = 'list;
 			local showThread := wide or mode <> 'list;
 			local tx := if wide then listW + 1 else 0;
-			// the folder tab over the list (across the top when wide: the
-			// conversation's header under it); none over a conversation alone
-			local tabH := if showList then (folderTab:LocalBox()).bottom + 2 else 0;
-			if showList then folderTab:Show() else folderTab:Hide();
+			// the folder tab across the top whatever is shown (the owner asked
+			// for the top to stay the same over a conversation): the list or
+			// the conversation's header under it
+			local tabH := (folderTab:LocalBox()).bottom + 2;
+			folderTab:Show();
 			if showThread then headerView:Show() else headerView:Hide();
 			SetValue(headerView, 'viewBounds, RelBounds(tx, tabH, w - tx, headerH));
 			SetValue(listView, 'viewBounds, RelBounds(0, tabH, listW, barTop - tabH));
@@ -546,7 +547,7 @@
 
 			// a conversation
 			{
-				viewClass: 74, viewFlags: 513, viewFormat: 0, role: 'threadView,
+				viewClass: 74, viewFlags: 545, viewFormat: 0, role: 'threadView,	// (vClipping: older bubbles cut at its top, not over the header)
 				viewBounds: {left: 0, top: 24, right: 240, bottom: 270},
 				viewDrawScript: func()
 				begin
