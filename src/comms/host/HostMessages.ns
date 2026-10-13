@@ -107,7 +107,7 @@
 			local w := box.right - box.left;
 			local h := box.bottom - box.top;
 			local barTop := h - (if statusBar then (statusBar:LocalBox()).bottom else 24);
-			local headerH := FontHeight(kBold) + 12;
+			local headerH := FontHeight(kBold) + 6;			// (tight: a small screen)
 			local replyH := FontHeight(kFont) + 14;
 			local wide := w >= kSideBySideWidth;
 			local listW := if wide then Min(w * 2 div 5, 300) else w;
@@ -117,7 +117,7 @@
 			// the folder tab across the top whatever is shown (the owner asked
 			// for the top to stay the same over a conversation): the list or
 			// the conversation's header under it
-			local tabH := (folderTab:LocalBox()).bottom + 2;
+			local tabH := (folderTab:LocalBox()).bottom - 3;	// (just under its button, which ends 4 above its bottom)
 			folderTab:Show();
 			if showThread then headerView:Show() else headerView:Hide();
 			SetValue(headerView, 'viewBounds, RelBounds(tx, tabH, w - tx, headerH));
