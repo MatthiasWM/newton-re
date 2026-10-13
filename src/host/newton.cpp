@@ -128,6 +128,19 @@
 	Once listening it prints "[host] cell port N";
 	tools/modem/fakecell.py is the module (docs/host-tdeck-pro-phone.md).
 
+	--gps gives the machine a GPS receiver (hal/host/HostGPS.h), plugged
+	into the external serial port as GPS software expects one - NMEA 0183
+	sentences each second (GPS Map, GPS Monitor, GPS View in
+	fixtures/packages/apps): sim[:lat,lon[,knots]] a pretend one going
+	round a circle, fixed:lat,lon[,alt] one standing still, nmea:file a
+	log replayed, tcp:host:port or gpsd[:host[:port]] a receiver on the
+	network, serial:device[@baud] one plugged into the host (COM3,
+	/dev/ttyUSB0).  --gps-kind tripmate makes it a DeLorme Tripmate (the
+	ASTRAL handshake first: GPS View).  While it is plugged in it is the
+	serial port's cable and nobody docks over the network; the Host
+	preferences panel's "GPS on the serial port" unplugs it or changes
+	its kind (docs/comms/gps.md).
+
 	--mesh-air lan[:port] makes this newton a LoRa mesh node
 	(hal/host/HostMesh.h: a MeshCore chat node, as the T-Deck Pro is)
 	whose radio is a pretend one: packets are datagrams to the UDP
@@ -188,6 +201,7 @@
 #include "HostSoundDriver.h"
 #include "HostEchoServer.h"
 #include "HostCellular.h"
+#include "HostGPS.h"
 #include "HostMesh.h"
 #include "HostSerialChip.h"
 #include "HostIRChip.h"
@@ -287,6 +301,8 @@ static long gSerialPort = kHostSerialPort;	// --serial-port: -1 none
 static long gCellPort = -1;					// --cell-port: -1 none
 static const char* gMeshAir = nil;			// --mesh-air: "lan[:port]"
 static const char* gMeshName = nil;			// --mesh-name
+static const char* gGPS = nil;				// --gps: the GPS receiver's source
+static const char* gGPSKind = nil;			// --gps-kind: nmea or tripmate
 static const char* gIRPeer = nil;			// --ir-peer, or the LAN medium's "lan[:PORT][@ADDRESS]"
 static char gIRLan[80];						// --ir-lan, --ir-lan-interface
 static const char* gIRLanPort = nil;
@@ -310,6 +326,8 @@ Usage(void)
 					"              [--serial-port port|none] [--ir-peer listen:port|host:port] [--print-dir dir]\n"
 					"              [--ir-lan [port]] [--ir-lan-interface address] [--cell-port port]\n"
 					"              [--mesh-air lan[:port]] [--mesh-name name]\n"
+					"              [--gps sim[:lat,lon[,knots]]|fixed:lat,lon[,alt]|nmea:file|tcp:host:port|gpsd[:host[:port]]|serial:device[@baud]]\n"
+					"              [--gps-kind nmea|tripmate]\n"
 					"              [--ipp-printer uri]\n"
 					"By default it boots the object file built from romsrc/ (NEWTON_OBJECTS overrides);\n"
 					"--rom boots a ROM image instead.\n"
@@ -347,6 +365,20 @@ NewtonBoot(void)
 	// boots, as the cellular module is, so the Mesh application is there
 	if (gMeshAir != nil && !HostMeshAirStart(gMeshAir, HostGetStoreFile(), gMeshName))
 		fprintf(stderr, "[host] no mesh air (%s)\n", gMeshAir);
+	// the GPS receiver: its thread started before the newt world boots;
+	// plugged into the serial port once that is made (below)
+	if (gGPS != nil)
+	{
+		char why[160];
+		if (HostGPSStart(gGPS, why, sizeof(why)))
+		{
+			if (gGPSKind != nil && strcmp(gGPSKind, "tripmate") == 0)
+				HostGPSSetKind(kHostGPSTripmate);
+			fprintf(stderr, "[host] GPS receiver: %s\n", gGPS);
+		}
+		else
+			fprintf(stderr, "[host] no GPS receiver: %s\n", why);
+	}
 	HostBootNewtWorld();
 	// DEVIATION: the ROM's boot starts the timers and the serial hardware
 	// (InitializeCommHardware); the host does it here, the external port a
@@ -375,6 +407,8 @@ NewtonBoot(void)
 		// the --ir-peer or nobody)
 		HostSettingsSetBeamPeers(gIRLanAsked ? gIRPeer : nil, gIRLanAsked ? nil : gIRPeer);
 		HostSettingsSetSerialPort(gSerialPort);
+		if (timerErr == noErr)
+			HostSettingsPlugGPS();
 		if (err == noErr)
 			err = HostIRChipInstall(gIRPeer);
 		if (err == noErr)
@@ -1117,6 +1151,10 @@ main(int argc, char** argv)
 			gMeshAir = argv[++i];
 		else if (strcmp(argv[i], "--mesh-name") == 0 && i + 1 < argc)
 			gMeshName = argv[++i];
+		else if (strcmp(argv[i], "--gps") == 0 && i + 1 < argc)
+			gGPS = argv[++i];
+		else if (strcmp(argv[i], "--gps-kind") == 0 && i + 1 < argc)
+			gGPSKind = argv[++i];
 		else if (strcmp(argv[i], "--serial-port") == 0 && i + 1 < argc)
 		{
 			i++;

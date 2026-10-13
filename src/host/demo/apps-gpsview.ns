@@ -1,0 +1,53 @@
+// GPS View 3 (fixtures/packages/apps/GPSView), Harry Dodgson's viewer for
+// the DeLorme Tripmate: its Connect button opens a serial endpoint, waits
+// for the receiver's "ASTRAL", answers it, switches the receiver's
+// sentences down to $GPRMC ($PRWIILOG), sends it the time and place
+// ($PRWIINIT) and then shows each RMC's position, speed and heading.  The
+// host's receiver (hal/host/HostGPS.h) is made a Tripmate with the Host
+// preferences panel's setting ("GPS on the serial port"), then GPS View
+// connects to it and follows it from Melbourne to Greenwich.  ctest
+// host.NewtonAppGPSView:
+//
+//   build/host/host/newton --display 320x480 --erase --store tmp/gpsview.store \
+//       --headless 280 --gps fixed:-37.8136,144.9631,31 \
+//       --package fixtures/packages/apps/GPSView/GPS_View_3.pkg \
+//       --script src/host/demo/apps-gpsview.ns
+//
+// (GPS View was written on an eMate and is meant for a landscape screen;
+// on a MessagePad held upright it fits all the same.)
+
+HostInclude("common.ns");			// tapAt, typeKey, waitFor, walkSetup
+HostInclude("walkhelpers.ns");		// findView, viewWithText, the steps
+HostInclude("apphelpers.ns");		// openFromExtras, tapButtonText
+HostInclude("gpshelpers.ns");		// gpsShowsStep, gpsMoveStep
+
+wtName := "gpsview";
+gvSym := '|GpsApp:Dodgson|;
+
+wtIndex := 0;
+wtSteps := [
+	call gpsPluggedStep with ('nmea),
+	func(done) begin
+		// (the Host panel's choices: not plugged in, NMEA, Tripmate)
+		call wtCheck with ("the receiver made a Tripmate", HostSetSetting('gps, 2), "(not taken)");
+		call done with ();
+	end,
+	call gpsPluggedStep with ('tripmate),
+	func(done) call openFromExtras with ("GPS View", gvSym, done),
+	func(done) begin
+		call tapButtonText with (GetRoot().(gvSym), "Connect");
+		call done with ();
+	end,
+	call gpsShowsStep with (gvSym, "the Tripmate answered", ["Tripmate Okay", "Connected"]),
+	call gpsShowsStep with (gvSym, "Melbourne from the receiver", ["3748.816,S", "14457.786,E"]),
+	call shotStep with ("gpsview-1"),
+	call gpsMoveStep with (51.4779, -0.0015, 46, 0, 0),
+	call gpsShowsStep with (gvSym, "moved to Greenwich", ["5128.674,N", "00000.090,W"]),
+	call shotStep with ("gpsview-2"),
+	func(done) begin
+		Print("gpsview: done, " & wtFailures & " failed");
+		HostQuit();
+	end];
+
+call walkSetup with ([2, 0, 45, 34, 14, 37], func()			// "Daniel"
+	call waitFor with ("gpsview: installed", func() GetRoot().(gvSym), wtNext, 60));

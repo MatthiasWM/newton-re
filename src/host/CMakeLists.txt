@@ -5,7 +5,7 @@
 # the host boots with (HostStores.cpp).
 # the view system on the host (HostViews.h), for newtonscript and the newt
 # world's boot
-add_library(host_views STATIC HostViews.cpp HostNatives.cpp HostStores.cpp HostCards.cpp HostInterconnect.cpp HostWifi.cpp HostCellularNatives.cpp HostMeshNatives.cpp HostUTF8.cpp FactorySoups.cpp HostObjectsFile.cpp)
+add_library(host_views STATIC HostViews.cpp HostNatives.cpp HostStores.cpp HostCards.cpp HostInterconnect.cpp HostWifi.cpp HostCellularNatives.cpp HostMeshNatives.cpp HostGPSNatives.cpp HostUTF8.cpp FactorySoups.cpp HostObjectsFile.cpp)
 target_link_libraries(host_views PUBLIC flash frames comms_script comms_dock comms_fax thirdparty_nie views recognition pcmcia sound system stores packages intl intl_meetings assist hal_host_display hal_host_tablet)
 target_include_directories(host_views PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -13,6 +13,8 @@ target_include_directories(host_views PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(host_views PUBLIC hal_host_cellular)
 # ... and the LoRa mesh engine's (hal/host/HostMesh.h)
 target_link_libraries(host_views PUBLIC hal_host_mesh)
+# ... and the GPS receiver's (hal/host/HostGPS.h), on the serial port
+target_link_libraries(host_views PUBLIC hal_host_gps hal_host_serial)
 
 add_executable(newtonscript newtonscript.cpp NSRoundTrip.cpp IMATool.cpp)
 target_link_libraries(newtonscript PRIVATE host_views)
@@ -1848,6 +1850,31 @@ if(EXISTS ${THIRDPARTY_DIR}/apps/RPNcalc/rpncalc.pkg)
     # Stack > Recipe, a field edited and a card added
     newton_app_demo(NewtCard newtcard apps/NewtCard/newtcard.pkg apps/NewtCard/NewtCard/Stacks/HOME.PKG
                     apps/NewtCard/NewtCard/Stacks/ADDRESS.PKG apps/NewtCard/NewtCard/Stacks/RECIPE.PKG)
+    # the GPS applications (fixtures/packages/apps/GPS*) reading the host's
+    # GPS receiver on the serial port (hal/host/HostGPS.h): one standing
+    # still in Melbourne, moved by the demo (src/host/demo/gpshelpers.ns)
+    function(newton_gps_demo name script)
+        set(packages)
+        foreach(pkg ${ARGN})
+            list(APPEND packages --package ${THIRDPARTY_DIR}/${pkg})
+        endforeach()
+        add_test(NAME host.NewtonApp${name}
+                 COMMAND newton --display 320x480 --erase
+                         --store ${CMAKE_CURRENT_BINARY_DIR}/app-${script}.store --headless 280
+                         --serial-port 0 --gps fixed:-37.8136,144.9631,31
+                         ${packages}
+                         --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/apps-${script}.ns
+                 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+        set_tests_properties(host.NewtonApp${name} PROPERTIES TIMEOUT 340
+                             PASS_REGULAR_EXPRESSION "${script}: done, 0 failed"
+                             FAIL_REGULAR_EXPRESSION "FAILED|waited in vain|is not answered|stopped \\(|fell over")
+    endfunction()
+    # GPS Monitor: its NMEA readout; GPS View: the receiver made a Tripmate
+    # in the Host panel, the ASTRAL handshake; GPS Map: its native NMEA
+    # driver on armcpu
+    newton_gps_demo(GPSMonitor gpsmonitor apps/GPSMonitor2.0b9/GPS_MON.PKG)
+    newton_gps_demo(GPSView gpsview apps/GPSView/GPS_View_3.pkg)
+    newton_gps_demo(GPSMap gpsmap apps/GPSMap2.1/GPS_Map21.pkg)
 else()
     message(STATUS "fixtures/packages not there: host.NewtonThirdPartyPackages is not run")
 endif()

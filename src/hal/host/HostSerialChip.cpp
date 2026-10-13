@@ -12,6 +12,7 @@
 #include "HALSerialChip.h"
 #include "HostSerialChip.h"
 #include "HostSockets.h"
+#include "HostGPS.h"
 #include "HostInterruptSources.h"
 #include "HALOptions.h"
 #include "Options.h"
@@ -90,6 +91,7 @@ public:
 	unsigned short		fPort;
 	int					fListener;			// the listening socket, or -1
 	int					fClient;			// the desktop's connection, or -1
+	Boolean				fGPS;				// the GPS receiver is plugged in instead (HostGPS.h)
 	void*				fTool;				// the tool that has the chip, and its handlers
 	SCCChannelInts		fHandlers;
 	Boolean				fIntEnabled;
@@ -119,6 +121,7 @@ THostSerialChip::New()
 	fPort = 0;
 	fListener = -1;
 	fClient = -1;
+	fGPS = false;
 	fTool = nil;
 	memset(&fHandlers, 0, sizeof(fHandlers));
 	fIntEnabled = false;
@@ -168,6 +171,14 @@ THostSerialChip::InstallChipHandler(void* serialTool, SCCChannelInts* intHandler
 		return -1;				// (claimed: as the 16450 answers)
 	fHandlers = *intHandlers;
 	fTool = serialTool;
+	if (fGPS)
+	{
+		// (what the receiver said while nobody was reading the port is gone,
+		// as it would be at a UART nobody serviced)
+		unsigned char stale[256];
+		while (HostGPSRead(stale, sizeof(stale)) > 0)
+			;
+	}
 	return noErr;
 }
 
@@ -226,7 +237,7 @@ THostSerialChip::GetSerialStatus()
 		status |= kSerialRxCharAvailable;
 	if (fTxCount < kTxSize)
 		status |= kSerialTxBufferEmpty;
-	if (fClient >= 0)
+	if (fClient >= 0 || fGPS)
 		status |= kSerialDCDAsserted | kSerialDSRAsserted | kSerialCTSAsserted;
 	return status;
 }
@@ -359,6 +370,25 @@ THostSerialChip::Due(Int64* when)
 void
 THostSerialChip::Poll(void)
 {
+	if (fGPS)
+	{
+		// the GPS receiver's cable: what it said, and what the tool put to it
+		while (fRxCount < kRxSize)
+		{
+			long tail = (fRxHead + fRxCount) % kRxSize;
+			long room = (tail >= fRxHead) ? kRxSize - tail : fRxHead - tail;
+			long got = HostGPSRead(fRx + tail, room);
+			if (got <= 0)
+				break;
+			fRxCount += got;
+		}
+		if (fTxCount > 0)
+		{
+			HostGPSWrite(fTx, fTxCount);
+			fTxCount = 0;
+		}
+		return;
+	}
 	if (fClient < 0 && fListener >= 0)
 	{
 		int client;
@@ -473,19 +503,27 @@ HostSerialDeliver(void)
 }
 
 
-NewtonErr
-HostSerialChipInstall(unsigned short port)
+// the chip made and registered as 'extr', listening on port unless listen is
+// false
+static NewtonErr
+MakeHostSerialChip(Boolean listen, unsigned short port)
 {
 	NewtonErr err = InitSerialChipRegistry();
 	if (err != noErr)
 		return err;
 	if (gHostSerialChip != nil)
+	{
+		// (made already for the GPS receiver, before newton listened)
+		if (listen && gHostSerialChip->fListener < 0)
+			return gHostSerialChip->Listen(port);
 		return noErr;
+	}
 	THostSerialChip::ClassInfo()->Register();
 	THostSerialChip* chip = (THostSerialChip*) TSerialChip::New((char*) "THostSerialChip");
 	if (chip == nil)
 		return -10007;
-	err = chip->Listen(port);
+	if (listen)
+		err = chip->Listen(port);
 	if (err == noErr)
 		err = GetSerialChipRegistry()->Register(chip, kHWLocExternalSerial);
 	if (err != noErr)
@@ -496,6 +534,13 @@ HostSerialChipInstall(unsigned short port)
 	gHostSerialChip = chip;
 	HostRegisterInterruptSource(HostSerialDeadline, HostSerialDeliver);
 	return noErr;
+}
+
+
+NewtonErr
+HostSerialChipInstall(unsigned short port)
+{
+	return MakeHostSerialChip(true, port);
 }
 
 
@@ -525,5 +570,42 @@ HostSerialChipSetListening(Boolean on, unsigned short port)
 Boolean
 HostSerialChipListening(void)
 {
-	return gHostSerialChip != nil && gHostSerialChip->fListener >= 0;
+	return gHostSerialChip != nil && gHostSerialChip->fListener >= 0 && !gHostSerialChip->fGPS;
+}
+
+
+NewtonErr
+HostSerialChipSetGPS(Boolean on)
+{
+	if (on && !HostGPSStarted())
+		return -1;
+	if (gHostSerialChip == nil)
+	{
+		if (!on)
+			return noErr;
+		NewtonErr err = MakeHostSerialChip(false, 0);
+		if (err != noErr)
+			return err;
+	}
+	THostSerialChip* chip = gHostSerialChip;
+	if (on == chip->fGPS)
+		return noErr;
+	if (on && chip->fClient >= 0)
+	{
+		HostSocketClose(chip->fClient);		// (the desktop's cable pulled out)
+		chip->fClient = -1;
+	}
+	chip->fGPS = on;
+	chip->fRxHead = chip->fRxCount = chip->fRxReady = 0;
+	chip->fTxCount = 0;
+	chip->fStatusChanged = true;			// (the carrier comes or goes)
+	HostGPSPlug(on);
+	return noErr;
+}
+
+
+Boolean
+HostSerialChipGPS(void)
+{
+	return gHostSerialChip != nil && gHostSerialChip->fGPS;
 }

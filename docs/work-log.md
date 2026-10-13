@@ -9,6 +9,26 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-14: A GPS receiver on the serial port
+
+Three GPS applications added as fixtures (GPS Map 2.1 with its SatNav
+card driver and simulator, GPS Monitor 2.0b9, GPS View 3) and read with
+`pkgns.py`: each opens an asynchronous serial endpoint and reads NMEA
+0183 off it, GPS View expecting a DeLorme Tripmate's ASTRAL handshake.
+The owner chose the serial interface only, so the host's GPS is a
+receiver at the far end of the external serial port
+(`hal/host/HostGPS.h`, `HostSerialChipSetGPS`; `docs/comms/gps.md`):
+pretend (a circle, or standing still and moved by script), a log
+replayed, TCP, gpsd or a receiver on a host serial port, as an NMEA
+receiver or a Tripmate - `newton --gps`, `--gps-kind`, and the Host
+panel's "GPS on the serial port".  All three applications follow it
+unchanged, GPS Map's 38 KB of native code on armcpu (ctests
+`host.NewtonAppGPSMonitor`, `.GPSView`, `.GPSMap`; `hal.GPS`,
+`hal.GPSReplay`).  On the way: the serial discard option (`'sdsc'`) was
+missing from `HostOptionLayouts` (GPS Map sends it); GPS Monitor blanks
+its track at any speed with its default GGA+VTG sentences, the
+application's own bug (a VTG's speed test the wrong way round).
+
 ## 2026-10-13: MeshCore on the T-Deck Pro (branch tdeck-meshcore)
 
 The owner's lilyphone1 MeshCore node brought over

@@ -56,4 +56,15 @@ unsigned short	HostSerialChipPort(void);
 NewtonErr	HostSerialChipSetListening(Boolean on, unsigned short port);
 Boolean		HostSerialChipListening(void);
 
+// The GPS receiver (HostGPS.h, newton --gps) plugged into the port, or taken
+// out again (the Host preferences panel's "GPS on the serial port"): while
+// it is in, it is the cable - DCD, DSR and CTS asserted, its sentences what
+// the tool reads, what the tool sends its - and a desktop connected is cut
+// off and none is taken.  DEVIATION (hardware): the receiver's bytes come
+// at whatever speed the tool sets (a real one talks at its own, 4800 baud,
+// and a tool set otherwise reads noise).  Made the chip if there was none
+// (--serial-port none).  ==> noErr, or why not (no GPS source).
+NewtonErr	HostSerialChipSetGPS(Boolean on);
+Boolean		HostSerialChipGPS(void);
+
 #endif

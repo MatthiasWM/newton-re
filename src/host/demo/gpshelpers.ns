@@ -1,0 +1,49 @@
+// What the GPS application demos share (apps-gps*.ns), run by
+// HostInclude("gpshelpers.ns") after common.ns, walkhelpers.ns and
+// apphelpers.ns.  newton is started with a GPS receiver standing still in
+// Melbourne (--gps fixed:-37.8136,144.9631,31: 37 48.816' S, 144
+// 57.786' E), which the host plugs into the serial port
+// (hal/host/HostGPS.h); a demo moves it with HostGPSSetPosition and waits
+// for the application's display to follow.
+
+// the text of the application's views that have one, run together
+gpsTexts := func(sym) begin
+	local all := "";
+	call findView with (GetRoot().(sym), func(v) begin
+		if IsString(v.text) then all := all & v.text & "|";
+		nil
+	end);
+	all
+end;
+
+// a test: the application shows every one of `pieces`
+gpsShows := func(sym, pieces) func() begin
+	local all := call gpsTexts with (sym);
+	local ok := true;
+	foreach piece in pieces do
+		if not StrPos(all, piece, 0) then ok := nil;
+	ok
+end;
+
+// a step: wait until the application shows `pieces`, checked as `what`
+gpsShowsStep := func(sym, what, pieces) func(done) begin
+	local test := call gpsShows with (sym, pieces);
+	call waitFor with (wtName & ": " & what, test, func() begin
+		call wtCheck with (what, call test with (), "(it shows " & call gpsTexts with (sym) & ")");
+		call done with ();
+	end, 40);
+end;
+
+// a step: the receiver moved (and how fast it goes, which way)
+gpsMoveStep := func(lat, lon, alt, knots, course) func(done) begin
+	call wtCheck with ("the receiver moved", HostGPSSetPosition(lat, lon, alt, knots, course), "(HostGPSSetPosition refused)");
+	call done with ();
+end;
+
+// a step: the receiver on the serial port, of the kind given, with a fix
+gpsPluggedStep := func(kind) func(done) begin
+	local s := HostGPSStatus();
+	call wtCheck with ("the GPS receiver plugged in as " & kind, s and s.plugged and s.kind = kind and s.fix,
+		"(" & SPrintObject(s) & ")");
+	call done with ();
+end;

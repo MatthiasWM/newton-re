@@ -15,6 +15,7 @@
 #include "hal/host/HostIRChip.h"
 #include "hal/host/HostCellular.h"
 #include "hal/host/HostSerialChip.h"
+#include "hal/host/HostGPS.h"
 #include "NewtWorld.h"
 #include "Frames.h"
 #include "ObjectHeap.h"
@@ -198,6 +199,32 @@ ChoiceIndex(const long* values, int count, long value)
 }
 
 
+// the GPS receiver on the serial port (hal/host/HostGPS.h): none, or one of
+// its kinds; and whether the panel has chosen yet (if not, newton plugs it
+// in when it starts the serial port - HostSettingsPlugGPS)
+static const char* const	kGPSChoices[3] = { "Not plugged in", "NMEA receiver", "DeLorme Tripmate" };
+static bool					gGPSChosen = false;
+
+static bool
+SetGPS(long choice)
+{
+	if (choice > 0)
+		HostGPSSetKind(choice == 2 ? kHostGPSTripmate : kHostGPSNMEA);
+	return HostSerialChipSetGPS(choice > 0) == noErr;
+}
+
+
+void
+HostSettingsPlugGPS(void)
+{
+	if (HostGPSStarted() && !gGPSChosen && !HostSerialChipGPS())
+	{
+		bool taken = SetGPS(1 + HostGPSGetKind());
+		fprintf(stderr, "[host] the GPS receiver on the serial port%s\n", taken ? "" : " - it could not be plugged in");
+	}
+}
+
+
 // HostSettingsList(): the settings this host has, each {setting, label,
 // kind, value} - kind 'check (value true or nil), 'button, or 'choice
 // (value the index of one of its choices, an array of strings); nextStart
@@ -211,6 +238,12 @@ FHostSettingsList(RefArg /*rcvr*/)
 		AddArraySlot(list, RefVar(Item("lanBeam", "Beam over the network", kCheck, HostIRChipOnLan())));
 	if (gSerialPort >= 0)
 		AddArraySlot(list, RefVar(Item("docking", "Dock over the network", kCheck, HostSerialChipListening())));
+	if (HostGPSStarted())
+	{
+		RefVar item(Item("gps", "GPS on the serial port", kChoice, HostSerialChipGPS() ? 1 + HostGPSGetKind() : 0));
+		Choices(item, kGPSChoices, 3);
+		AddArraySlot(list, item);
+	}
 	if (HostCellularPowerSwitchable())
 		AddArraySlot(list, RefVar(Item("cellPower", "The 4G module on", kCheck, HostCellularPowered())));
 	// (the LoRa mesh node's settings - its radio's power and preset, its
@@ -323,6 +356,15 @@ FHostSetSetting(RefArg /*rcvr*/, RefArg setting, RefArg value)
 			fprintf(stderr, "[host] docking over the network on: serial port %u\n", (unsigned) HostSerialChipPort());
 		else
 			fprintf(stderr, "[host] docking over the network %s%s\n", on ? "on" : "off", taken ? "" : " - the port could not be opened");
+		return MAKEBOOLEAN(taken);
+	}
+	if (strcmp(name, "gps") == 0)
+	{
+		if (!HostGPSStarted() || !ISINT(value) || RINT(value) < 0 || RINT(value) > 2)
+			return NILREF;
+		gGPSChosen = true;
+		bool taken = SetGPS(RINT(value));
+		fprintf(stderr, "[host] GPS on the serial port: %s%s\n", kGPSChoices[RINT(value)], taken ? "" : " - not taken");
 		return MAKEBOOLEAN(taken);
 	}
 	if (strcmp(name, "cellPower") == 0)

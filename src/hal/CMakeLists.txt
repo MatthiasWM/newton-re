@@ -72,6 +72,20 @@ if(Threads_FOUND)
     target_link_libraries(hal_host_cellular PUBLIC Threads::Threads)
 endif()
 
+# The GPS receiver (host/HostGPS.h): NMEA 0183 from a pretend receiver, a
+# log, a TCP server or gpsd, or a receiver plugged into the host, on a
+# thread of its own - at the far end of the host's serial port while the
+# Host panel has it plugged in (newton --gps).  Built as the cellular
+# engine is, without the Newton include paths.
+add_library(hal_host_gps STATIC
+    host/HostGPS.cpp
+)
+target_link_libraries(hal_host_gps PUBLIC newton_config hal_host_sockets)
+target_include_directories(hal_host_gps PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/host)
+if(Threads_FOUND)
+    target_link_libraries(hal_host_gps PUBLIC Threads::Threads)
+endif()
+
 # The LoRa mesh engine (host/HostMesh.h): a MeshCore chat node
 # (thirdparty/meshcore) on the radio the host gives it - a board's SX1262,
 # or a desktop's pretend one whose air is a UDP multicast group
@@ -110,7 +124,7 @@ add_library(hal_host_serial STATIC
     host/HostSerialChip.cpp
     host/HostIRChip.cpp
 )
-target_link_libraries(hal_host_serial PUBLIC newton_config hal_serial hal_host hal_host_sockets)
+target_link_libraries(hal_host_serial PUBLIC newton_config hal_serial hal_host hal_host_sockets hal_host_gps)
 target_include_directories(hal_host_serial PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/host)
 
 # The host's PC card (host/HostCard.h: a card image in Einstein's container

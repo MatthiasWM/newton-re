@@ -1,0 +1,44 @@
+// GPS Monitor 2.0b9 (fixtures/packages/apps/GPSMonitor2.0b9), Gerd
+// Staudenmaier's tool for checking a GPS receiver for GPS Map: it opens an
+// asynchronous serial endpoint on the port its Prefs name (the serial
+// port by default, 4800 baud) as it opens, and shows the NMEA sentences'
+// position, track, speed, altitude and DOP.  Here the receiver is the
+// host's (hal/host/HostGPS.h): standing still in Melbourne, then moved to
+// Greenwich, then set going at 5 knots.  ctest host.NewtonAppGPSMonitor:
+//
+//   build/host/host/newton --display 320x480 --erase --store tmp/gpsmonitor.store \
+//       --headless 280 --gps fixed:-37.8136,144.9631,31 \
+//       --package fixtures/packages/apps/GPSMonitor2.0b9/GPS_MON.PKG \
+//       --script src/host/demo/apps-gpsmonitor.ns
+//
+// (Its track shows "--------" whenever the speed is over 0.1 knot with its
+// usual sentences, GGA and VTG: decode_NMEA clears the track when
+// Abs(Speed) > 0.1 after a VTG, and when < 0.1 after an RMC - the VTG's
+// test the wrong way round, the application's own bug.)
+
+HostInclude("common.ns");			// tapAt, typeKey, waitFor, walkSetup
+HostInclude("walkhelpers.ns");		// findView, viewWithText, the steps
+HostInclude("apphelpers.ns");		// openFromExtras, tapButtonText
+HostInclude("gpshelpers.ns");		// gpsShowsStep, gpsMoveStep
+
+wtName := "gpsmonitor";
+gmSym := '|GPS Monitor:GESTAUD|;
+
+wtIndex := 0;
+wtSteps := [
+	call gpsPluggedStep with ('nmea),
+	func(done) call openFromExtras with ("GPS Monitor", gmSym, done),
+	call gpsShowsStep with (gmSym, "Melbourne from the receiver", ["48.816' S", "57.786' E", "ALT	: 31 m", "DOP	: 0.9", "SPD	: 0 kn"]),
+	call shotStep with ("gpsmonitor-1"),
+	call gpsMoveStep with (51.4779, -0.0015, 46, 0, 0),
+	call gpsShowsStep with (gmSym, "moved to Greenwich", ["28.674' N", "0.090' W", "ALT	: 46 m"]),
+	call gpsMoveStep with (51.4779, -0.0015, 46, 5, 90),
+	call gpsShowsStep with (gmSym, "going at 5 knots", ["SPD	: 5 kn"]),
+	call shotStep with ("gpsmonitor-2"),
+	func(done) begin
+		Print("gpsmonitor: done, " & wtFailures & " failed");
+		HostQuit();
+	end];
+
+call walkSetup with ([2, 0, 45, 34, 14, 37], func()			// "Daniel"
+	call waitFor with ("gpsmonitor: installed", func() GetRoot().(gmSym), wtNext, 60));

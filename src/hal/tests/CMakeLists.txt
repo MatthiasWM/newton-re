@@ -4,6 +4,14 @@ add_executable(test_HostCellular test_HostCellular.cpp)
 target_link_libraries(test_HostCellular PRIVATE hal_host_cellular)
 add_test(NAME hal.Cellular COMMAND test_HostCellular)
 
+# the GPS receiver (host/HostGPS.h): its sentences and their parsing, a
+# fixed receiver and a Tripmate run, and a log replayed
+add_executable(test_HostGPS test_HostGPS.cpp)
+target_link_libraries(test_HostGPS PRIVATE hal_host_gps)
+add_test(NAME hal.GPS COMMAND test_HostGPS)
+add_test(NAME hal.GPSReplay COMMAND test_HostGPS replay WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+set_tests_properties(hal.GPS hal.GPSReplay PROPERTIES TIMEOUT 60 PASS_REGULAR_EXPRESSION "all passed")
+
 add_executable(test_HostSerialChip test_HostSerialChip.cpp)
 target_link_libraries(test_HostSerialChip PRIVATE hal_host_serial os600_kernel os600_user)
 add_test(NAME hal.HostSerialChip COMMAND test_HostSerialChip)

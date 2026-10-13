@@ -37,6 +37,7 @@
 #include "HostWifi.h"
 #include "HostCellular.h"
 #include "HostMesh.h"
+#include "HostGPS.h"
 #include "HostTablet.h"
 #include "hal/host/Host.h"
 #include "ROMImport.h"
@@ -282,6 +283,7 @@ HostRegisterViewFunctions(void)
 	HostRegisterWifiFunctions();
 	HostRegisterCellularFunctions();
 	HostRegisterMeshFunctions();
+	HostRegisterGPSFunctions();
 }
 
 

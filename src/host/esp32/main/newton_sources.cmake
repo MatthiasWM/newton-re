@@ -147,6 +147,7 @@ set(NEWTON_SOURCES
     hal/host/HostCellularSocket.cpp
     hal/host/HostFIQTimer.cpp
     hal/host/HostFlash.cpp
+    hal/host/HostGPS.cpp
     hal/host/HostIRChip.cpp
     hal/host/HostInterruptSources.cpp
     hal/host/HostScreen.cpp
@@ -163,6 +164,7 @@ set(NEWTON_SOURCES
     host/FactorySoups.cpp
     host/HostCards.cpp
     host/HostCellularNatives.cpp
+    host/HostGPSNatives.cpp
     host/HostInterconnect.cpp
     host/HostKeyboard.cpp
     host/HostMeshNatives.cpp
@@ -1214,6 +1216,7 @@ set(NEWTON_GROUP_15_INCLUDES
 set(NEWTON_GROUP_16_SOURCES
     hal/host/HostCellular.cpp
     hal/host/HostCellularSocket.cpp
+    hal/host/HostGPS.cpp
 )
 set(NEWTON_GROUP_16_INCLUDES
     hal/host
@@ -1334,6 +1337,7 @@ set(NEWTON_GROUP_22_SOURCES
     host/FactorySoups.cpp
     host/HostCards.cpp
     host/HostCellularNatives.cpp
+    host/HostGPSNatives.cpp
     host/HostInterconnect.cpp
     host/HostMeshNatives.cpp
     host/HostNatives.cpp

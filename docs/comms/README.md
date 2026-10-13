@@ -657,6 +657,13 @@ Newt's Cape's behaviour, kept as it is:
   ending in a return and the later lookup of the trimmed URL misses.
   `demo/newtscape.ns` uses File > Open Location instead.
 
+## A GPS receiver on the serial port
+
+`newton --gps` puts a GPS receiver at the far end of the external serial
+port - pretend, a log, gpsd or TCP, or one plugged into the host - for
+the GPS applications (GPS Map, GPS Monitor, GPS View) to read their NMEA
+sentences from: [gps.md](gps.md).
+
 ## Devices that bring their own package
 
 A device plugged into the serial port can carry the package that drives

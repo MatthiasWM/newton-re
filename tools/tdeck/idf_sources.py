@@ -55,7 +55,10 @@ KEPT_IN_HOST = {"host/HostNatives.cpp", "host/HostViews.cpp", "host/HostStores.c
                 # the LoRa mesh engine's natives (the engine is hal/host's,
                 # over the board's SX1262: tdeck_lora.cpp), and the UTF-8
                 # both engines' natives turn strings to and from
-                "host/HostMeshNatives.cpp", "host/HostUTF8.cpp"}
+                "host/HostMeshNatives.cpp", "host/HostUTF8.cpp",
+                # the GPS receiver's natives (the receiver is hal/host's,
+                # on the serial port; HostViews.cpp registers them)
+                "host/HostGPSNatives.cpp"}
 
 
 def main(argv):

@@ -52,6 +52,7 @@ static const HostOptionLayout kLayouts[] =
 	{ kCMOSerialDTRControl,			"b" },
 	{ kHMOHiSpeedClockOption,		"b" },
 	{ kCMOSerialBytesAvailable,		"u" },
+	{ kCMOSerialDiscard,			"bb" },
 	{ kCMOFramingParms,				"bbbbb" },
 	{ kCMOFramedAsyncStats,			"u" },
 	// slow IR (SerialOptions.h; comms/SharpIRTool.h)
