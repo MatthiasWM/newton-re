@@ -170,6 +170,16 @@ bool	HostCellularStarted(void);
 // that the Newton's side, starting meanwhile, counts it as there
 void	HostCellularWillRun(void);
 void	HostCellularSetClockHandler(void (*handler)(long long utcSeconds, long offsetMinutes, bool hasOffset));
+// A module whose supply the host can switch (a board's, to save its
+// battery): the host gives its switch (==> whether it took) and whether the
+// module is on now.  HostCellularSetPower (the Host preferences panel) off
+// shuts the module down in order (AT+CPOF) and then switches it off - the
+// engine sends it nothing and waits, its status "no module"; on switches
+// it on and the engine configures it as after a power cycle
+void	HostCellularSetPowerSwitch(bool (*powerSwitch)(bool on), bool on);
+bool	HostCellularPowerSwitchable(void);
+bool	HostCellularPowered(void);
+bool	HostCellularSetPower(bool on);
 
 // What the Newton's side asks of it (any thread; none of them waits on the
 // module but HostCellularCommand)

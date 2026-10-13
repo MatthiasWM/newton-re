@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <atomic>
 #include <chrono>
 #include <thread>
 #include <mutex>
@@ -95,6 +96,8 @@ static bool					gStarted = false;
 static HostCellStatusInfo	gStatus;
 static long long			gCallConnected = 0;			// Millis() at the connection; 0 none
 static void					(*gClockHandler)(long long, long, bool) = nullptr;
+static bool					(*gPowerSwitch)(bool) = nullptr;	// the host's switch of the module's supply; nil none
+static std::atomic<bool>	gPoweredOff(false);			// switched off: nothing sent to it
 
 static Request				gRequests[kRequestQueue] HOST_LARGE_STATIC;
 static long					gRequestHead = 0, gRequestCount = 0;
@@ -681,6 +684,8 @@ Exec(const char* command, char* first, long firstSize, long timeoutMs, char* all
 		first[0] = 0;
 	if (all != nullptr && allSize > 0)
 		all[0] = 0;
+	if (gPoweredOff)
+		return false;			// (no module: the engine waits for it as for one not started)
 	HandleUnsolicited(0);
 	WriteCommand(command);
 	long long until = Millis() + timeoutMs;
@@ -1316,6 +1321,58 @@ void
 HostCellularSetClockHandler(void (*handler)(long long, long, bool))
 {
 	gClockHandler = handler;
+}
+
+
+void
+HostCellularSetPowerSwitch(bool (*powerSwitch)(bool on), bool on)
+{
+	gPowerSwitch = powerSwitch;
+	gPoweredOff = !on;
+}
+
+
+bool
+HostCellularPowerSwitchable(void)
+{
+	return gPowerSwitch != nullptr;
+}
+
+
+bool
+HostCellularPowered(void)
+{
+	return !gPoweredOff;
+}
+
+
+bool
+HostCellularSetPower(bool on)
+{
+	if (gPowerSwitch == nullptr)
+		return false;
+	if (on == !gPoweredOff)
+		return true;
+	if (!on)
+	{
+		// the module shut down in order (it leaves the network) before
+		// its supply is taken away; the engine then finds it gone, forgets
+		// its state and waits for it - as for a module power cycled
+		// (only when it answers: the engine takes a command only then)
+		HostCellState state;
+		{
+			std::lock_guard<std::mutex> hold(gLock);
+			state = gStatus.state;
+		}
+		char reply[64];
+		if (state != kHostCellNone && state != kHostCellStarting)
+			HostCellularCommand("AT+CPOF", reply, sizeof(reply), 5000);
+		gPoweredOff = true;
+		return gPowerSwitch(false);
+	}
+	bool taken = gPowerSwitch(true);
+	gPoweredOff = !taken;
+	return taken;
 }
 
 

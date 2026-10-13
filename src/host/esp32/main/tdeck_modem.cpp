@@ -20,6 +20,16 @@
 				  the other T-Deck Pro variant's I2S audio uses the same
 				  pins, which is why that variant has no modem.
 
+				The module can be switched off to save the battery (the
+				Host preferences panel's "The 4G module on":
+				HostCellularSetPower): GPIO 41 low after the engine has
+				shut it down in order; on again, GPIO 41 high and a press
+				of the power key, as at boot.  The choice is kept in NVS
+				("cellOff"), so a module switched off stays off from the
+				next boot on.  The switching is done by a task of the
+				board's own: the Newton's tasks, whose stacks are in PSRAM,
+				must not write the flash NVS is on.
+
 				The task's stack is in internal RAM (it is a FreeRTOS task
 				the board makes itself, not one of the Newton's): the
 				engine's large buffers are HOST_LARGE_STATIC, in PSRAM.
@@ -30,6 +40,8 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
+#include "nvs.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
 
@@ -43,6 +55,7 @@
 
 static const uart_port_t	kPort = UART_NUM_1;
 static HostCellularLink		gLink;
+static QueueHandle_t		gPowerRequests;		// the switch's: on or off (a bool)
 
 
 static long
@@ -121,9 +134,77 @@ PressPowerKey(int ms)
 }
 
 
+// the choice kept: whether the module was switched off
+static bool
+KeptOff(void)
+{
+	nvs_handle_t nvs;
+	uint8_t off = 0;
+	if (nvs_open("newton", NVS_READONLY, &nvs) == ESP_OK)
+	{
+		nvs_get_u8(nvs, "cellOff", &off);
+		nvs_close(nvs);
+	}
+	return off != 0;
+}
+
+
+static void
+KeepOff(bool off)
+{
+	nvs_handle_t nvs;
+	if (nvs_open("newton", NVS_READWRITE, &nvs) == ESP_OK)
+	{
+		nvs_set_u8(nvs, "cellOff", off ? 1 : 0);
+		nvs_commit(nvs);
+		nvs_close(nvs);
+	}
+}
+
+
+// The switch (HostCellularSetPowerSwitch): handed to the power task
+static bool
+PowerSwitch(bool on)
+{
+	return xQueueSend(gPowerRequests, &on, 0) == pdTRUE;
+}
+
+
+static void
+PowerTask(void*)
+{
+	for (;;)
+	{
+		bool on;
+		if (xQueueReceive(gPowerRequests, &on, portMAX_DELAY) != pdTRUE)
+			continue;
+		if (on)
+		{
+			gpio_set_level((gpio_num_t) PIN_MODEM_POWER, 1);
+			vTaskDelay(pdMS_TO_TICKS(100));
+			PressPowerKey(50);
+		}
+		else
+		{
+			gpio_set_level((gpio_num_t) PIN_MODEM_PWRKEY, 0);
+			gpio_set_level((gpio_num_t) PIN_MODEM_POWER, 0);
+		}
+		KeepOff(!on);
+		printf("[cell] the module switched %s\n", on ? "on" : "off");
+	}
+}
+
+
 static void
 CellTask(void*)
 {
+	if (KeptOff())
+	{
+		// switched off before: left off, the engine waiting for it
+		gpio_set_level((gpio_num_t) PIN_MODEM_POWER, 0);
+		printf("[cell] the module is switched off (the Host panel)\n");
+		HostCellularRun(&gLink);
+	}
 	// the module powered and started as LilyGO's example (and lilyphone1's
 	// A7682E_init) do: the supply on, a 50 ms press of the power key; and,
 	// as lilyphone1 does when that gets no answer, a longer press (a second)
@@ -181,6 +262,9 @@ HostDeviceCellStart(void)
 	gLink.read = UartRead;
 	gLink.write = UartWrite;
 	HostCellularSetClockHandler(NetworkTime);
+	gPowerRequests = xQueueCreate(4, sizeof(bool));
+	if (gPowerRequests != NULL && xTaskCreatePinnedToCore(PowerTask, "cellpower", 3072, NULL, 4, NULL, 0) == pdPASS)
+		HostCellularSetPowerSwitch(PowerSwitch, !KeptOff());
 	HostCellularWillRun();					// (the Newton's side boots while the module starts)
 	// (core 0, beside the WiFi's task: the Newton's are on core 1)
 	if (xTaskCreatePinnedToCore(CellTask, "cell", 8192, NULL, 4, NULL, 0) != pdPASS)

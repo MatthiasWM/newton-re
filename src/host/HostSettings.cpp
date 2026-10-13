@@ -13,6 +13,7 @@
 #include "HostFonts.h"
 #include "HostWindow.h"
 #include "hal/host/HostIRChip.h"
+#include "hal/host/HostCellular.h"
 #include "hal/host/HostSerialChip.h"
 #include "NewtWorld.h"
 #include "Frames.h"
@@ -202,6 +203,8 @@ FHostSettingsList(RefArg /*rcvr*/)
 		AddArraySlot(list, RefVar(Item("lanBeam", "Beam over the network", kCheck, HostIRChipOnLan())));
 	if (gSerialPort >= 0)
 		AddArraySlot(list, RefVar(Item("docking", "Dock over the network", kCheck, HostSerialChipListening())));
+	if (HostCellularPowerSwitchable())
+		AddArraySlot(list, RefVar(Item("cellPower", "The 4G module on", kCheck, HostCellularPowered())));
 	if (HostWindowOption("waveform", &value))
 	{
 		RefVar item(Item("waveform", "Ink", kChoice, value));
@@ -298,6 +301,14 @@ FHostSetSetting(RefArg /*rcvr*/, RefArg setting, RefArg value)
 			fprintf(stderr, "[host] docking over the network on: serial port %u\n", (unsigned) HostSerialChipPort());
 		else
 			fprintf(stderr, "[host] docking over the network %s%s\n", on ? "on" : "off", taken ? "" : " - the port could not be opened");
+		return MAKEBOOLEAN(taken);
+	}
+	if (strcmp(name, "cellPower") == 0)
+	{
+		if (!HostCellularPowerSwitchable())
+			return NILREF;
+		bool taken = HostCellularSetPower(on);
+		fprintf(stderr, "[host] the 4G module %s%s\n", on ? "on" : "off", taken ? "" : " - it could not be switched");
 		return MAKEBOOLEAN(taken);
 	}
 	if (strcmp(name, "waveform") == 0)
