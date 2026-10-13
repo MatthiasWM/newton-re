@@ -117,7 +117,7 @@
 			// the folder tab across the top whatever is shown (the owner asked
 			// for the top to stay the same over a conversation): the list or
 			// the conversation's header under it
-			local tabH := (folderTab:LocalBox()).bottom - 3;	// (just under its button, which ends 4 above its bottom)
+			local tabH := (folderTab:LocalBox()).bottom - 5;	// (over its button's last lines, which draw nothing)
 			folderTab:Show();
 			if showThread then headerView:Show() else headerView:Hide();
 			SetValue(headerView, 'viewBounds, RelBounds(tx, tabH, w - tx, headerH));
@@ -458,13 +458,13 @@
 					local h := b.bottom;
 					local base := :Parent();
 					:DrawShape(MakeLine(0, h - 1, w, h - 1), {penSize: 1});
-					// (each text in a box its font's height, centred on the
-					// diamond: a box to the header's bottom put it at the bottom,
-					// against the conversation)
+					// (each text in a box its font's height, near the top - more
+					// room under it, against the conversation, than over it; the
+					// number and the diamond lined up with the name)
 					local bh := FontHeight(base.kBold);
-					local bt := (h - bh) div 2;
+					local bt := 1;
 					local sh := FontHeight(base.kSmall);
-					local st := (h - sh) div 2;
+					local st := bt + bh - sh;
 					// a new message's To line: tapped, the Names file's picker (the
 					// address picker's own, which is kept hidden: on the host its
 					// label came out half drawn)
@@ -472,12 +472,12 @@
 						local sel := base.toPicker.selected;
 						local who := if sel and Length(sel) > 0 then base:RecipientName(sel[0]) else "Choose a name";
 						:DrawShape(MakeText("To", 8, bt, 30, bt + bh), {font: base.kBold});
-						:DrawShape(base:Diamond(38, h div 2, 4), {penPattern: 0, fillPattern: 5});
+						:DrawShape(base:Diamond(38, bt + bh div 2, 4), {penPattern: 0, fillPattern: 5});
 						:DrawShape(MakeText(StyledStrTruncate(who, w - 60, base.kBold), 48, bt, w, bt + bh), {font: base.kBold});
 					end;
 					local t := if base.currentThread then base:ThreadFor(base.currentThread);
 					if t and base.mode = 'thread then begin
-						:DrawShape(base:Diamond(12, h div 2, 4), {penPattern: 0, fillPattern: 5});
+						:DrawShape(base:Diamond(12, bt + bh div 2, 4), {penPattern: 0, fillPattern: 5});
 						local name := if t.name then t.name else t.number;
 						local nw := if t.name then StrFontWidth(t.number, base.kSmall) else 0;
 						:DrawShape(MakeText(StyledStrTruncate(name, w - nw - 40, base.kBold), 22, bt, w - nw - 12, bt + bh), {font: base.kBold});
