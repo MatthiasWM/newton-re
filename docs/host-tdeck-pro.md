@@ -256,6 +256,19 @@ T-Deck Pro; every figure below is the spike's own output.
   refresh saves the flash, not the time. So with the OTP's waveforms the
   quickest update is **0.65 s**; anything faster needs a waveform of our
   own (`REG` = LUT from registers) - not tried.
+- **A full refresh over a window greys the rest of the panel**
+  (2026-10-13, the panel's set-up of `tdeck_panel.cpp`, `DevicePanelSet("test",
+  2)` photographed every half second with `tools/tdeck/camshot.py`): the
+  window went through the full waveform's flash and came out clean, but
+  the white outside it - rows the window does not scan included - went
+  from 160 to 135 in the camera's levels and stayed there, while the
+  white inside came back to 153 as before (so not the camera's exposure).
+  The full waveform swings the common electrode, which is the whole
+  panel's.  Two partial refreshes over the window instead, to it inverted
+  and back (`"test", 3`), left the white outside at 155 as it was; the
+  black inside came back a little lighter than around it (31 against 24).
+  So the panel's local clean-up (`CleanArea`, setting `localClean`) is the
+  flip and back.
 - **What the refresh shows is what was sent with DTM1 (0x10)**, not DTM2:
   the datasheet calls DTM1 "B/W or OLD" and DTM2 "Red or NEW", and sending
   the new frame to DTM2 showed, every time, the frame sent to DTM1 - the

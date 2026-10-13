@@ -9,6 +9,18 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-13: the T-Deck's panel cleaned up only where it changed
+
+The panel's clean-up (a full, flashing refresh) ran 30 s after any partial
+refresh, so a still screen whose clock changed each minute flashed every
+minute - the battery (the owner's ask).  Partial refreshes since the last
+full one are now kept as a map of the bytes they redrew: the whole screen
+is cleaned up only once they cover `cleanArea` of it (5 %), and less is
+cleaned up after `localClean` (10) of them over just its rectangle, by two
+partial refreshes to it inverted and back.  A full refresh over a window
+was tried first and photographed: it greys the white outside the window
+(docs/host-tdeck-pro.md).  Both on the Host prefs page.
+
 ## 2026-10-13: the T-Deck's store writes batched
 
 The store's driver's run of words (its `BeginWrite` to its

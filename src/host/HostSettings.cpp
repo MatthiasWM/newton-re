@@ -179,6 +179,10 @@ static const char* const	kCleanAfterNames[kCleanChoices] = { "After 5 seconds", 
 // (percent) between them - 0 any
 static const long			kCleanAreas[kCleanChoices] = { 0, 2, 5, 10, 25 };
 static const char* const	kCleanAreaNames[kCleanChoices] = { "Any change", "2% of the screen changed", "5% of the screen changed", "10% of the screen changed", "A quarter changed" };
+// less than that cleaned up over the part redrawn, after so many quick
+// updates - 0 never
+static const long			kLocalCleans[kCleanChoices] = { 5, 10, 20, 50, 0 };
+static const char* const	kLocalCleanNames[kCleanChoices] = { "After 5 updates", "After 10 updates", "After 20 updates", "After 50 updates", "Never" };
 
 // the choice nearest value (one set otherwise - DevicePanelSet - shown as
 // the nearest)
@@ -278,6 +282,12 @@ FHostSettingsList(RefArg /*rcvr*/)
 		Choices(item, kCleanAreaNames, kCleanChoices);
 		AddArraySlot(list, item);
 	}
+	if (HostWindowOption("localClean", &value))
+	{
+		RefVar item(Item("localClean", "Small changes cleaned up", kChoice, ChoiceIndex(kLocalCleans, kCleanChoices, value)));
+		Choices(item, kLocalCleanNames, kCleanChoices);
+		AddArraySlot(list, item);
+	}
 	if (HostWindowOption("clearGhosts", &value))
 		AddArraySlot(list, RefVar(Item("clearGhosts", "Clear ghosts", kButton, 0)));
 	return list;
@@ -359,9 +369,11 @@ FHostSetSetting(RefArg /*rcvr*/, RefArg setting, RefArg value)
 	}
 	if (strcmp(name, "bigChange") == 0)
 		return MAKEBOOLEAN(HostWindowSetOption(name, on ? 12 : 100));
-	if (strcmp(name, "cleanCount") == 0 || strcmp(name, "cleanAfter") == 0 || strcmp(name, "cleanArea") == 0)
+	if (strcmp(name, "cleanCount") == 0 || strcmp(name, "cleanAfter") == 0 || strcmp(name, "cleanArea") == 0
+	 || strcmp(name, "localClean") == 0)
 	{
-		const long* values = strcmp(name, "cleanCount") == 0 ? kCleanCounts : strcmp(name, "cleanAfter") == 0 ? kCleanAfters : kCleanAreas;
+		const long* values = strcmp(name, "cleanCount") == 0 ? kCleanCounts : strcmp(name, "cleanAfter") == 0 ? kCleanAfters
+						   : strcmp(name, "cleanArea") == 0 ? kCleanAreas : kLocalCleans;
 		if (!ISINT(value) || RINT(value) < 0 || RINT(value) >= kCleanChoices)
 			return NILREF;
 		return MAKEBOOLEAN(HostWindowSetOption(name, values[RINT(value)]));

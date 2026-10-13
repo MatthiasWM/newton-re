@@ -49,7 +49,15 @@
 				    them redrawn "cleanArea" of the screen: a clock's
 				    minute alone is never cleaned up, so a screen nobody
 				    touches is not flashed every minute (the owner's ask,
-				    2026-10-13: the battery).
+				    2026-10-13: the battery);
+				  - two partial ones over a window, to it inverted and
+				    back (1.3 s; CleanArea): the clean-up of less than
+				    that - after "localClean" partial ones, at the first
+				    pause of "cleanPause", over the rectangle they redrew
+				    between them (a clock's digits every so often, not
+				    the screen).  Not a full refresh over the window:
+				    that greys the white outside it (CleanArea says how
+				    it was seen).
 				The settings can be changed while it runs
 				(HostDevicePanelSet, from NewtonScript DevicePanelSet(name,
 				value)); the set-up's own ones are kept so that others can
@@ -108,6 +116,7 @@ static volatile long	gCleanAfterMs = 30000;		// "cleanAfter": partial refreshes 
 static volatile long	gCleanCount = 30;			// "cleanCount": ... or after this many of them (0: never) ...
 static volatile long	gCleanPauseMs = 2000;		// "cleanPause": ... once the screen has been still this long
 static volatile long	gCleanAreaPercent = 5;		// "cleanArea": ... and only once the partial ones have redrawn this much of the screen between them (0: any)
+static volatile long	gLocalCleanCount = 10;		// "localClean": less than that cleaned up over its rectangle after this many partial ones, at the first pause (0: never)
 static volatile long	gTrace = 0;					// "trace": each refresh printed with its time
 // (the set-up, to compare others on the panel while it runs - panelprobe.py)
 static volatile long	gPSR2 = 0x0D;				// "psr2": PSR's second byte (the device spike had 0x8D)
@@ -120,7 +129,7 @@ static volatile long	gSwap = 0;					// "swap": the new picture to DTM1 and the o
 static volatile long	gWindow = 1;				// "window": a partial refresh only over the rectangle that changed
 static volatile long	gResetAsked = 0;			// "reset": the controller reset and set up again, once
 static volatile long	gRedraw = 0;				// "redraw": 1 the screen sent again by partial refreshes (via white), 2 by full ones
-static volatile long	gTest = 0;					// "test": the test pattern (TestPattern), then the Newton's screen again
+static volatile long	gTest = 0;					// "test": the test pattern (TestPattern; 3 its last step CleanArea, 2 a full refresh over a window), then the Newton's screen again
 const int64_t	kSettleMs = 60;					// a change unchanged this long is shown
 const int64_t	kSettleAtMostMs = 400;			// ... and one still changing after this long
 
@@ -241,14 +250,33 @@ PanelInit(void)
 }
 
 
+// A rectangle of the panel: rows, and columns in bytes (the controller's
+// window takes x in whole bytes)
+struct PanelArea
+{
+	long	top, bottom, left, right;
+};
+
+
+// area: a full refresh over that window only (the full waveform, so its
+// ghosts cleared, and the rest of the panel left alone - neither flashed
+// nor driven)
 static void
-Refresh(const uint8_t* before, const uint8_t* picture, bool partial)
+Refresh(const uint8_t* before, const uint8_t* picture, bool partial, const PanelArea* area = NULL)
 {
 	// a partial refresh over the bytes that changed only: their rows and
 	// byte columns, as a window (x to whole bytes, as the controller takes it)
 	long top = 0, bottom = kPanelHeight - 1, left = 0, right = kRowBytes - 1;
 	bool window = false;
-	if (partial && gWindow != 0)
+	if (!partial && area != NULL)
+	{
+		top = area->top;
+		bottom = area->bottom;
+		left = area->left;
+		right = area->right;
+		window = true;
+	}
+	else if (partial && gWindow != 0)
 	{
 		top = kPanelHeight;
 		bottom = -1;
@@ -293,12 +321,13 @@ Refresh(const uint8_t* before, const uint8_t* picture, bool partial)
 		Send(PTIN, NULL, 0);
 		Send(PTL, ptl, 7);
 		long rowBytes = right - left + 1, rows = bottom - top + 1;
-		for (int pass = gOldAfter != 0 ? 1 : 0; pass < 2; pass++)
+		for (int pass = partial && gOldAfter != 0 ? 1 : 0; pass < 2; pass++)
 		{
-			const uint8_t* frame = pass == 0 ? first : second;
+			// (a full one: the picture in both, as below)
+			const uint8_t* frame = !partial ? picture : pass == 0 ? first : second;
 			for (long r = 0; r < rows; r++)
 				memcpy(part + r * rowBytes, frame + (top + r) * kRowBytes + left, rowBytes);
-			gInvertSending = gInvertOld != 0 && (pass == 0) == (gSwap == 0);
+			gInvertSending = partial && gInvertOld != 0 && (pass == 0) == (gSwap == 0);
 			Send(pass == 0 ? DTM1 : DTM2, part, (size_t) (rowBytes * rows));
 		}
 		gInvertSending = false;
@@ -404,15 +433,38 @@ Convert(uint8_t* frame)
 }
 
 
+// The ghosts over area cleared without touching the rest of the panel: two
+// partial refreshes over it, to the picture inverted and back, so that every
+// pixel in it is driven through black and white (1.3 s).  A full refresh over
+// a window - the full waveform - clears them too, but its common electrode
+// is the whole panel's: the white outside the window came out grey (the
+// webcam, 2026-10-13: 160 to 135 outside, 153 inside as before)
+static void
+CleanArea(const uint8_t* shown, const PanelArea& area)
+{
+	static uint8_t* flipped = NULL;
+	if (flipped == NULL)
+		flipped = (uint8_t*) heap_caps_malloc(kFrameBytes, MALLOC_CAP_SPIRAM);
+	memcpy(flipped, shown, kFrameBytes);
+	for (long y = area.top; y <= area.bottom; y++)
+		for (long b = area.left; b <= area.right; b++)
+			flipped[y * kRowBytes + b] = (uint8_t) ~flipped[y * kRowBytes + b];
+	Refresh(shown, flipped, true);
+	Refresh(flipped, shown, true);
+}
+
+
 // A pattern whose right result is easy to tell (the settings above
 // compared on the panel): (1) a full refresh: the left half black, the right
 // white; (2) after three seconds a partial one over the middle (160 x 160 at
 // 40, 80), the top half of that square flipped and its bottom half as it
 // was; (3) after three more, a partial one back to (1).  Then the Newton's
 // screen again, by a full refresh.  shown: the Newton's picture, which the
-// last refresh goes back to.
+// last refresh goes back to.  clean: (3) is instead (2) cleaned up over the
+// square only (1: CleanArea's flip and back, 2: a full refresh over it) -
+// the panel outside the square must stay as it was (camshot.py --every).
 static void
-TestPattern(uint8_t* shown)
+TestPattern(uint8_t* shown, int clean)
 {
 	static uint8_t* a = NULL;
 	static uint8_t* b = NULL;
@@ -438,11 +490,25 @@ TestPattern(uint8_t* shown)
 	printf("newton: test (2) partial: the middle square's top half flipped, its bottom half as it was\n");
 	Refresh(a, b, true);
 	vTaskDelay(pdMS_TO_TICKS(3000));
-	printf("newton: test (3) partial: back to (1)\n");
-	Refresh(b, a, true);
+	PanelArea square = { 80, 239, 40 / 8, 200 / 8 - 1 };
+	if (clean == 1)
+	{
+		printf("newton: test (3) the square flipped and back: (2) again\n");
+		CleanArea(b, square);
+	}
+	else if (clean == 2)
+	{
+		printf("newton: test (3) full over the square: (2) again, only the square flashing\n");
+		Refresh(b, b, false, &square);
+	}
+	else
+	{
+		printf("newton: test (3) partial: back to (1)\n");
+		Refresh(b, a, true);
+	}
 	vTaskDelay(pdMS_TO_TICKS(3000));
 	printf("newton: test done: the Newton's screen again\n");
-	Refresh(a, shown, false);
+	Refresh(clean != 0 ? b : a, shown, false);
 }
 
 
@@ -481,8 +547,9 @@ PanelTask(void*)
 		int64_t t = esp_timer_get_time();
 		if (gTest != 0)
 		{
+			int clean = gTest == 3 ? 1 : gTest == 2 ? 2 : 0;
 			gTest = 0;
-			TestPattern(shown);
+			TestPattern(shown, clean);
 			memcpy(pending, shown, kFrameBytes);
 			continue;
 		}
@@ -550,6 +617,28 @@ PanelTask(void*)
 			touchedCount = 0;
 			shownAt = esp_timer_get_time();
 		}
+		else if (partialsSinceFull > 0 && touchedCount * 100 < kFrameBytes * gCleanAreaPercent
+				 && gLocalCleanCount > 0 && partialsSinceFull >= gLocalCleanCount && (t - shownAt) / 1000 >= gCleanPauseMs)
+		{
+			// a little redrawn many times (a clock): its ghosts cleared over
+			// the rectangle it was redrawn in, the rest of the screen left
+			PanelArea area = { kPanelHeight, -1, kRowBytes, -1 };
+			for (long y = 0; y < kPanelHeight; y++)
+				for (long b = 0; b < kRowBytes; b++)
+					if (touched[y * kRowBytes + b])
+					{
+						if (y < area.top) area.top = y;
+						if (y > area.bottom) area.bottom = y;
+						if (b < area.left) area.left = b;
+						if (b > area.right) area.right = b;
+					}
+			if (area.bottom >= 0)
+				CleanArea(shown, area);
+			partialsSinceFull = 0;
+			memset(touched, 0, kFrameBytes);
+			touchedCount = 0;
+			shownAt = esp_timer_get_time();
+		}
 	}
 }
 
@@ -604,6 +693,8 @@ HostDevicePanelSet(const char* name, long value)
 		gCleanPauseMs = value;
 	else if (strcasecmp(name, "cleanArea") == 0)
 		gCleanAreaPercent = value;
+	else if (strcasecmp(name, "localClean") == 0)
+		gLocalCleanCount = value;
 	else if (strcasecmp(name, "trace") == 0)
 		gTrace = value;
 	else if (strcasecmp(name, "redraw") == 0)
@@ -628,6 +719,8 @@ HostWindowOption(const char* name, long* value)
 		*value = gCleanAfterMs;
 	else if (strcmp(name, "cleanArea") == 0)
 		*value = gCleanAreaPercent;
+	else if (strcmp(name, "localClean") == 0)
+		*value = gLocalCleanCount;
 	else if (strcmp(name, "clearGhosts") == 0)
 		*value = 0;
 	else
