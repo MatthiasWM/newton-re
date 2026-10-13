@@ -5,12 +5,14 @@
 # the host boots with (HostStores.cpp).
 # the view system on the host (HostViews.h), for newtonscript and the newt
 # world's boot
-add_library(host_views STATIC HostViews.cpp HostNatives.cpp HostStores.cpp HostCards.cpp HostInterconnect.cpp HostWifi.cpp HostCellularNatives.cpp FactorySoups.cpp HostObjectsFile.cpp)
+add_library(host_views STATIC HostViews.cpp HostNatives.cpp HostStores.cpp HostCards.cpp HostInterconnect.cpp HostWifi.cpp HostCellularNatives.cpp HostMeshNatives.cpp HostUTF8.cpp FactorySoups.cpp HostObjectsFile.cpp)
 target_link_libraries(host_views PUBLIC flash frames comms_script comms_dock comms_fax thirdparty_nie views recognition pcmcia sound system stores packages intl intl_meetings assist hal_host_display hal_host_tablet)
 target_include_directories(host_views PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # the cellular modem engine (hal/host/HostCellular.h), under the natives
 target_link_libraries(host_views PUBLIC hal_host_cellular)
+# ... and the LoRa mesh engine's (hal/host/HostMesh.h)
+target_link_libraries(host_views PUBLIC hal_host_mesh)
 
 add_executable(newtonscript newtonscript.cpp NSRoundTrip.cpp IMATool.cpp)
 target_link_libraries(newtonscript PRIVATE host_views)
@@ -539,6 +541,23 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../fixtures/packages/fonts/monac
                  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
         set_tests_properties(host.NewtonMessages.${size} PROPERTIES TIMEOUT 300
                              PASS_REGULAR_EXPRESSION "fakecell: text to 0400000002: Also - bring the cable.*messages: done, 0 failed"
+                             FAIL_REGULAR_EXPRESSION "waited in vain|FAILED|Traceback|Exception")
+    endforeach()
+    # the Mesh application (comms/host/HostMesh.ns) on a pretend LoRa air
+    # (newton --mesh-air) with tools/mesh's meshpeer as another node, Ada, at
+    # each kind of screen: her channel hello filed, a conversation begun
+    # with her, the message acknowledged and her echo filed, a message to
+    # the Public channel (mesh-<w>x<h>-<n>.pgm) - docs/host-tdeck-pro-mesh.md
+    foreach(size 240x320 320x480 480x320 810x1080)
+        add_test(NAME host.NewtonMesh.${size}
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/mesh/meshrun.py --seconds 280
+                         --peer "$<TARGET_FILE:meshpeer> --air lan:{port} --name Ada --echo --channel 'Hello mesh' --seconds 300"
+                         -- $<TARGET_FILE:newton> --mesh-air lan:{port} --serial-port none --display ${size} --erase
+                         --store ${CMAKE_CURRENT_BINARY_DIR}/mesh-${size}.store --headless 200
+                         --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/mesh.ns
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+        set_tests_properties(host.NewtonMesh.${size} PROPERTIES TIMEOUT 300
+                             PASS_REGULAR_EXPRESSION "meshpeer: channel Public [^:]*: Hello everyone.*mesh: done, 0 failed|mesh: done, 0 failed.*meshpeer: channel Public [^:]*: Hello everyone"
                              FAIL_REGULAR_EXPRESSION "waited in vain|FAILED|Traceback|Exception")
     endforeach()
     add_test(NAME host.NewtonModemAnswer

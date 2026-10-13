@@ -128,6 +128,16 @@
 	Once listening it prints "[host] cell port N";
 	tools/modem/fakecell.py is the module (docs/host-tdeck-pro-phone.md).
 
+	--mesh-air lan[:port] makes this newton a LoRa mesh node
+	(hal/host/HostMesh.h: a MeshCore chat node, as the T-Deck Pro is)
+	whose radio is a pretend one: packets are datagrams to the UDP
+	multicast group 239.255.78.121 on that port (3685 by default), which
+	other newtons and tools/mesh's meshpeer on the same air hear.  The
+	node's identity and contacts are kept beside the store
+	("<store>.mesh-identity", ...; --erase forgets them too); --mesh-name
+	is its name until the Mesh application gives it another
+	(docs/host-tdeck-pro-mesh.md).
+
 	--ir-peer puts the Newton's built-in IR port on a TCP connection to
 	another newton (hal/host/HostIRChip.h), so the two can beam to each
 	other: one is given listen:PORT (0 picks a free port) and the other
@@ -178,6 +188,7 @@
 #include "HostSoundDriver.h"
 #include "HostEchoServer.h"
 #include "HostCellular.h"
+#include "HostMesh.h"
 #include "HostSerialChip.h"
 #include "HostIRChip.h"
 #include "FIQTimer.h"
@@ -190,6 +201,7 @@
 #include "FaxTool.h"
 #include "HostLink.h"
 #include "HostCellProvider.h"
+#include "HostMeshApp.h"
 #include "print/host/HostPrinter.h"
 #include "print/host/HostIPP.h"
 #include "power/host/HostPowerSwitch.h"
@@ -273,6 +285,8 @@ static long gScale = 1;
 static long gHeadlessSeconds = 0;
 static long gSerialPort = kHostSerialPort;	// --serial-port: -1 none
 static long gCellPort = -1;					// --cell-port: -1 none
+static const char* gMeshAir = nil;			// --mesh-air: "lan[:port]"
+static const char* gMeshName = nil;			// --mesh-name
 static const char* gIRPeer = nil;			// --ir-peer, or the LAN medium's "lan[:PORT][@ADDRESS]"
 static char gIRLan[80];						// --ir-lan, --ir-lan-interface
 static const char* gIRLanPort = nil;
@@ -295,6 +309,7 @@ Usage(void)
 					"              [--package file.pkg]... [--card file] [--microphone-tone hz] [--tcp-echo port]\n"
 					"              [--serial-port port|none] [--ir-peer listen:port|host:port] [--print-dir dir]\n"
 					"              [--ir-lan [port]] [--ir-lan-interface address] [--cell-port port]\n"
+					"              [--mesh-air lan[:port]] [--mesh-name name]\n"
 					"              [--ipp-printer uri]\n"
 					"By default it boots the object file built from romsrc/ (NEWTON_OBJECTS overrides);\n"
 					"--rom boots a ROM image instead.\n"
@@ -328,6 +343,10 @@ NewtonBoot(void)
 		else
 			fprintf(stderr, "[host] no cell port on %ld\n", gCellPort);
 	}
+	// the mesh node, on its pretend air: started before the newt world
+	// boots, as the cellular module is, so the Mesh application is there
+	if (gMeshAir != nil && !HostMeshAirStart(gMeshAir, HostGetStoreFile(), gMeshName))
+		fprintf(stderr, "[host] no mesh air (%s)\n", gMeshAir);
 	HostBootNewtWorld();
 	// DEVIATION: the ROM's boot starts the timers and the serial hardware
 	// (InitializeCommHardware); the host does it here, the external port a
@@ -612,6 +631,7 @@ NewtonPreMain(void)
 	HostInstallOrientationGlobal();
 	HostLinkStart();
 	HostCellProviderStart();			// (comms/host/HostCellProvider.h: the cellular module, when there is one, for the Phone transport)
+	HostMeshAppStart();					// (comms/host/HostMeshApp.h: the Mesh application, when there is a mesh node)
 	HostInstallPrinter();
 	HostInstallPowerGlobals();			// (power/host/HostPowerSwitch.h: HostPowerSwitch(), HostWakeAfter(ms), ...)
 	HostInstallFonts();					// (the host's fonts, offered when asked for: before the Host panel, which may turn them on)
@@ -1081,6 +1101,10 @@ main(int argc, char** argv)
 			gIRLanInterface = argv[++i];
 		else if (strcmp(argv[i], "--cell-port") == 0 && i + 1 < argc)
 			gCellPort = strtol(argv[++i], nil, 0);
+		else if (strcmp(argv[i], "--mesh-air") == 0 && i + 1 < argc)
+			gMeshAir = argv[++i];
+		else if (strcmp(argv[i], "--mesh-name") == 0 && i + 1 < argc)
+			gMeshName = argv[++i];
 		else if (strcmp(argv[i], "--serial-port") == 0 && i + 1 < argc)
 		{
 			i++;
@@ -1177,6 +1201,17 @@ main(int argc, char** argv)
 	}
 	if (erase && storeFile != nil && remove(storeFile) == 0)
 		fprintf(stderr, "[host] %s erased; the machine starts new\n", storeFile);
+	if (erase && storeFile != nil)
+	{
+		// (the mesh node's blobs beside it: HostMeshAir.cpp)
+		static const char* const kMeshBlobs[] = { "identity", "settings", "contacts" };
+		char path[1100];
+		for (const char* blob : kMeshBlobs)
+		{
+			snprintf(path, sizeof(path), "%s.mesh-%s", storeFile, blob);
+			remove(path);
+		}
+	}
 	HostSetStoreFile(storeFile);
 	if (flashSize == 0)
 		flashSize = flatFlash ? kHostFlashBankSize : (ULong) 64 << 20;

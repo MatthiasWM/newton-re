@@ -1,0 +1,788 @@
+// Mesh: text over a LoRa mesh (MeshCore) as conversations, for a host with
+// a mesh node (hal/host/HostMesh.h: the T-Deck Pro's SX1262, or a desktop's
+// pretend air, newton --mesh-air).  Compiled into the host as
+// HostMeshSource.cpp by src/cmake/EmbedText.cmake, evaluated at boot by
+// comms/host/HostMeshApp.cpp, the frame kept in the global HostMesh:host.
+//
+// DEVIATION (host addition): the ROM has no mesh.  The application is the
+// Messages application's design (HostMessages.ns) over the mesh's natives
+// rather than a transport: the frame polls HostMeshNextMessage every few
+// seconds whether the application is open or not, and keeps what comes in
+// the soup "Mesh:host" (a union soup), one entry a message: {class:
+// '|meshMessage:host|, thread, name, sender, text, time, dir
+// 'incoming/'outgoing, state 'unread/'read/'sending/'sent/'delivered/
+// 'failed, sendId}.  A conversation is a thread: a node's public key (64 hex
+// digits) for the messages to and from it, or "public" for the Public
+// channel every MeshCore node shares, where sender is who said each thing.
+// A message sent is kept as 'sending with the engine's id for it
+// (HostMeshSendText); the same poll asks HostMeshSendState until it is
+// 'sent (a channel's: on the air), 'delivered (acknowledged) or 'failed.
+//
+// Any screen, as Messages: GetAppParams' area, Layout, the list and a
+// conversation drawn by the application, side by side from
+// kSideBySideWidth.  A new conversation is begun with a node heard on the
+// mesh (HostMeshContacts), not a Names card; Announce sends this node's
+// advert so that others hear it.  docs/host-tdeck-pro-mesh.md.
+
+{
+	appSymbol: '|Mesh:host|,
+	soupName: "Mesh:host",
+	kPublic: "public",
+	kPollMs: 2000,
+
+	app: {
+		viewClass: 74,							// clView
+		viewFlags: 5,							// vVisible, vApplication
+		viewFormat: 273,						// white, a one-pixel black frame
+		viewBounds: {left: 0, top: 0, right: 240, bottom: 320},
+		declareSelf: 'base,
+		viewFont: 10240,
+		appSymbol: '|Mesh:host|,
+		title: "Mesh",
+		ReOrientToScreen: func() :Relayout(),
+
+		kSideBySideWidth: 400,
+		kFont: 10240,							// the system font, 10 point
+		kBold: 1058816,							// bold
+		kSmall: 9216,							// 9 point
+
+		appAll: "All Conversations",
+		labelsFilter: '_all,
+
+		mode: 'list,							// 'list or 'thread
+		currentThread: nil,						// the thread shown
+		threads: nil,							// the conversations, Public first, then newest first
+		listScroll: 0,
+		threadScroll: 0,
+		pickNodes: nil,							// (New's picker: the nodes it lists)
+
+		folderTab: nil, headerView: nil, listView: nil, threadView: nil, replyLine: nil,
+		sendButton: nil, statusBar: nil,
+
+		viewSetupFormScript: func()
+		begin
+			local p := GetAppParams();
+			viewBounds := RelBounds(p.appAreaLeft, p.appAreaTop, p.appAreaWidth, p.appAreaHeight);
+		end,
+
+		viewSetupDoneScript: func()
+		begin
+			foreach v in :ChildViewFrames() do
+				if v.role then
+					self.(v.role) := v;
+			if folderTab and folderTab.showBarText then begin
+				folderTab.showBarText.buttonClickScript := ConversationPicker;
+				folderTab.showBarText.pickActionScript := ConversationPicked;
+				folderTab.showBarText.pickThreads := nil;
+			end;
+			:Reload();
+			:Layout();
+		end,
+
+		viewQuitScript: func()
+		begin
+			folderTab := headerView := listView := threadView := replyLine := sendButton := statusBar := nil;
+		end,
+
+		Relayout: func()
+		begin
+			local p := GetAppParams();
+			SetValue(self, 'viewBounds, RelBounds(p.appAreaLeft, p.appAreaTop, p.appAreaWidth, p.appAreaHeight));
+			:Layout();
+		end,
+
+		// Every view placed in the application's area as it is now
+		Layout: func()
+		begin
+			local box := :LocalBox();
+			local w := box.right - box.left;
+			local h := box.bottom - box.top;
+			local barTop := h - (if statusBar then (statusBar:LocalBox()).bottom else 24);
+			local headerH := FontHeight(kBold) + 6;
+			local replyH := FontHeight(kFont) + 14;
+			local wide := w >= kSideBySideWidth;
+			local listW := if wide then Min(w * 2 div 5, 300) else w;
+			local showList := wide or mode = 'list;
+			local showThread := wide or mode <> 'list;
+			local tx := if wide then listW + 1 else 0;
+			local tabH := (folderTab:LocalBox()).bottom - 5;
+			folderTab:Show();
+			if showThread then headerView:Show() else headerView:Hide();
+			SetValue(headerView, 'viewBounds, RelBounds(tx, tabH, w - tx, headerH));
+			SetValue(listView, 'viewBounds, RelBounds(0, tabH, listW, barTop - tabH));
+			local threadTop := tabH + headerH;
+			SetValue(threadView, 'viewBounds, RelBounds(tx, threadTop, w - tx, barTop - threadTop - replyH));
+			local sendW := StrFontWidth(sendButton.text, kBold) + 20;
+			SetValue(replyLine, 'viewBounds, RelBounds(tx + 6, barTop - replyH + 4, w - tx - sendW - 18, replyH - 8));
+			SetValue(sendButton, 'viewBounds, RelBounds(w - sendW - 6, barTop - replyH + 4, sendW, replyH - 8));
+			if showList then listView:Show() else listView:Hide();
+			if showThread and currentThread then begin
+				threadView:Show();
+				replyLine:Show();
+				sendButton:Show();
+			end else begin
+				if showThread then threadView:Show() else threadView:Hide();
+				replyLine:Hide();
+				sendButton:Hide();
+			end;
+			if folderTab and folderTab.showBarText then
+				folderTab.showBarText:SyncView();
+			:Redraw();
+		end,
+
+		Redraw: func()
+		begin
+			if headerView then headerView:Dirty();
+			if listView then listView:Dirty();
+			if threadView then threadView:Dirty();
+		end,
+
+		/*------------------------------------------------------------------
+			The messages
+		------------------------------------------------------------------*/
+
+		Mesh: func() GetGlobalVar('|HostMesh:host|),
+		Soup: func() GetUnionSoup(:Mesh().soupName),
+
+		// the conversations: the Public channel first, then the rest newest
+		// first - {thread, name, text, sender, time, dir, state, unread}
+		Reload: func()
+		begin
+			local mesh := :Mesh();
+			local byThread := {};
+			local list := [];
+			local soup := :Soup();
+			if soup then begin
+				local cursor := Query(soup, {type: 'index});
+				local e;
+				while e := cursor:Entry() do begin
+					local key := Intern("t" & e.thread);
+					local t := byThread.(key);
+					if not t then begin
+						t := {thread: e.thread, name: e.name, text: e.text, sender: e.sender, time: e.time,
+							dir: e.dir, state: e.state, unread: 0};
+						byThread.(key) := t;
+						AddArraySlot(list, t);
+					end else if e.time >= t.time then begin
+						t.text := e.text; t.time := e.time; t.dir := e.dir; t.state := e.state; t.sender := e.sender;
+						if e.name and e.thread <> mesh.kPublic then t.name := e.name;
+					end;
+					if e.state = 'unread then
+						t.unread := t.unread + 1;
+					cursor:Next();
+				end;
+			end;
+			// (a node chosen with New, nothing said yet, is a conversation too)
+			if currentThread and not byThread.(Intern("t" & currentThread)) then
+				AddArraySlot(list, {thread: currentThread, name: mesh:NodeName(currentThread), text: nil, time: Time(), unread: 0});
+			local public := byThread.(Intern("t" & mesh.kPublic));
+			if public then
+				ArrayRemoveCount(list, LSearch(list, public, 0, '|=|, nil), 1)
+			else
+				public := {thread: mesh.kPublic, text: nil, time: nil, unread: 0};
+			public.name := "Public channel";
+			threads := [public];
+			ArrayMunger(threads, 1, 0, Sort(list, '|>|, 'time), 0, nil);
+		end,
+
+		// the messages of a thread, oldest first
+		ThreadMessages: func(thread)
+		begin
+			local messages := [];
+			local soup := :Soup();
+			if soup then begin
+				local cursor := Query(soup, {type: 'index});
+				local e;
+				while e := cursor:Entry() do begin
+					if StrEqual(e.thread, thread) then
+						AddArraySlot(messages, e);
+					cursor:Next();
+				end;
+			end;
+			Sort(messages, '|<|, 'time);
+		end,
+
+		ThreadFor: func(thread)
+		begin
+			if threads then
+				foreach t in threads do
+					if StrEqual(t.thread, thread) then
+						return t;
+			nil;
+		end,
+
+		OpenThread: func(thread)
+		begin
+			currentThread := thread;
+			threadScroll := 0;
+			mode := 'thread;
+			foreach e in :ThreadMessages(thread) do
+				if e.state = 'unread then begin
+					e.state := 'read;
+					EntryChangeXmit(e, nil);
+				end;
+			:Reload();
+			:Layout();
+			if replyLine then SetKeyView(replyLine.entryLine, 0);
+		end,
+
+		GetTargetInfo: func(reason)
+			{target: nil, targetView: self, targetStore: GetDefaultStore()},
+
+		ThreadName: func(t) if t.name then t.name else :Mesh():ShortKey(t.thread),
+
+		ShownThread: func()
+			if mode = 'thread and currentThread then :ThreadFor(currentThread),
+
+		// the folder tab's picker: All Conversations, then the conversations
+		ConversationPicker: func()
+		begin
+			local shown := base:ShownThread();
+			pickThreads := if base.threads then Clone(base.threads) else [];
+			local items := [{item: base.appAll, mark: if shown then $  else $\uFC0B}];
+			if Length(pickThreads) > 0 then
+				AddArraySlot(items, 'pickseparator);
+			foreach t in pickThreads do
+				AddArraySlot(items, {item: base:ThreadName(t), mark: if shown and StrEqual(shown.thread, t.thread) then $\uFC0B else $ });
+			DoPopup(items, 0, 2, self);
+		end,
+
+		ConversationPicked: func(index)
+		begin
+			local chosen := if index >= 2 and pickThreads and index - 2 < Length(pickThreads) then pickThreads[index - 2];
+			pickThreads := nil;
+			:hilite(nil);
+			if chosen then
+				base:OpenThread(chosen.thread)
+			else if index = 0 then begin
+				base.currentThread := nil;
+				base:ShowList();
+			end;
+		end,
+
+		ShowList: func()
+		begin
+			mode := 'list;
+			:Reload();
+			:Layout();
+		end,
+
+		// New: the nodes heard, to begin a conversation with one
+		Compose: func()
+		begin
+			local nodes := HostMeshContacts();
+			if not nodes or Length(nodes) = 0 then begin
+				GetRoot():Notify(3, "Mesh", "No one has been heard on the mesh yet. Tap Announce so that others hear you.");
+				return nil;
+			end;
+			pickNodes := nodes;
+			local items := [];
+			foreach n in nodes do
+				AddArraySlot(items, {item: n.name & (if n.kind <> 'chat then " (" & SymbolName(n.kind) & ")" else ""), mark: $ });
+			DoPopup(items, 0, 0, self);
+		end,
+
+		pickActionScript: func(index)
+		begin
+			local nodes := pickNodes;
+			pickNodes := nil;
+			if nodes and index >= 0 and index < Length(nodes) then
+				:OpenThread(nodes[index].key);
+		end,
+
+		pickCancelledScript: func() pickNodes := nil,
+
+		// the reply line's text sent to the conversation, and the line emptied
+		SendTyped: func()
+		begin
+			local text := replyLine.entryLine.text;
+			if not StrFilled(text) or not currentThread then
+				return nil;
+			local t := :ThreadFor(currentThread);
+			:Mesh():SendText(currentThread, if t then t.name, text);
+			SetValue(replyLine.entryLine, 'text, "");
+			:Reload();
+			:Redraw();
+		end,
+
+		Announce: func()
+		begin
+			if HostMeshAdvertise() then
+				GetRoot():Notify(3, "Mesh", "Announced as " & (HostMeshStatus()).name & ".");
+		end,
+
+		viewScrollUpScript: func()
+		begin
+			if mode = 'list then listScroll := Max(0, listScroll - 1)
+			else threadScroll := threadScroll + 1;
+			:Redraw();
+		end,
+
+		viewScrollDownScript: func()
+		begin
+			if mode = 'list then listScroll := listScroll + 1
+			else threadScroll := Max(0, threadScroll - 1);
+			:Redraw();
+		end,
+
+		/*------------------------------------------------------------------
+			Drawing helpers (Messages')
+		------------------------------------------------------------------*/
+
+		Diamond: func(x, y, r) MakePolygon([x, y - r, x + r, y, x, y + r, x - r, y]),
+
+		WrapText: func(text, width, font)
+		begin
+			local lines := [];
+			foreach paragraph in :Split(text, $\n) do begin
+				local line := "";
+				foreach word in :Split(paragraph, $ ) do begin
+					local tryLine := if StrLen(line) = 0 then word else line & " " & word;
+					if StrFontWidth(tryLine, font) <= width then
+						line := tryLine
+					else begin
+						if StrLen(line) > 0 then
+							AddArraySlot(lines, line);
+						line := word;
+						while StrFontWidth(line, font) > width and StrLen(line) > 1 do begin
+							local n := StrLen(line) - 1;
+							while n > 1 and StrFontWidth(SubStr(line, 0, n), font) > width do
+								n := n - 1;
+							AddArraySlot(lines, SubStr(line, 0, n));
+							line := SubStr(line, n, StrLen(line) - n);
+						end;
+					end;
+				end;
+				AddArraySlot(lines, line);
+			end;
+			lines;
+		end,
+
+		WhenText: func(time)
+		begin
+			if not time then return "";
+			local today := Time() div 1440;
+			local day := time div 1440;
+			if day = today then :TimeText(time)
+			else if day = today - 1 then "Yesterday"
+			else ShortDate(time);
+		end,
+
+		TimeText: func(time)
+		begin
+			local minutes := time mod 1440;
+			local hour := minutes div 60;
+			local minute := minutes mod 60;
+			local suffix := if hour >= 12 then " PM" else " AM";
+			hour := hour mod 12;
+			if hour = 0 then hour := 12;
+			NumberStr(hour) & ":" & (if minute < 10 then "0" else "") & NumberStr(minute) & suffix;
+		end,
+
+		DayText: func(time)
+		begin
+			local today := Time() div 1440;
+			local day := time div 1440;
+			if day = today then "Today" else if day = today - 1 then "Yesterday" else ShortDate(time);
+		end,
+
+		StateText: func(m)
+		begin
+			if m.state = 'failed then "Not sent"
+			else if m.state = 'sending then "Sending"
+			else if m.state = 'delivered then "Delivered " & :WhenText(m.time)
+			else "Sent " & :WhenText(m.time);
+		end,
+
+		stepChildren: [
+			{
+				_proto: @670,						// protoClockFolderTab
+				role: 'folderTab,
+				RedoText: func()
+				begin
+					local t := base:ShownThread();
+					local text := Stringer([$\uFC01, if t then base:ThreadName(t) else base.appAll]);
+					showBarText.text := StrTruncate(text, 137);
+					showBarText.width := StrFontWidth(showBarText.text, showBarText.viewFont) + 16;
+					showBarText.viewBounds := SetBounds(-showBarText.width - 4, 3, -4, 17);
+					showBarText.viewJustify := 8388646;
+					:Dirty();
+				end
+			},
+
+			// the header over a conversation: its name, and the node's id
+			{
+				viewClass: 74, viewFlags: 513, viewFormat: 0, role: 'headerView,
+				viewBounds: {left: 0, top: 0, right: 240, bottom: 24},
+				viewDrawScript: func()
+				begin
+					local b := :LocalBox();
+					local w := b.right;
+					local h := b.bottom;
+					local base := :Parent();
+					:DrawShape(MakeLine(0, h - 1, w, h - 1), {penSize: 1});
+					local bh := FontHeight(base.kBold);
+					local bt := 1;
+					local sh := FontHeight(base.kSmall);
+					local st := bt + bh - sh;
+					local t := if base.currentThread then base:ThreadFor(base.currentThread);
+					if t and base.mode = 'thread then begin
+						:DrawShape(base:Diamond(12, bt + bh div 2, 4), {penPattern: 0, fillPattern: 5});
+						local id := if StrEqual(t.thread, base:Mesh().kPublic) then "everyone" else base:Mesh():ShortKey(t.thread);
+						local iw := StrFontWidth(id, base.kSmall);
+						:DrawShape(MakeText(StyledStrTruncate(base:ThreadName(t), w - iw - 40, base.kBold), 22, bt, w - iw - 12, bt + bh), {font: base.kBold});
+						:DrawShape(MakeText(id, w - iw - 8, st, w, st + sh), {font: base.kSmall});
+					end;
+				end,
+				viewClickScript: func(unit)
+				begin
+					local base := :Parent();
+					if base.mode <> 'list and (base:LocalBox()).right < base.kSideBySideWidth then
+						base:ShowList();
+					true;
+				end
+			},
+
+			// the conversations, and this node at the foot
+			{
+				viewClass: 74, viewFlags: 513, viewFormat: 0, role: 'listView,
+				viewBounds: {left: 0, top: 24, right: 240, bottom: 300},
+				RowHeight: func() FontHeight(:Parent().kBold) + FontHeight(:Parent().kFont) + 16,
+				viewDrawScript: func()
+				begin
+					local base := :Parent();
+					local b := :LocalBox();
+					local w := b.right;
+					local rowH := :RowHeight();
+					local footH := FontHeight(base.kSmall) + 6;
+					local y := 0;
+					local i := base.listScroll;
+					while base.threads and i < Length(base.threads) and y + rowH <= b.bottom - footH do begin
+						local t := base.threads[i];
+						local selected := (base:LocalBox()).right >= base.kSideBySideWidth and base.currentThread and StrEqual(base.currentThread, t.thread);
+						if selected then
+							:DrawShape(MakeRect(0, y, w, y + rowH), {penPattern: 0, fillPattern: 5});
+						local ink := if selected then 1 else 5;
+						local mode := if selected then 3 else 0;
+						if t.unread > 0 then
+							:DrawShape(base:Diamond(10, y + 10, 4), {penPattern: 0, fillPattern: ink});
+						local when := base:WhenText(if t.text then t.time);
+						local whenW := StrFontWidth(when, base.kSmall);
+						:DrawShape(MakeText(StyledStrTruncate(base:ThreadName(t), w - whenW - 30, base.kBold), 20, y + 4, w - whenW - 10, y + 4 + FontHeight(base.kBold)),
+							{font: base.kBold, transferMode: mode});
+						:DrawShape(MakeText(when, w - whenW - 6, y + 6, w, y + 6 + FontHeight(base.kSmall)),
+							{font: base.kSmall, transferMode: mode});
+						local snippet := if not t.text then "Nothing said yet."
+							else (if t.dir = 'outgoing then (if t.state = 'failed then "You: Not sent - " else "You: ")
+								else if t.sender then t.sender & ": " else "") & base:Flatten(t.text);
+						local font := if t.unread > 0 then base.kBold else base.kFont;
+						:DrawShape(MakeText(StyledStrTruncate(snippet, w - 26, font), 20, y + 8 + FontHeight(base.kBold), w - 6, y + rowH - 3),
+							{font: font, transferMode: mode});
+						:DrawShape(MakeLine(4, y + rowH - 1, w - 4, y + rowH - 1), {penSize: 1, penPattern: 3});
+						y := y + rowH;
+						i := i + 1;
+					end;
+					// this node: its name, id and radio, or that it is off
+					local status := HostMeshStatus();
+					local me := if not status then "No mesh radio."
+						else if status.state = 'off then "The LoRa radio is off (Prefs, Host)."
+						else "You: " & status.name & " " & status.id & " - " & status.region;
+					:DrawShape(MakeLine(0, b.bottom - footH, w, b.bottom - footH), {penSize: 1, penPattern: 3});
+					:DrawShape(MakeText(StyledStrTruncate(me, w - 12, base.kSmall), 6, b.bottom - footH + 3, w - 6, b.bottom),
+						{font: base.kSmall});
+				end,
+				viewClickScript: func(unit)
+				begin
+					local base := :Parent();
+					local y := GetPoint(5, unit) - (:GlobalBox()).top;
+					local i := base.listScroll + y div :RowHeight();
+					if base.threads and i < Length(base.threads) then
+						base:OpenThread(base.threads[i].thread);
+					true;
+				end
+			},
+
+			// a conversation
+			{
+				viewClass: 74, viewFlags: 545, viewFormat: 0, role: 'threadView,
+				viewBounds: {left: 0, top: 24, right: 240, bottom: 270},
+				viewDrawScript: func()
+				begin
+					local base := :Parent();
+					local b := :LocalBox();
+					local w := b.right;
+					local h := b.bottom;
+					if (base:LocalBox()).right >= base.kSideBySideWidth then
+						:DrawShape(MakeLine(0, 0, 0, h), {penSize: 1});
+					if not base.currentThread then begin
+						:DrawShape(MakeText("Choose a conversation.", 12, 16, w - 12, 40), {font: base.kFont});
+						return;
+					end;
+					local messages := base:ThreadMessages(base.currentThread);
+					local font := base.kFont;
+					local small := base.kSmall;
+					local lineH := FontHeight(font);
+					local smallH := FontHeight(small);
+					local maxBubble := w * 7 div 10;
+					if Length(messages) = 0 then begin
+						:DrawShape(MakeText("Nothing said yet. Write below and tap Send.", 12, 16, w - 12, 16 + 3 * lineH), {font: font});
+						return;
+					end;
+					local y := h - 6;
+					local i := Length(messages) - 1 - base.threadScroll;
+					local newerDay := nil;
+					while i >= 0 and y > 0 do begin
+						local m := messages[i];
+						local day := m.time div 1440;
+						if newerDay and day <> newerDay then
+							y := :DaySeparator(y, w, messages[i + 1].time);
+						newerDay := day;
+						local lines := base:WrapText(m.text, maxBubble - 16, font);
+						local textW := 0;
+						foreach line in lines do
+							textW := Max(textW, StrFontWidth(line, font));
+						local bubbleW := textW + 16;
+						local bubbleH := Length(lines) * lineH + 10;
+						local out := m.dir = 'outgoing;
+						// (on a channel, who said it, over its time)
+						local meta := if out then base:StateText(m)
+							else (if m.sender then m.sender & "  " else "") & base:WhenText(m.time);
+						y := y - smallH;
+						local metaW := Min(StrFontWidth(meta, small), w - 16);
+						local mx := if out then w - metaW - 8 else 8;
+						:DrawShape(MakeText(StyledStrTruncate(meta, metaW + 1, small), mx, y, mx + metaW + 2, y + smallH), {font: small});
+						y := y - bubbleH - 4;
+						local left := if out then w - bubbleW - 10 else 6;
+						if out then
+							:DrawShape(MakeRoundRect(left + 3, y + 3, left + bubbleW + 3, y + bubbleH + 3, 6), {penPattern: 0, fillPattern: 5});
+						:DrawShape(MakeRoundRect(left, y, left + bubbleW, y + bubbleH, 6), {penSize: 1, penPattern: 5, fillPattern: 1});
+						local ty := y + 5;
+						foreach line in lines do begin
+							:DrawShape(MakeText(line, left + 8, ty, left + bubbleW, ty + lineH), {font: font});
+							ty := ty + lineH;
+						end;
+						y := y - 8;
+						i := i - 1;
+					end;
+					if i < 0 and newerDay then
+						:DaySeparator(y, w, messages[0].time);
+				end,
+				DaySeparator: func(y, w, time)
+				begin
+					local base := :Parent();
+					local label := base:DayText(time);
+					local lw := StrFontWidth(label, base.kSmall);
+					local sh := FontHeight(base.kSmall);
+					local top := y - sh - 2;
+					local cy := top + sh div 2;
+					:DrawShape(MakeLine(8, cy, (w - lw) div 2 - 6, cy), {penSize: 1, penPattern: 3});
+					:DrawShape(MakeLine((w + lw) div 2 + 6, cy, w - 8, cy), {penSize: 1, penPattern: 3});
+					:DrawShape(MakeText(label, (w - lw) div 2, top, (w + lw) div 2 + 2, top + sh), {font: base.kSmall});
+					top - 8;
+				end
+			},
+
+			{
+				_proto: @189,						// protoLabelInputLine
+				role: 'replyLine,
+				viewBounds: {left: 6, top: 270, right: 180, bottom: 290},
+				label: "Say",
+				labelFont: 1058816,
+				entryFont: 10240
+			},
+			{
+				_proto: @226,						// protoTextButton
+				role: 'sendButton,
+				viewBounds: {left: 190, top: 270, right: 234, bottom: 290},
+				text: "Send",
+				buttonClickScript: func() :Parent():SendTyped()
+			},
+
+			// the status bar: New, All, Announce; the close box
+			{
+				_proto: @73,						// protoStatusBar
+				role: 'statusBar,
+				menuLeftButtons: [
+					{_proto: @226, text: "New", buttonClickScript: func() base:Compose()},
+					{_proto: @226, text: "All", buttonClickScript: func() base:ShowList()},
+					{_proto: @226, text: "Announce", buttonClickScript: func() base:Announce()}
+				],
+				menuRightButtons: [
+					{_proto: @166}					// protoClosebox
+				]
+			}
+		],
+
+		Split: func(text, separator)
+		begin
+			local pieces := [];
+			local start := 0;
+			for i := 0 to StrLen(text) - 1 do
+				if text[i] = separator then begin
+					if i > start then
+						AddArraySlot(pieces, SubStr(text, start, i - start));
+					start := i + 1;
+				end;
+			if StrLen(text) > start then
+				AddArraySlot(pieces, SubStr(text, start, StrLen(text) - start));
+			if Length(pieces) = 0 then
+				AddArraySlot(pieces, "");
+			pieces;
+		end,
+
+		Flatten: func(text)
+		begin
+			local flat := Clone(text);
+			for i := 0 to StrLen(flat) - 1 do
+				if flat[i] = $\n then flat[i] := $ ;
+			flat;
+		end
+	},
+
+	/*----------------------------------------------------------------------
+		The application's work outside its views
+	----------------------------------------------------------------------*/
+
+	Soup: func() GetUnionSoup(soupName),
+
+	// a key's first eight digits, as the node's id
+	ShortKey: func(key) if StrLen(key) > 8 then SubStr(key, 0, 8) else key,
+
+	// a node's name, as last heard
+	NodeName: func(key)
+	begin
+		local nodes := HostMeshContacts();
+		if nodes then
+			foreach n in nodes do
+				if StrEqual(n.key, key) then
+					return n.name;
+		nil;
+	end,
+
+	Base: func()
+	begin
+		local base := GetRoot().(appSymbol);
+		if base and base.viewCObject then base;
+	end,
+
+	Refresh: func()
+	begin
+		local base := :Base();
+		if base then begin
+			base:Reload();
+			base:Redraw();
+		end;
+	end,
+
+	// a message the mesh received
+	Received: func(m)
+	begin
+		local thread := if m.channel then kPublic else m.key;
+		local entry := {class: '|meshMessage:host|, thread: thread,
+			name: if m.channel then nil else m.name, sender: if m.channel then m.name else nil,
+			text: m.text, time: if m.age then Time() - m.age else Time(), dir: 'incoming, state: 'unread};
+		local base := :Base();
+		if base and base.currentThread and StrEqual(base.currentThread, thread) then
+			entry.state := 'read;
+		:Soup():AddToDefaultStoreXmit(entry, nil);
+		:Refresh();
+		if base then
+			PlaySound(@102)
+		else
+			GetRoot():Notify(3, if m.channel then "Mesh: " & m.channel else "Mesh: " & m.name,
+				(if m.channel and StrFilled(m.name) then m.name & ": " else "") & m.text);
+	end,
+
+	// a message sent: kept as 'sending, handed to the mesh
+	SendText: func(thread, name, text)
+	begin
+		local id := HostMeshSendText(if StrEqual(thread, kPublic) then nil else thread, text);
+		local entry := {class: '|meshMessage:host|, thread: thread, name: if StrEqual(thread, kPublic) then nil else name,
+			text: text, time: Time(), dir: 'outgoing, state: if id then 'sending else 'failed, sendId: id};
+		:Soup():AddToDefaultStoreXmit(entry, nil);
+		pending := true;
+		entry;
+	end,
+
+	pending: true,							// (messages 'sending to ask after: at boot, any left)
+
+	// the poll: messages received, and how the sendings went
+	Poll: func()
+	begin
+		local changed := nil;
+		local m;
+		while m := HostMeshNextMessage() do begin
+			:Received(m);
+			changed := true;
+		end;
+		if pending then begin
+			pending := nil;
+			local soup := :Soup();
+			if soup then begin
+				local cursor := Query(soup, {type: 'index});
+				local e;
+				while e := cursor:Entry() do begin
+					if e.state = 'sending then begin
+						local state := if e.sendId then HostMeshSendState(e.sendId);
+						if state = 'busy then
+							pending := true
+						else begin
+							e.state := if state then state else 'failed;	// (nil: a sending from before a restart)
+							EntryChangeXmit(e, nil);
+							changed := true;
+						end;
+					end;
+					cursor:Next();
+				end;
+			end;
+		end;
+		if changed then
+			:Refresh();
+		AddDelayedCall(func() GetGlobalVar('|HostMesh:host|):Poll(), [], kPollMs);
+	end,
+
+	// an antenna and its waves, for the Extras drawer
+	MakeIcon: func()
+	begin
+		local bitmap := MakeBitmap(28, 26, nil);
+		DrawIntoBitmap([MakeLine(14, 10, 14, 25), MakeLine(9, 25, 19, 25)], {penSize: 2}, bitmap);
+		DrawIntoBitmap([MakeOval(11, 7, 17, 13)], {penSize: 1, fillPattern: 5}, bitmap);
+		// (the waves either side: two short strokes each)
+		DrawIntoBitmap([MakeLine(8, 6, 6, 10), MakeLine(6, 10, 8, 14), MakeLine(20, 6, 22, 10), MakeLine(22, 10, 20, 14),
+			MakeLine(4, 3, 1, 10), MakeLine(1, 10, 4, 17), MakeLine(24, 3, 27, 10), MakeLine(27, 10, 24, 17)], {penSize: 1}, bitmap);
+		bitmap;
+	end,
+
+	Start: func()
+	begin
+		RegUnionSoup(appSymbol, {name: soupName, userName: "Mesh", ownerApp: appSymbol,
+			ownerAppName: "Mesh", userDescr: "Mesh messages",
+			indexes: [{structure: 'slot, path: 'time, type: 'int}]});
+		if not GetRoot().(appSymbol) then
+			GetRoot().(appSymbol) := BuildContext(app);
+		// the node named after the owner, the first time (it may be named
+		// again later; this is only so it is not "Newton" on the mesh)
+		local prefs := GetAppPrefs(appSymbol, {named: nil});
+		local owner := GetUserConfig('name);
+		if not prefs.named and StrFilled(owner) then begin
+			if HostMeshSetName(owner) then begin
+				prefs.named := true;
+				EntryChange(prefs);
+			end;
+		end;
+		local extras := GetUnionSoup(@307.name);
+		if extras then begin
+			local cursor := Query(extras, {type: 'index});
+			local e;
+			local found := nil;
+			while not found and (e := cursor:Entry()) do begin
+				if e.app = appSymbol then found := e;
+				cursor:Next();
+			end;
+			if not found then
+				extras:AddToDefaultStoreXmit({class: 'ROMFormEntry, text: "Mesh", app: appSymbol,
+					icon: :MakeIcon(), labels: nil, sequence: 31, _tagList: ['_icon, '_noBackup]}, nil);
+		end;
+		:Poll();
+	end
+}

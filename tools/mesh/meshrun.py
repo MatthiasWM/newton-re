@@ -40,6 +40,10 @@ def relay(process, label, lock):
 
 
 def start(argv, label, lock):
+    # (a relative path with forward slashes is not found by Windows'
+    # CreateProcess: made absolute)
+    if os.path.exists(argv[0]):
+        argv = [os.path.abspath(argv[0])] + argv[1:]
     process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
     thread = threading.Thread(target=relay, args=(process, label, lock), daemon=True)
     thread.start()

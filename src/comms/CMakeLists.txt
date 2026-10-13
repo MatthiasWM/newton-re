@@ -20,7 +20,7 @@ add_library(comms STATIC
 )
 # hal_host_sockets: the host's network, which host/HostTCPTool.cpp (the
 # stand-in for the NIE's TCP tool) works over
-target_link_libraries(comms PUBLIC newton_config os600_user memory utility hal_host_sockets hal_host_cellular)
+target_link_libraries(comms PUBLIC newton_config os600_user memory utility hal_host_sockets hal_host_cellular hal_host_mesh)
 target_include_directories(comms PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/host)
 
 # The serial tools (SerialTool.h): TSerTool, TAsyncSerTool and the 'aser
@@ -99,6 +99,14 @@ add_custom_command(
             -P ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/host/HostMessages.ns ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
     VERBATIM)
+# host/HostMesh.ns, the Mesh application (LoRa mesh), likewise
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostMeshSource.cpp
+    COMMAND ${CMAKE_COMMAND} -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/host/HostMesh.ns
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/HostMeshSource.cpp -DNAME=gHostMeshSource
+            -P ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/host/HostMesh.ns ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
+    VERBATIM)
 add_library(comms_script STATIC
     Translators.cpp
     CommTrace.cpp
@@ -115,6 +123,8 @@ add_library(comms_script STATIC
     ${CMAKE_CURRENT_BINARY_DIR}/HostCellSource.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/HostTextSource.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/HostMessagesSource.cpp
+    host/HostMeshApp.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/HostMeshSource.cpp
 )
 # newt: ExceptionNotify and CheckForDeferredActions; views: the root view
 # brought up to date after an endpoint event; the modem navigator every

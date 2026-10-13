@@ -1,0 +1,183 @@
+// The Mesh application (comms/host/HostMesh.ns) over the host's LoRa mesh
+// node, on a desktop's pretend air with tools/mesh's meshpeer as the other
+// node - "Ada", which says hello on the Public channel once it hears
+// someone and answers each message to it with "echo: <text>": its icon in
+// the Extras drawer; Ada heard and her channel message filed under the
+// Public channel; a conversation begun with her from New, the message
+// acknowledged ('delivered) and her echo filed beside it; a message on the
+// Public channel ('sent); each screen snapshotted
+// (mesh-<width>x<height>-<n>.pgm).  The ctests host.NewtonMesh.<size>:
+//
+//   python tools/mesh/meshrun.py \
+//       --peer "build/host/hal/meshpeer --air lan:{port} --name Ada --echo --channel 'Hello mesh' --seconds 200" \
+//       -- build/host/host/newton --mesh-air lan:{port} --display 240x320 --erase \
+//       --store mesh.store --headless 150 --script src/host/demo/mesh.ns
+
+HostInclude("common.ns");
+meFailures := 0;
+meApp := nil;
+meShot := 0;
+meAda := nil;
+
+meCheck := func(what, ok, why) begin
+	if ok then
+		Print("mesh: " & what & " ok")
+	else begin
+		Print("mesh: " & what & " FAILED - " & why);
+		meFailures := meFailures + 1;
+	end;
+end;
+
+meSnap := func() begin
+	if meApp then meApp:Dirty();
+	RefreshViews();
+	local p := GetAppParams();
+	meShot := meShot + 1;
+	ScreenSnapshot("mesh-" & NumberStr(p.appAreaWidth + p.appAreaLeft) & "x"
+		& NumberStr(p.appAreaHeight + p.appAreaTop) & "-" & NumberStr(meShot) & ".pgm");
+end;
+
+meEntries := func() begin
+	local items := [];
+	local soup := GetUnionSoup("Mesh:host");
+	if soup then begin
+		local cursor := Query(soup, {type: 'index});
+		local e;
+		while e := cursor:Entry() do begin
+			AddArraySlot(items, e);
+			cursor:Next();
+		end;
+	end;
+	items;
+end;
+
+meEntryWith := func(text) begin
+	foreach e in call meEntries with () do
+		if StrEqual(e.text, text) then
+			return e;
+	nil;
+end;
+
+meNode := func(name) begin
+	local nodes := HostMeshContacts();
+	if nodes then
+		foreach n in nodes do
+			if StrEqual(n.name, name) then
+				return n;
+	nil;
+end;
+
+meIconThere := func() begin
+	local cursor := Query(GetUnionSoup(@307.name), {type: 'index});
+	local e;
+	while e := cursor:Entry() do begin
+		if e.app = '|Mesh:host| then
+			return e._tagList and SetContains(e._tagList, '_icon);
+		cursor:Next();
+	end;
+	nil;
+end;
+
+meSteps := [
+	// (a fresh store's Setup assistant closed first)
+	func(next) begin
+		local start := Ticks();
+		local poll;
+		poll := func() begin
+			if GetRoot().setup and GetRoot().setup.viewCObject then begin
+				GetRoot().setup:Close();
+				AddDelayedCall(next, nil, 500);
+			end else if Ticks() - start > 20 * 60 then
+				call next with ()
+			else
+				AddDelayedCall(poll, nil, 250);
+		end;
+		call poll with ();
+	end,
+	func(next) call waitFor with ("mesh: the application",
+		func() GetRoot().|Mesh:host| and HostMeshStatus().state = 'on, next, 90),
+	func(next) begin
+		meApp := GetRoot().|Mesh:host|;
+		call meCheck with ("its icon in the Extras drawer", call meIconThere with (), "none");
+		meApp:Open();
+		call meCheck with ("the Public channel listed first", meApp.threads and Length(meApp.threads) >= 1
+			and StrEqual(meApp.threads[0].thread, "public"), "the list is " & (if meApp.threads then Length(meApp.threads)));
+		call meSnap with ();
+		// Ada hears this node's first advert, says hello on the channel
+		call waitFor with ("mesh: Ada and her hello", func() (call meNode with ("Ada"))
+			and call meEntryWith with ("Hello mesh"), next, 60);
+	end,
+	func(next) begin
+		meAda := call meNode with ("Ada");
+		local hello := call meEntryWith with ("Hello mesh");
+		call meCheck with ("Ada's hello on the Public channel", hello and StrEqual(hello.thread, "public")
+			and StrEqual(hello.sender, "Ada") and hello.dir = 'incoming,
+			"it is " & (if hello then hello.thread & " from " & hello.sender));
+		call meCheck with ("unread", hello and hello.state = 'unread, "it is " & (if hello then hello.state));
+		call meCheck with ("Ada a chat node", meAda.kind = 'chat, "she is " & meAda.kind);
+		call meSnap with ();
+		// New: the nodes heard; Ada chosen
+		meApp:Compose();
+		local index := 0;
+		foreach i, n in meApp.pickNodes do
+			if StrEqual(n.name, "Ada") then index := i;
+		meApp:pickActionScript(index);
+		call meCheck with ("a conversation with Ada", meApp.mode = 'thread and StrEqual(meApp.currentThread, meAda.key),
+			"the mode is " & meApp.mode);
+		call meCheck with ("the tab's title Ada", StrPos(meApp.folderTab.showBarText.text, "Ada", 0),
+			"it is " & meApp.folderTab.showBarText.text);
+		SetValue(meApp.replyLine.entryLine, 'text, "Hi Ada - are you on the hill tonight?");
+		meApp.sendButton:buttonClickScript();
+		call waitFor with ("mesh: the message delivered and echoed", func() begin
+			local e := call meEntryWith with ("Hi Ada - are you on the hill tonight?");
+			e and e.state = 'delivered and call meEntryWith with ("echo: Hi Ada - are you on the hill tonight?");
+		end, next, 60);
+	end,
+	func(next) begin
+		local sent := call meEntryWith with ("Hi Ada - are you on the hill tonight?");
+		local echo := call meEntryWith with ("echo: Hi Ada - are you on the hill tonight?");
+		call meCheck with ("the message in Ada's conversation", sent and sent.dir = 'outgoing
+			and StrEqual(sent.thread, meAda.key), "it is " & (if sent then sent.thread));
+		call meCheck with ("her echo beside it, read", echo and StrEqual(echo.thread, meAda.key) and echo.state = 'read
+			and StrEqual(echo.name, "Ada"), "it is " & (if echo then echo.state));
+		call meSnap with ();
+		// the Public channel: a message to everyone
+		meApp:OpenThread("public");
+		SetValue(meApp.replyLine.entryLine, 'text, "Hello everyone");
+		meApp.sendButton:buttonClickScript();
+		call waitFor with ("mesh: the channel message sent", func() begin
+			local e := call meEntryWith with ("Hello everyone");
+			e and e.state = 'sent;
+		end, next, 30);
+	end,
+	func(next) begin
+		local hello := call meEntryWith with ("Hello mesh");
+		call meCheck with ("Ada's hello read once the channel was opened", hello and hello.state = 'read,
+			"it is " & (if hello then hello.state));
+		call meSnap with ();
+		meApp:ShowList();
+		call meSnap with ();
+		// the Host preferences' Mesh radio: the presets listed, another chosen
+		local item := nil;
+		foreach s in HostSettingsList() do
+			if s.setting = 'meshRegion then item := s;
+		call meCheck with ("the Mesh radio setting", item and item.kind = 'choice and Length(item.choices) = Length(HostMeshRegions())
+			and item.value = 0, "it is " & (if item then item.value));
+		HostSetSetting('meshRegion, 1);
+		call waitFor with ("mesh: retuned", func() StrEqual(HostMeshStatus().region, "Aus / NZ"), next, 10);
+	end,
+	func(next) begin
+		call meCheck with ("retuned to Aus / NZ", HostMeshRegion() = 1, "it is " & HostMeshRegion());
+		HostSetSetting('meshRegion, 0);
+		Print("mesh: done, " & meFailures & " failed");
+		HostQuit();
+	end];
+
+meStep := 0;
+meNext := func() begin
+	local step := meSteps[meStep];
+	meStep := meStep + 1;
+	call step with (meNext);
+end;
+
+call meNext with ();

@@ -8,7 +8,9 @@
 				host or the link - hears what the others send, as nodes in
 				range of each other do.  A datagram is "MCA1", the sender's
 				own random tag (a node hears its own sends come back on
-				loopback, and drops them), and the packet's bytes.  Sends are
+				loopback, and drops them), the radio's settings as a word
+				(a node tuned to other settings does not hear it, as a
+				LoRa radio would not), and the packet's bytes.  Sends are
 				as quick as the network: the airtime MeshCore is told is a
 				real LoRa packet's at the preset's settings, which its
 				timeouts are reckoned from.
@@ -32,6 +34,7 @@
 const uint32_t	kAirGroup = (239u << 24) | (255u << 16) | (78u << 8) | 121u;	// 239.255.78.121
 const uint16_t	kAirPort = 3685;
 static const char	kAirMagic[4] = { 'M', 'C', 'A', '1' };
+const int		kHeader = 12;			// the magic, the sender's tag, the settings
 
 class AirRadio : public mesh::Radio
 {
@@ -43,21 +46,32 @@ public:
 	uint32_t				fInterfaces[8];
 	int						fInterfaceCount = 0;
 
+	// the settings as a word: frequency in kHz, bandwidth, SF, CR
+	uint32_t Tuning() const
+	{
+		uint32_t t = (uint32_t) (fSettings.frequency * 1000.0f + 0.5f);
+		t = t * 31 + (uint32_t) (fSettings.bandwidth * 10.0f + 0.5f);
+		t = t * 31 + (uint32_t) fSettings.spreadingFactor;
+		return t * 31 + (uint32_t) fSettings.codingRate;
+	}
+
 	int recvRaw(uint8_t* bytes, int size) override
 	{
-		uint8_t datagram[8 + MAX_TRANS_UNIT];
+		uint8_t datagram[kHeader + MAX_TRANS_UNIT];
 		for (;;)
 		{
 			size_t got = 0;
 			uint32_t from = 0;
 			if (fHandle < 0 || HostUDPReceive(fHandle, datagram, sizeof(datagram), &got, &from) != kHostSocketOK || got == 0)
 				return 0;
-			if (got <= 8 || memcmp(datagram, kAirMagic, 4) != 0 || memcmp(datagram + 4, fTag, 4) == 0)
-				continue;							// not the air's, or this node's own
-			int n = (int) got - 8;
+			uint32_t tuning = Tuning();
+			if (got <= kHeader || memcmp(datagram, kAirMagic, 4) != 0 || memcmp(datagram + 4, fTag, 4) == 0
+			 || memcmp(datagram + 8, &tuning, 4) != 0)
+				continue;							// not the air's, this node's own, or on other settings
+			int n = (int) got - kHeader;
 			if (n > size)
 				continue;
-			memcpy(bytes, datagram + 8, n);
+			memcpy(bytes, datagram + kHeader, n);
 			return n;
 		}
 	}
@@ -78,16 +92,18 @@ public:
 
 	bool startSendRaw(const uint8_t* bytes, int length) override
 	{
-		uint8_t datagram[8 + MAX_TRANS_UNIT];
+		uint8_t datagram[kHeader + MAX_TRANS_UNIT];
 		if (fHandle < 0 || length > MAX_TRANS_UNIT)
 			return false;
+		uint32_t tuning = Tuning();
 		memcpy(datagram, kAirMagic, 4);
 		memcpy(datagram + 4, fTag, 4);
-		memcpy(datagram + 8, bytes, length);
+		memcpy(datagram + 8, &tuning, 4);
+		memcpy(datagram + kHeader, bytes, length);
 		if (fInterfaceCount == 0)
-			HostUDPMulticastSend(fHandle, kAirGroup, fPort, 0, datagram, 8 + length);
+			HostUDPMulticastSend(fHandle, kAirGroup, fPort, 0, datagram, kHeader + length);
 		for (int i = 0; i < fInterfaceCount; i++)
-			HostUDPMulticastSend(fHandle, kAirGroup, fPort, fInterfaces[i], datagram, 8 + length);
+			HostUDPMulticastSend(fHandle, kAirGroup, fPort, fInterfaces[i], datagram, kHeader + length);
 		return true;
 	}
 

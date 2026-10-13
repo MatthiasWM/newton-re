@@ -36,6 +36,7 @@
 #include "HostInterconnect.h"
 #include "HostWifi.h"
 #include "HostCellular.h"
+#include "HostMesh.h"
 #include "HostTablet.h"
 #include "hal/host/Host.h"
 #include "ROMImport.h"
@@ -280,6 +281,7 @@ HostRegisterViewFunctions(void)
 	HostRegisterInterconnectFunctions();
 	HostRegisterWifiFunctions();
 	HostRegisterCellularFunctions();
+	HostRegisterMeshFunctions();
 }
 
 

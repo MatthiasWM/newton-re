@@ -46,7 +46,11 @@ KEPT_IN_HOST = {"host/HostNatives.cpp", "host/HostViews.cpp", "host/HostStores.c
                 "host/HostWifi.cpp",
                 # the cellular engine's natives (the engine is hal/host's,
                 # over the board's UART: tdeck_modem.cpp)
-                "host/HostCellularNatives.cpp"}
+                "host/HostCellularNatives.cpp",
+                # the LoRa mesh engine's natives (the engine is hal/host's,
+                # over the board's SX1262: tdeck_lora.cpp), and the UTF-8
+                # both engines' natives turn strings to and from
+                "host/HostMeshNatives.cpp", "host/HostUTF8.cpp"}
 
 
 def main(argv):
