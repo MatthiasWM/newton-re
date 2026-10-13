@@ -383,6 +383,11 @@ DeviceScenario(void)
 	// the PSS manager's slots through gPSSManager (this ROM's 0x0c1016bc)
 	InstallARMPSSManager();
 	TPSSManager* manager = new TPSSManager;
+	// (its slots cleared as MainConstructor clears them - the test never
+	// runs the world, and the constructor leaves them as the heap had them,
+	// which made GetCardSlotStores find a stale store now and then)
+	for (int i = 0; i < 4; i++)
+		manager->fSlots[i].Clear();
 	gPSSManager = manager;
 	uint32_t view = 0;
 	EXPECT(ARMRead32(0x0c1016bc, &view) && view == ARMPSSManagerView() && view != 0);

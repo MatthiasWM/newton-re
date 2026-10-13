@@ -9,6 +9,19 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-14: armcpu.ARMProtocols failing now and then
+
+`armcpu.ARMProtocols` failed about one run in five under `--repeat
+until-fail:20` (and once in a full `ctest -j8`) at
+`GetCardSlotStores(0, stores) == 1`.  Not a race with the PSS manager or
+card server tasks, as it looked: the test makes its own `TPSSManager`
+with `new` and never runs the world, and the slots are cleared only by
+`MainConstructor` (`SPSSSlotInfo::Clear`, as in the ROM; the constructor
+leaves them alone), so slot 0's other store infos held whatever the heap
+had there and a stale non-nil `fStore` was counted as a second store.
+The test now clears the slots as `MainConstructor` does; 50 runs of 50
+pass.
+
 ## 2026-10-14: A GPS receiver on the serial port
 
 Three GPS applications added as fixtures (GPS Map 2.1 with its SatNav
