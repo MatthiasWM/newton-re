@@ -58,6 +58,7 @@
 
 		mode: 'list,							// 'list, 'thread or 'compose
 		currentThread: nil,						// the thread shown
+		selectedId: nil,						// (the message selected in it: its _uniqueID)
 		threads: nil,							// the conversations, newest first
 		listScroll: 0,							// conversations scrolled past
 		threadScroll: 0,						// messages scrolled past, from the newest
@@ -65,6 +66,7 @@
 		// (the child views, found by their role once they exist)
 		folderTab: nil, headerView: nil, listView: nil, threadView: nil, replyLine: nil,
 		sendButton: nil, toPicker: nil, statusBar: nil,
+		replyLines: 1,							// (the lines its text wraps to, as last laid out)
 
 		viewSetupFormScript: func()
 		begin
@@ -108,7 +110,6 @@
 			local h := box.bottom - box.top;
 			local barTop := h - (if statusBar then (statusBar:LocalBox()).bottom else 24);
 			local headerH := FontHeight(kBold) + 6;			// (tight: a small screen)
-			local replyH := FontHeight(kFont) + 14;
 			local wide := w >= kSideBySideWidth;
 			local listW := if wide then Min(w * 2 div 5, 300) else w;
 			local showList := wide or mode = 'list;
@@ -118,15 +119,22 @@
 			// for the top to stay the same over a conversation): the list or
 			// the conversation's header under it
 			local tabH := (folderTab:LocalBox()).bottom - 5;	// (over its button's last lines, which draw nothing)
+			local sendW := StrFontWidth(sendButton.text, kBold) + 20;
+			// the reply line as tall as its text wrapped (at most half the
+			// conversation), the Send button beside its last line
+			local spacing := :ReplySpacing();
+			local maxLines := Max(1, (barTop - tabH - headerH) div 2 div spacing);
+			replyLines := :ReplyLineCount(w - tx - sendW - 18);
+			local replyH := FontHeight(kFont) + 14 + (Min(replyLines, maxLines) - 1) * spacing;
 			folderTab:Show();
 			if showThread then headerView:Show() else headerView:Hide();
 			SetValue(headerView, 'viewBounds, RelBounds(tx, tabH, w - tx, headerH));
 			SetValue(listView, 'viewBounds, RelBounds(0, tabH, listW, barTop - tabH));
 			local threadTop := tabH + headerH;
 			SetValue(threadView, 'viewBounds, RelBounds(tx, threadTop, w - tx, barTop - threadTop - replyH));
-			local sendW := StrFontWidth(sendButton.text, kBold) + 20;
 			SetValue(replyLine, 'viewBounds, RelBounds(tx + 6, barTop - replyH + 4, w - tx - sendW - 18, replyH - 8));
-			SetValue(sendButton, 'viewBounds, RelBounds(w - sendW - 6, barTop - replyH + 4, sendW, replyH - 8));
+			local sendH := FontHeight(kFont) + 6;
+			SetValue(sendButton, 'viewBounds, RelBounds(w - sendW - 6, barTop - 4 - sendH, sendW, sendH));
 			local pickerH := 13;
 			SetValue(toPicker, 'viewBounds, RelBounds(tx + 8, tabH + (headerH - pickerH) div 2, w - tx - 16, pickerH));
 			if showList then listView:Show() else listView:Hide();
@@ -216,6 +224,7 @@
 		OpenThread: func(thread)
 		begin
 			currentThread := thread;
+			selectedId := nil;
 			threadScroll := 0;
 			mode := 'thread;
 			// (read now)
@@ -272,6 +281,7 @@
 		ShowList: func()
 		begin
 			mode := 'list;
+			selectedId := nil;
 			:Reload();
 			:Layout();
 		end,
@@ -290,10 +300,57 @@
 
 		// the reply line's text sent to the conversation (or the To line's
 		// recipients), and the line emptied
+		// Deleting: a message tapped in the conversation is selected (drawn
+		// inverted; tapped again, or another place, it is not); Delete
+		// removes the selected message, or - nothing selected - the whole
+		// conversation, once confirmed (AsyncConfirm).
+		DeleteSelected: func()
+		begin
+			if not currentThread or (mode = 'list and (:LocalBox()).right < kSideBySideWidth) then begin
+				GetRoot():Notify(3, "Messages", "Open a conversation to delete it, or tap one of its messages to delete just that message.");
+				return nil;
+			end;
+			if selectedId then begin
+				foreach e in :ThreadMessages(currentThread) do
+					if e._uniqueID = selectedId then
+						EntryRemoveFromSoupXmit(e, nil);
+				selectedId := nil;
+				:Reload();
+				:Redraw();
+				return true;
+			end;
+			local thread := currentThread;
+			AsyncConfirm(:DeleteQuestion(thread),
+				[{value: true, text: "Delete"}, {value: nil, text: "Cancel"}],
+				func(confirmed) if confirmed then base:DeleteThread(thread));
+		end,
+
+		DeleteQuestion: func(thread)
+		begin
+			local t := :ThreadFor(thread);
+			"Delete the conversation with " & (if t then :ThreadName(t) else "this number") & "?";
+		end,
+
+		// every message of a conversation removed
+		DeleteThread: func(thread)
+		begin
+			foreach e in :ThreadMessages(thread) do
+				EntryRemoveFromSoupXmit(e, nil);
+			selectedId := nil;
+			if StrEqual(currentThread, thread) then begin
+				currentThread := nil;
+				mode := 'list;
+			end;
+			:Reload();
+			:Layout();
+		end,
+
 		SendTyped: func()
 		begin
 			local text := replyLine.entryLine.text;
-			if not StrFilled(text) then
+			// (nothing to send: Send does nothing - StrFilled is only
+			// "not empty", spaces count)
+			if not text or StrLen(TrimString(Clone(text))) = 0 then
 				return nil;
 			local messages := GetGlobalVar('|HostMessages:host|);
 			if mode = 'compose then begin
@@ -306,15 +363,53 @@
 				foreach number in numbers do
 					messages:SendText(number, name, text);
 				SetValue(replyLine.entryLine, 'text, Clone(""));
+				:ReplyChanged();
 				:OpenThread(messages:ThreadKey(numbers[0]));
 			end else if currentThread then begin
+				// emptied first, so that the line is empty however the
+				// sending goes
+				SetValue(replyLine.entryLine, 'text, Clone(""));
+				:ReplyChanged();
 				local t := :ThreadFor(currentThread);
 				if t then
 					messages:SendText(t.number, t.name, text);
-				SetValue(replyLine.entryLine, 'text, Clone(""));
 				:Reload();
 				:Redraw();
 			end;
+		end,
+
+		// the reply line's spacing between lines
+		ReplySpacing: func()
+			if replyLine and replyLine.entryLine and replyLine.entryLine.viewLineSpacing then
+				replyLine.entryLine.viewLineSpacing
+			else FontHeight(kFont) + 6,
+
+		// how many lines the reply line's text wraps to in a line this wide
+		// (its label's indent taken off; a little narrower than the
+		// paragraph's own wrapping, so as to give a line too many rather
+		// than one too few)
+		ReplyLineCount: func(width)
+		begin
+			local entry := if replyLine then replyLine.entryLine;
+			if not entry or not entry.text or StrLen(entry.text) = 0 then
+				return 1;
+			local font := if entry.viewFont then entry.viewFont else kFont;
+			local textW := width - (if replyLine.indent then replyLine.indent else 0) - 8;
+			Max(1, Length(:WrapText(entry.text, Max(textW, 20), font)));
+		end,
+
+		// the reply line's text changed: laid out again when it wraps to
+		// more lines or fewer
+		ReplyChanged: func()
+		begin
+			if not replyLine then return nil;
+			local box := :LocalBox();
+			local wide := box.right - box.left >= kSideBySideWidth;
+			local tx := if wide then Min((box.right - box.left) * 2 div 5, 300) + 1 else 0;
+			local sendW := StrFontWidth(sendButton.text, kBold) + 20;
+			local lines := :ReplyLineCount(box.right - box.left - tx - sendW - 18);
+			if lines <> replyLines then
+				:Layout();
 		end,
 
 		// a To line's choice: its card's name, or the number
@@ -576,6 +671,7 @@
 					local smallH := FontHeight(small);
 					local maxBubble := w * 7 div 10;
 					local y := h - 6;
+					hits := [];
 					local i := Length(messages) - 1 - base.threadScroll;
 					local newerDay := nil;
 					while i >= 0 and y > 0 do begin
@@ -601,12 +697,15 @@
 						:DrawShape(MakeText(meta, mx, y, mx + metaW + 2, y + smallH), {font: small});
 						y := y - bubbleH - 4;
 						local left := if out then w - bubbleW - 10 else 6;
+						// (the selected one inverted: Delete removes it)
+						local chosen := base.selectedId and m._uniqueID = base.selectedId;
+						AddArraySlot(hits, {left: left, top: y, right: left + bubbleW, bottom: y + bubbleH, id: m._uniqueID});
 						if out then
 							:DrawShape(MakeRoundRect(left + 3, y + 3, left + bubbleW + 3, y + bubbleH + 3, 6), {penPattern: 0, fillPattern: 5});
-						:DrawShape(MakeRoundRect(left, y, left + bubbleW, y + bubbleH, 6), {penSize: 1, penPattern: 5, fillPattern: 1});
+						:DrawShape(MakeRoundRect(left, y, left + bubbleW, y + bubbleH, 6), {penSize: 1, penPattern: 5, fillPattern: if chosen then 5 else 1});
 						local ty := y + 5;
 						foreach line in lines do begin
-							:DrawShape(MakeText(line, left + 8, ty, left + bubbleW, ty + lineH), {font: font});
+							:DrawShape(MakeText(line, left + 8, ty, left + bubbleW, ty + lineH), {font: font, transferMode: if chosen then 3 else 0});
 							ty := ty + lineH;
 						end;
 						y := y - 8;
@@ -614,6 +713,24 @@
 					end;
 					if i < 0 and newerDay then
 						:DaySeparator(y, w, messages[0].time);
+				end,
+				// (the bubbles as last drawn, for a tap to find: {left, top,
+				// right, bottom, id})
+				hits: nil,
+				viewClickScript: func(unit)
+				begin
+					local base := :Parent();
+					local box := :GlobalBox();
+					local x := GetPoint(4, unit) - box.left;
+					local y := GetPoint(5, unit) - box.top;
+					local hit := nil;
+					if hits then
+						foreach h in hits do
+							if x >= h.left and x < h.right and y >= h.top and y < h.bottom then
+								hit := h.id;
+					base.selectedId := if hit and hit <> base.selectedId then hit else nil;
+					:Dirty();
+					true;
 				end,
 				DaySeparator: func(y, w, time)
 				begin
@@ -655,7 +772,20 @@
 				viewBounds: {left: 6, top: 270, right: 180, bottom: 290},
 				label: "Reply",
 				labelFont: 1058816,
-				entryFont: 10240
+				entryFont: 10240,
+				// the entry wraps (the proto's is one line only), the
+				// reply area growing to fit it
+				viewSetupChildrenScript: func()
+				begin
+					inherited:viewSetupChildrenScript();
+					if BAnd(entryLine.viewJustify, 0x800000) <> 0 then
+						entryLine.viewJustify := entryLine.viewJustify - 0x800000;
+				end,
+				textChanged: func()
+				begin
+					inherited:?textChanged();
+					base:ReplyChanged();
+				end
 			},
 			{
 				_proto: @226,						// protoTextButton
@@ -665,14 +795,15 @@
 				buttonClickScript: func() :Parent():SendTyped()
 			},
 
-			// the status bar: New, All (back to the list), Call; the close box
+			// the status bar: New, All (back to the list), Call, Delete; the close box
 			{
 				_proto: @73,						// protoStatusBar
 				role: 'statusBar,
 				menuLeftButtons: [
 					{_proto: @226, text: "New", buttonClickScript: func() base:Compose()},
 					{_proto: @226, text: "All", buttonClickScript: func() base:ShowList()},
-					{_proto: @226, text: "Call", buttonClickScript: func() base:CallCurrent()}
+					{_proto: @226, text: "Call", buttonClickScript: func() base:CallCurrent()},
+					{_proto: @226, text: "Delete", buttonClickScript: func() base:DeleteSelected()}
 				],
 				menuRightButtons: [
 					{_proto: @166}					// protoClosebox

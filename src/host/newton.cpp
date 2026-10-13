@@ -455,6 +455,17 @@ FHostPenReplayDone(RefArg /*rcvr*/)
 }
 
 
+// HostPenTap(x, y): a tap at a display point, as the pen would make it
+// (HostPenReplayDone says when it has been played)
+static Ref
+FHostPenTap(RefArg /*rcvr*/, RefArg x, RefArg y)
+{
+	if (!ISINT(x) || !ISINT(y))
+		return NILREF;
+	return MAKEINT(HostPenTapStart((double) RINT(x), (double) RINT(y)));
+}
+
+
 // HostRebootCount(): how many times the machine has restarted in this run
 // (host/HostRestart.h)
 static Ref
@@ -618,6 +629,7 @@ NewtonPreMain(void)
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "HostRebootCount")), RefVar(MakeCFunction((void*) FHostRebootCount, 0, nil)));
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "HostPenReplay")), RefVar(MakeCFunction((void*) FHostPenReplay, 1, nil)));
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "HostPenReplayDone")), RefVar(MakeCFunction((void*) FHostPenReplayDone, 0, nil)));
+	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "HostPenTap")), RefVar(MakeCFunction((void*) FHostPenTap, 2, nil)));
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "HostInclude")), RefVar(MakeCFunction((void*) FHostInclude, 1, nil)));
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "HostCPUTime")), RefVar(MakeCFunction((void*) FHostCPUTime, 0, nil)));
 	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "HostThreadCPUTime")), RefVar(MakeCFunction((void*) FHostThreadCPUTime, 0, nil)));

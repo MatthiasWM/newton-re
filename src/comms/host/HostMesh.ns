@@ -30,6 +30,19 @@
 	kPublic: "public",
 	kPollMs: 2000,
 
+	// How long messages are kept (the owner's ask, 2026-10-14: a busy mesh
+	// says a lot): the Prefs' Keep, a week unless chosen otherwise (kept in
+	// the application's prefs, keep: an index); and never more than
+	// kMessagesMax, the oldest going first.  A message still sending is
+	// never taken.  Pruned at the start, then at most hourly from the poll,
+	// and at once when Keep is changed.
+	kKeepNames: ["A day", "A week", "A month", "A year", "Always"],
+	kKeepMinutes: [1440, 10080, 43200, 525600, nil],
+	kKeepDefault: 1,
+	kMessagesMax: 1000,
+	kPruneEvery: 60,						// minutes
+	lastPrune: nil,
+
 	app: {
 		viewClass: 74,							// clView
 		viewFlags: 5,							// vVisible, vApplication
@@ -51,6 +64,7 @@
 
 		mode: 'list,							// 'list or 'thread
 		currentThread: nil,						// the thread shown
+		selectedId: nil,						// (the message selected in it: its _uniqueID)
 		threads: nil,							// the conversations, Public first, then newest first
 		listScroll: 0,
 		threadScroll: 0,
@@ -225,6 +239,7 @@
 		OpenThread: func(thread)
 		begin
 			currentThread := thread;
+			selectedId := nil;
 			threadScroll := 0;
 			mode := 'thread;
 			foreach e in :ThreadMessages(thread) do
@@ -274,6 +289,7 @@
 		ShowList: func()
 		begin
 			mode := 'list;
+			selectedId := nil;
 			:Reload();
 			:Layout();
 		end,
@@ -356,6 +372,52 @@
 				:Layout();
 		end,
 
+		// Deleting: a message tapped in the conversation is selected (drawn
+		// inverted; tapped again, or another place, it is not); Delete
+		// removes the selected message, or - nothing selected - the whole
+		// conversation, once confirmed (AsyncConfirm).
+		DeleteSelected: func()
+		begin
+			if not currentThread or (mode = 'list and (:LocalBox()).right < kSideBySideWidth) then begin
+				GetRoot():Notify(3, "Mesh", "Open a conversation to delete it, or tap one of its messages to delete just that message.");
+				return nil;
+			end;
+			if selectedId then begin
+				foreach e in :ThreadMessages(currentThread) do
+					if e._uniqueID = selectedId then
+						EntryRemoveFromSoupXmit(e, nil);
+				selectedId := nil;
+				:Reload();
+				:Redraw();
+				return true;
+			end;
+			local thread := currentThread;
+			AsyncConfirm(:DeleteQuestion(thread),
+				[{value: true, text: "Delete"}, {value: nil, text: "Cancel"}],
+				func(confirmed) if confirmed then base:DeleteThread(thread));
+		end,
+
+		DeleteQuestion: func(thread)
+		begin
+			local t := :ThreadFor(thread);
+			if StrEqual(thread, :Mesh().kPublic) then "Delete every message on the Public channel?"
+			else "Delete the conversation with " & (if t then :ThreadName(t) else "this node") & "?";
+		end,
+
+		// every message of a conversation removed
+		DeleteThread: func(thread)
+		begin
+			foreach e in :ThreadMessages(thread) do
+				EntryRemoveFromSoupXmit(e, nil);
+			selectedId := nil;
+			if StrEqual(currentThread, thread) then begin
+				currentThread := nil;
+				mode := 'list;
+			end;
+			:Reload();
+			:Layout();
+		end,
+
 		Announce: func()
 		begin
 			if HostMeshAdvertise() then
@@ -386,7 +448,7 @@
 			local box := :GlobalBox();
 			local width := Min(box.right - box.left - 12, 260);
 			local switchable := HostMeshPowerSwitchable();
-			local height := 230 + (if switchable then 20 else 0);
+			local height := 240 + (if switchable then 22 else 0);
 			height := Min(height, box.bottom - box.top - 8);
 			prefsSlip := BuildContext({_proto: prefsTemplate, meshApp: self, switchable: switchable,
 				viewBounds: RelBounds(box.left + (box.right - box.left - width) div 2,
@@ -443,10 +505,11 @@
 					local app := meshApp;
 					AddDelayedCall(func() if app.viewCObject then app:Redraw(), [], 1000);
 				end;
+				keepPicker := nil;
 				nameLine := presetPicker := frequencyLine := bandwidthPicker := spreadingPicker := codingPicker := powerLine := hashPicker := nil;
 				inherited:?viewQuitScript();
 			end,
-			nameLine: nil, presetPicker: nil, frequencyLine: nil, bandwidthPicker: nil, spreadingPicker: nil,
+			nameLine: nil, keepPicker: nil, presetPicker: nil, frequencyLine: nil, bandwidthPicker: nil, spreadingPicker: nil,
 			codingPicker: nil, powerLine: nil, hashPicker: nil,
 
 			// a number's text with no more decimals than it needs (at most places)
@@ -523,8 +586,25 @@
 				 label: "Name", labelFont: 1058816, entryFont: 10240, indent: 76,
 				 TextSetup: func() Clone(theSlip.nameShown)},
 				{_proto: @190,					// protoLabelPicker
+				 role: 'keepPicker,
+				 viewBounds: {left: 10, top: 48, right: -10, bottom: 64}, viewJustify: 48,
+				 text: "Keep", indent: 76,
+				 labelCommands: [""],
+				 viewSetupFormScript: func()
+				 begin
+					labelCommands := GetGlobalVar('|HostMesh:host|).kKeepNames;
+					inherited:?viewSetupFormScript();
+				 end,
+				 TextSetup: func()
+				 begin
+					local mesh := GetGlobalVar('|HostMesh:host|);
+					mesh.kKeepNames[mesh:KeepIndex()];
+				 end,
+				 // (at once: messages older than that go now)
+				 LabelActionScript: func(index) GetGlobalVar('|HostMesh:host|):SetKeep(index)},
+				{_proto: @190,					// protoLabelPicker
 				 role: 'presetPicker,
-				 viewBounds: {left: 10, top: 52, right: -10, bottom: 68}, viewJustify: 48,
+				 viewBounds: {left: 10, top: 68, right: -10, bottom: 84}, viewJustify: 48,
 				 text: "Preset", indent: 76,
 				 labelCommands: [""],
 				 viewSetupFormScript: func()
@@ -547,7 +627,7 @@
 				 end},
 				{_proto: @189,					// protoLabelInputLine
 				 role: 'frequencyLine,
-				 viewBounds: {left: 10, top: 70, right: -40, bottom: 90}, viewJustify: 48,
+				 viewBounds: {left: 10, top: 86, right: -40, bottom: 106}, viewJustify: 48,
 				 label: "Frequency", labelFont: 1058816, entryFont: 10240, indent: 76,
 				 entryFlags: 0x2A01,			// (numbers and punctuation)
 				 TextSetup: func() theSlip:NumText(theSlip.radio.frequency, 3),
@@ -558,10 +638,10 @@
 					theSlip:ShowPreset();
 				 end},
 				{_proto: @218,					// protoStaticText (the frequency's unit)
-				 viewBounds: {left: -36, top: 74, right: -8, bottom: 90}, viewJustify: 32, text: "MHz"},
+				 viewBounds: {left: -36, top: 90, right: -8, bottom: 106}, viewJustify: 32, text: "MHz"},
 				{_proto: @190,					// protoLabelPicker
 				 role: 'bandwidthPicker,
-				 viewBounds: {left: 10, top: 98, right: -10, bottom: 114}, viewJustify: 48,
+				 viewBounds: {left: 10, top: 110, right: -10, bottom: 126}, viewJustify: 48,
 				 text: "Bandwidth", indent: 76,
 				 labelCommands: [""],
 				 bandwidths: nil,
@@ -581,7 +661,7 @@
 				 end},
 				{_proto: @190,					// protoLabelPicker
 				 role: 'spreadingPicker,
-				 viewBounds: {left: 10, top: 120, right: -10, bottom: 136}, viewJustify: 48,
+				 viewBounds: {left: 10, top: 131, right: -10, bottom: 147}, viewJustify: 48,
 				 text: "Spreading", indent: 76,
 				 labelCommands: ["5", "6", "7", "8", "9", "10", "11", "12"],
 				 TextSetup: func() NumberStr(theSlip.radio.spreadingFactor),
@@ -592,7 +672,7 @@
 				 end},
 				{_proto: @190,					// protoLabelPicker
 				 role: 'codingPicker,
-				 viewBounds: {left: 10, top: 142, right: -10, bottom: 158}, viewJustify: 48,
+				 viewBounds: {left: 10, top: 152, right: -10, bottom: 168}, viewJustify: 48,
 				 text: "Coding", indent: 76,
 				 labelCommands: ["4/5", "4/6", "4/7", "4/8"],
 				 TextSetup: func() "4/" & NumberStr(theSlip.radio.codingRate),
@@ -603,7 +683,7 @@
 				 end},
 				{_proto: @189,					// protoLabelInputLine
 				 role: 'powerLine,
-				 viewBounds: {left: 10, top: 160, right: -40, bottom: 180}, viewJustify: 48,
+				 viewBounds: {left: 10, top: 170, right: -40, bottom: 190}, viewJustify: 48,
 				 label: "Power", labelFont: 1058816, entryFont: 10240, indent: 76,
 				 entryFlags: 0x2A01,			// (numbers and punctuation)
 				 TextSetup: func() NumberStr(theSlip.radio.txPower),
@@ -613,10 +693,10 @@
 					theSlip:TakeTyped();
 				 end},
 				{_proto: @218,					// protoStaticText (the power's unit)
-				 viewBounds: {left: -36, top: 164, right: -8, bottom: 180}, viewJustify: 32, text: "dBm"},
+				 viewBounds: {left: -36, top: 174, right: -8, bottom: 190}, viewJustify: 32, text: "dBm"},
 				{_proto: @190,					// protoLabelPicker
 				 role: 'hashPicker,
-				 viewBounds: {left: 10, top: 188, right: -10, bottom: 204}, viewJustify: 48,
+				 viewBounds: {left: 10, top: 194, right: -10, bottom: 210}, viewJustify: 48,
 				 text: "Path hash", indent: 76,
 				 labelCommands: ["1 byte", "2 bytes", "3 bytes"],
 				 TextSetup: func() labelCommands[Max(0, Min(2, theSlip.radio.pathHashSize - 1))],
@@ -627,7 +707,7 @@
 				 end},
 				{_proto: @164,					// protoCheckbox
 				 role: 'powerBox,
-				 viewBounds: {left: 10, top: 208, right: -10, bottom: 226}, viewJustify: 48,
+				 viewBounds: {left: 10, top: 214, right: -10, bottom: 232}, viewJustify: 48,
 				 text: "The radio on",
 				 buttonValue: true,
 				 viewValue: nil,
@@ -876,6 +956,7 @@
 						return;
 					end;
 					local y := h - 6;
+					hits := [];
 					local i := Length(messages) - 1 - base.threadScroll;
 					local newerDay := nil;
 					while i >= 0 and y > 0 do begin
@@ -900,12 +981,15 @@
 						:DrawShape(MakeText(StyledStrTruncate(meta, metaW + 1, small), mx, y, mx + metaW + 2, y + smallH), {font: small});
 						y := y - bubbleH - 4;
 						local left := if out then w - bubbleW - 10 else 6;
+						// (the selected one inverted: Delete removes it)
+						local chosen := base.selectedId and m._uniqueID = base.selectedId;
+						AddArraySlot(hits, {left: left, top: y, right: left + bubbleW, bottom: y + bubbleH, id: m._uniqueID});
 						if out then
 							:DrawShape(MakeRoundRect(left + 3, y + 3, left + bubbleW + 3, y + bubbleH + 3, 6), {penPattern: 0, fillPattern: 5});
-						:DrawShape(MakeRoundRect(left, y, left + bubbleW, y + bubbleH, 6), {penSize: 1, penPattern: 5, fillPattern: 1});
+						:DrawShape(MakeRoundRect(left, y, left + bubbleW, y + bubbleH, 6), {penSize: 1, penPattern: 5, fillPattern: if chosen then 5 else 1});
 						local ty := y + 5;
 						foreach line in lines do begin
-							:DrawShape(MakeText(line, left + 8, ty, left + bubbleW, ty + lineH), {font: font});
+							:DrawShape(MakeText(line, left + 8, ty, left + bubbleW, ty + lineH), {font: font, transferMode: if chosen then 3 else 0});
 							ty := ty + lineH;
 						end;
 						y := y - 8;
@@ -913,6 +997,24 @@
 					end;
 					if i < 0 and newerDay then
 						:DaySeparator(y, w, messages[0].time);
+				end,
+				// (the bubbles as last drawn, for a tap to find: {left, top,
+				// right, bottom, id})
+				hits: nil,
+				viewClickScript: func(unit)
+				begin
+					local base := :Parent();
+					local box := :GlobalBox();
+					local x := GetPoint(4, unit) - box.left;
+					local y := GetPoint(5, unit) - box.top;
+					local hit := nil;
+					if hits then
+						foreach h in hits do
+							if x >= h.left and x < h.right and y >= h.top and y < h.bottom then
+								hit := h.id;
+					base.selectedId := if hit and hit <> base.selectedId then hit else nil;
+					:Dirty();
+					true;
 				end,
 				DaySeparator: func(y, w, time)
 				begin
@@ -958,7 +1060,7 @@
 				buttonClickScript: func() :Parent():SendTyped()
 			},
 
-			// the status bar: the "i" button (Prefs), New, All, Announce;
+			// the status bar: the "i" button (Prefs), New, All, Announce, Delete;
 			// the close box
 			{
 				_proto: @73,						// protoStatusBar
@@ -967,7 +1069,8 @@
 					{_proto: @478},					// protoInfoButton (DoInfoPrefs)
 					{_proto: @226, text: "New", buttonClickScript: func() base:Compose()},
 					{_proto: @226, text: "All", buttonClickScript: func() base:ShowList()},
-					{_proto: @226, text: "Announce", buttonClickScript: func() base:Announce()}
+					{_proto: @226, text: "Announce", buttonClickScript: func() base:Announce()},
+					{_proto: @226, text: "Delete", buttonClickScript: func() base:DeleteSelected()}
 				],
 				menuRightButtons: [
 					{_proto: @166}					// protoClosebox
@@ -1006,6 +1109,52 @@
 	----------------------------------------------------------------------*/
 
 	Soup: func() GetUnionSoup(soupName),
+
+	KeepIndex: func()
+	begin
+		local prefs := GetAppPrefs(appSymbol, {named: nil});
+		if IsInteger(prefs.keep) and prefs.keep >= 0 and prefs.keep < Length(kKeepNames) then prefs.keep
+		else kKeepDefault;
+	end,
+
+	SetKeep: func(index)
+	begin
+		if not IsInteger(index) or index < 0 or index >= Length(kKeepNames) then return nil;
+		local prefs := GetAppPrefs(appSymbol, {named: nil});
+		prefs.keep := index;
+		EntryChange(prefs);
+		:Prune(true);
+	end,
+
+	// the messages older than Keep, and the oldest past kMessagesMax,
+	// removed (not one still sending); force: whenever it was last done
+	Prune: func(force)
+	begin
+		local now := Time();
+		if not force and lastPrune and now - lastPrune < kPruneEvery then
+			return nil;
+		lastPrune := now;
+		local soup := :Soup();
+		if not soup then return nil;
+		local minutes := kKeepMinutes[:KeepIndex()];
+		local cutoff := if minutes then now - minutes;
+		local cursor := Query(soup, {type: 'index, indexPath: 'time});
+		local over := Max(0, cursor:CountEntries() - kMessagesMax);
+		local doomed := [];
+		local e;
+		while e := cursor:Entry() do begin
+			if not ((cutoff and e.time < cutoff) or Length(doomed) < over) then
+				break;							// (oldest first: the rest are kept)
+			if e.state <> 'sending then
+				AddArraySlot(doomed, e);
+			cursor:Next();
+		end;
+		foreach e in doomed do
+			EntryRemoveFromSoupXmit(e, nil);
+		if Length(doomed) > 0 then
+			:Refresh();
+		Length(doomed);
+	end,
 
 	// a key's first eight digits, as the node's id
 	ShortKey: func(key) if StrLen(key) > 8 then SubStr(key, 0, 8) else key,
@@ -1110,6 +1259,10 @@
 			onexception |evt.ex| do
 				nil;
 		end;
+		try
+			:Prune(nil)
+		onexception |evt.ex| do
+			nil;
 		AddDelayedCall(func() GetGlobalVar('|HostMesh:host|):Poll(), [], kPollMs);
 	end,
 
@@ -1155,6 +1308,7 @@
 				extras:AddToDefaultStoreXmit({class: 'ROMFormEntry, text: "Mesh", app: appSymbol,
 					icon: :MakeIcon(), labels: nil, sequence: 31, _tagList: ['_icon, '_noBackup]}, nil);
 		end;
+		:Prune(true);
 		:Poll();
 	end
 }

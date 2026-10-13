@@ -2,7 +2,10 @@
 // cellular module: its icon in the Extras drawer; texts received filed into
 // conversations, the list and a conversation drawn; a reply sent from the
 // conversation's Reply line, the message 'sent; a new message to a Names
-// card; each screen snapshotted (messages-<width>x<height>-<n>.pgm), so a
+// card; the Reply line growing with a long message, Send doing nothing
+// with only spaces; a message tapped and deleted, then the whole
+// conversation once confirmed; each screen snapshotted
+// (messages-<width>x<height>-<n>.pgm), so a
 // run at each display size shows the layout made for it.  The module is
 // tools/modem/fakecell.py on --cell-port (ctests host.NewtonMessages.*):
 //
@@ -15,6 +18,8 @@ msFailures := 0;
 msApp := nil;
 msCard := nil;
 msShot := 0;
+msDeleteCount := 0;
+msDeleteId := nil;
 
 msCheck := func(what, ok, why) begin
 	if ok then
@@ -162,7 +167,52 @@ msSteps := [
 	func(next) begin
 		call msCheck with ("back in the conversation", msApp.mode = 'thread and StrEqual(msApp.currentThread, "00000002"),
 			"the mode is " & msApp.mode);
-		msApp:ShowList();
+		// the Reply line: Send with only spaces does nothing; it grows with a
+		// long message and is one line again when emptied
+		local count := Length(call msEntries with ());
+		SetValue(msApp.replyLine.entryLine, 'text, Clone("   "));
+		msApp.sendButton:buttonClickScript();
+		call msCheck with ("Send with only spaces does nothing", Length(call msEntries with ()) = count,
+			Length(call msEntries with ()) - count & " sent");
+		local oneLine := msApp.replyLine:LocalBox().bottom;
+		SetValue(msApp.replyLine.entryLine, 'text, Clone("A message long enough to wrap onto several lines of the reply area, which grows to fit it"));
+		call msCheck with ("the Reply line grown", msApp.replyLines > 1 and msApp.replyLine:LocalBox().bottom > oneLine,
+			"it is " & msApp.replyLines & " lines");
+		call msSnap with ();
+		SetValue(msApp.replyLine.entryLine, 'text, Clone(""));
+		msApp:ReplyChanged();
+		call msCheck with ("the Reply line one line again", msApp.replyLine:LocalBox().bottom = oneLine, "it is not");
+		// deleting: the newest message tapped (the pen, at the bubble as
+		// drawn) is selected, and Delete removes just it
+		RefreshViews();
+		local hit := msApp.threadView.hits[0];
+		local box := msApp.threadView:GlobalBox();
+		msDeleteCount := Length(msApp:ThreadMessages("00000002"));
+		msDeleteId := hit.id;
+		HostPenTap(box.left + (hit.left + hit.right) div 2, box.top + (hit.top + hit.bottom) div 2);
+		call waitFor with ("messages: a message tapped", func() HostPenReplayDone() and msApp.selectedId, next, 10);
+	end,
+	func(next) begin
+		call msCheck with ("the tapped message selected", msApp.selectedId = msDeleteId, "it is " & msApp.selectedId);
+		call msSnap with ();
+		msApp:DeleteSelected();
+		local left := msApp:ThreadMessages("00000002");
+		local still := nil;
+		foreach e in left do
+			if e._uniqueID = msDeleteId then still := true;
+		call msCheck with ("Delete removing just that message", Length(left) = msDeleteCount - 1 and not still,
+			Length(left) & " left of " & msDeleteCount);
+		// nothing selected: the whole conversation, once confirmed
+		local confirm := msApp:DeleteSelected();
+		call msCheck with ("Delete with nothing selected asking first", confirm and confirm.viewCObject, "it did not ask");
+		call msSnap with ();
+		confirm.confirmedValue := true;
+		confirm:Close();
+		call waitFor with ("messages: Alice's conversation deleted", func() Length(msApp:ThreadMessages("00000002")) = 0, next, 10);
+	end,
+	func(next) begin
+		call msCheck with ("back to the list, one conversation left", msApp.mode = 'list and not msApp.currentThread
+			and Length(msApp.threads) = 1, "the mode is " & msApp.mode & ", " & Length(msApp.threads) & " conversations");
 		call msSnap with ();
 		Print("messages: done, " & msFailures & " failed");
 		HostQuit();

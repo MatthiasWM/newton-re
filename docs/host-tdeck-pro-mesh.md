@@ -122,6 +122,10 @@ forgets them); the board's in NVS, namespace `mesh`.
   time, dir, state, sendId}`; a thread is a node's key or `"public"`);
   closed, a message is told with an alert; open, with a beep;
 - the node is named after the owner (Setup's name) the first time.
+- **deleting**: a message tapped in the conversation is selected (drawn
+  inverted); the status bar's **Delete** removes it, or - nothing selected
+  - asks (`AsyncConfirm`) and removes the whole conversation (the Public
+  channel stays listed, empty);
 - a message that cannot be filed is told on the console and the poll goes
   on (a throw out of `Poll` used to end the polling until a restart).
 
@@ -152,6 +156,11 @@ In the Mesh application, as other Newton applications have them: the
 is **Prefs** (the application's `DoInfoPrefs`), opens the Mesh
 Preferences slip:
 
+- **Keep** - how long messages are kept: a day, a week (the default), a
+  month, a year, or always; never more than 1000 in all, the oldest going
+  first, and never one still sending.  Pruned at the start, at most hourly
+  after, and at once when Keep is changed (the owner's ask, 2026-10-14: a
+  busy mesh says a lot);
 - **Name** - this node's name on the mesh (taken, and announced, when the
   slip closes);
 - **Preset** - fills in the settings below it; shows which preset they

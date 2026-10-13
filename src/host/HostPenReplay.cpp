@@ -25,6 +25,8 @@ void	HostWindowPenUp(void);
 static std::atomic<bool>	gReplayDone(true);
 static std::vector<PenEvent>*	gReplay = nullptr;
 
+static long	PlayEvents(std::vector<PenEvent>* events);
+
 long
 HostPenReplayStart(const char* path)
 {
@@ -36,6 +38,25 @@ HostPenReplayStart(const char* path)
 	while (fscanf(f, "%ld %d %lf %lf", &e.ms, &e.what, &e.x, &e.y) == 4)
 		events->push_back(e);
 	fclose(f);
+	return PlayEvents(events);
+}
+
+
+long
+HostPenTapStart(double x, double y)
+{
+	std::vector<PenEvent>* events = new std::vector<PenEvent>;
+	events->push_back(PenEvent{ 0, 0, x, y });
+	events->push_back(PenEvent{ 60, 1, x, y });
+	events->push_back(PenEvent{ 150, 2, x, y });
+	return PlayEvents(events);
+}
+
+
+// the events played on a thread of their own (one playing at a time)
+static long
+PlayEvents(std::vector<PenEvent>* events)
+{
 	if (gReplay != nullptr && !gReplayDone.load())
 	{
 		delete events;

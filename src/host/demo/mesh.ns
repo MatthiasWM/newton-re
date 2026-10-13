@@ -8,7 +8,8 @@
 // channel, Send doing nothing with only spaces to send, the reply line
 // growing with a long message and emptied by Send (typed text too), a
 // message to everyone ('sent); the "i" button's Prefs (only Prefs
-// offered), its slip retuning the radio (a preset, then a frequency typed) and renaming the node; each screen
+// offered), its slip retuning the radio (a preset, then a frequency typed) and renaming the node; deleting:
+// a message tapped and deleted, Ada's conversation deleted once confirmed; each screen
 // snapshotted
 // (mesh-<width>x<height>-<n>.pgm).  The ctests host.NewtonMesh.<size>:
 //
@@ -22,6 +23,8 @@ meFailures := 0;
 meApp := nil;
 meShot := 0;
 meAda := nil;
+meDeleteCount := 0;
+meDeleteId := nil;
 
 meCheck := func(what, ok, why) begin
 	if ok then
@@ -121,11 +124,13 @@ meSteps := [
 		call meCheck with ("Ada a chat node", meAda.kind = 'chat, "she is " & meAda.kind);
 		call meSnap with ();
 		// New: the nodes heard; Ada chosen
-		meApp:Compose();
+		local popup := meApp:Compose();
 		local index := 0;
 		foreach i, n in meApp.pickNodes do
 			if StrEqual(n.name, "Ada") then index := i;
 		meApp:pickActionScript(index);
+		// (as a pick closes it: left open, it would take the next tap)
+		if popup and popup.viewCObject then popup:Close();
 		call meCheck with ("a conversation with Ada", meApp.mode = 'thread and StrEqual(meApp.currentThread, meAda.key),
 			"the mode is " & meApp.mode);
 		call meCheck with ("the tab's title Ada", StrPos(meApp.folderTab.showBarText.text, "Ada", 0),
@@ -171,6 +176,56 @@ meSteps := [
 			local e := call meEntryWith with ("Hello everyone");
 			e and e.state = 'sent;
 		end, next, 30);
+	end,
+	// deleting: the newest message on the Public channel tapped (the pen,
+	// at the bubble as drawn) is selected, and Delete removes just it;
+	// Delete with nothing selected, confirmed, removes Ada's conversation
+	func(next) begin
+		meApp:OpenThread("public");
+		RefreshViews();
+		local hit := meApp.threadView.hits[0];
+		local box := meApp.threadView:GlobalBox();
+		meDeleteCount := Length(meApp:ThreadMessages("public"));
+		meDeleteId := hit.id;
+		HostPenTap(box.left + (hit.left + hit.right) div 2, box.top + (hit.top + hit.bottom) div 2);
+		call waitFor with ("mesh: a message tapped", func() HostPenReplayDone() and meApp.selectedId, next, 10);
+	end,
+	func(next) begin
+		call meCheck with ("the tapped message selected", meApp.selectedId = meDeleteId, "it is " & meApp.selectedId);
+		call meSnap with ();
+		meApp:DeleteSelected();
+		local left := meApp:ThreadMessages("public");
+		local still := nil;
+		foreach e in left do
+			if e._uniqueID = meDeleteId then still := true;
+		call meCheck with ("Delete removing just that message", Length(left) = meDeleteCount - 1 and not still and not meApp.selectedId,
+			Length(left) & " left of " & meDeleteCount);
+		meApp:OpenThread(meAda.key);
+		local confirm := meApp:DeleteSelected();
+		call meCheck with ("Delete with nothing selected asking first", confirm and confirm.viewCObject
+			and Length(meApp:ThreadMessages(meAda.key)) > 0, "it did not ask");
+		call meSnap with ();
+		confirm.confirmedValue := true;
+		confirm:Close();
+		call waitFor with ("mesh: Ada's conversation deleted", func() Length(meApp:ThreadMessages(meAda.key)) = 0, next, 10);
+	end,
+	func(next) begin
+		call meCheck with ("back to the list, Public still there", meApp.mode = 'list and not meApp.currentThread
+			and StrEqual(meApp.threads[0].thread, "public"), "the mode is " & meApp.mode);
+		call meSnap with ();
+		// keeping: a message two days old goes when Keep is a day; one of
+		// today stays; the default (a week) put back
+		local mesh := GetGlobalVar('|HostMesh:host|);
+		call meCheck with ("Keep a week by default", mesh:KeepIndex() = 1, "it is " & mesh:KeepIndex());
+		local soup := GetUnionSoup("Mesh:host");
+		soup:AddToDefaultStoreXmit({class: '|meshMessage:host|, thread: "public", sender: "Ada", text: "From two days ago",
+			time: Time() - 2 * 1440, dir: 'incoming, state: 'read}, nil);
+		local fresh := Length(meApp:ThreadMessages("public"));
+		mesh:SetKeep(0);
+		call meCheck with ("Keep a day taking the old message", not call meEntryWith with ("From two days ago")
+			and Length(meApp:ThreadMessages("public")) = fresh - 1, "it is still there");
+		mesh:SetKeep(1);
+		call next with ();
 	end,
 	func(next) begin
 		local hello := call meEntryWith with ("Hello mesh");

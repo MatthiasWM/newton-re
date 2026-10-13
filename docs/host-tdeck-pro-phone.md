@@ -348,6 +348,15 @@ edge is an inset), and on the host its own label came out half drawn
 ("T.") - the header draws "To ◆ name" and taps open the hidden picker's
 Names picker (`DoOpenPicker`).
 
+**Deleting** (2026-10-14, as in Mesh): a message tapped in the
+conversation is selected (drawn inverted; tapped again, it is not); the
+status bar's **Delete** removes it, or - nothing selected - asks
+(`AsyncConfirm`) and removes the whole conversation.  The **Reply** line
+wraps and grows with what is written (up to half the conversation), as
+Mesh's Say line does; Send empties it (with `Clone("")`: typing changes
+the line's string in place) and does nothing with only spaces.  Tests tap
+with `HostPenTap(x, y)` (`host/HostPenReplay.h`), at the bubble as drawn.
+
 ctests `host.NewtonMessages.240x320`, `.320x480`, `.480x320`,
 `.810x1080` (`src/host/demo/messages.ns`, snapshots
 `messages-<w>x<h>-<n>.pgm`): its icon; texts filed into conversations
