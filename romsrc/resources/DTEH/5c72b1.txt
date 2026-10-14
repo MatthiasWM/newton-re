@@ -1,0 +1,35 @@
+format dte-header
+# DTEHeader: the cursive recogniser's letter-table header (ParaGraph.h's
+# DTIHeader; ReadDteResource copies bytes 4-0x8f and sets the pointer
+# words itself).
+# `handle`: the first word, where the engine's handle word goes - the
+# build machine's stale handle address.
+handle 0x0109b8b0
+# fHeader (bytes 4-0x8f): what is not nought, as `text OFFSET string` (no
+# terminator: the rest is nought) or `bytes OFFSET hex`.  By their
+# contents a file name, its date, the DTE's name and its version; nothing
+# in the reconstructed engine reads them.
+text 0x04 english.dti
+text 0x10 s:8/27/1996
+text 0x1c DTE:English:english.dti
+text 0x84 DTI4EngM2.00
+# the pointer words (byte offset; DTIHeader's field): the engine sets them
+# when it loads the table, so these are stale build-machine values
+word fRAMDTE 0x0109b8d8	# +0x90
+word fDTEMain 0x00000000	# +0x94
+word fRAMDTEMain 0x00000000	# +0x98
+word fRAMDTEMainPtr 0x00000000	# +0x9c
+word f9C 0x00000000	# +0xa0
+word fLearnInfo 0x0109b8d4	# +0xa4
+word fLearnInfoPtr 0x00000000	# +0xa8
+word fA8 0x00000000	# +0xac
+word fAC 0x00000000	# +0xb0
+word fB0 0x00000000	# +0xb4
+word fPDF 0x0109b8cc	# +0xb8
+word fPDFPtr 0x00000000	# +0xbc
+word fRAMPDF 0x00000000	# +0xc0
+word fC0 0x00000000	# +0xc4
+word fC4 0x00000000	# +0xc8
+word fC8 0x00000000	# +0xcc
+word fCC 0x00000000	# +0xd0
+word fD0 0x00000000	# +0xd4

@@ -38,7 +38,9 @@ Usage:
 Other modules here add formats of their own (EXTENSIONS: each has
 FORMATS, unpack(data, format, path) and pack_lines(format, lines, base)),
 and these functions hand those formats to them: inktables.py (the ink
-code books, the letter trigrams, the letter pictures).
+code books, the letter trigrams, the letter pictures) and hwrtables.py
+(the cursive recogniser's letter table, post-processing rules and
+trigrams).
 
 As a module: `unpack(data, format, path)`, `pack(path)` -> bytes.
 `romsrc.py` writes them as `texttable(class, "resources/....txt")`.
@@ -425,8 +427,9 @@ _BYTES = {"to-unicode": _to_unicode_bytes, "from-unicode": _from_unicode_bytes, 
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inktables					# noqa: E402
+import hwrtables					# noqa: E402
 
-EXTENSIONS = (inktables,)
+EXTENSIONS = (inktables, hwrtables)
 
 
 def _extension(format: str):

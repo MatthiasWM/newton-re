@@ -142,8 +142,9 @@ constructors of its own):
                     frame (an encoding's maps, the character classes and
                     their case tables), a sorting table ('Sort), a
                     locale's break table ('Intl), an ink code book
-                    ('Comp), the letter trigrams ('Trigrams) or the Letter
-                    Shapes pictures ('letterimages) as text whose `format`
+                    ('Comp), the letter trigrams ('Trigrams), the Letter
+                    Shapes pictures ('letterimages) or the cursive
+                    recogniser's tables ('DTEH, 'DTEM, 'PPDB, 'Trigram) as text whose `format`
                     line says which: tools/tables/newtontables.py packs it
                     (tools/tables/README.md)
     lexicon('AirusA, "resources/AirusA/addr.lex")   an Airus dictionary
@@ -1265,6 +1266,14 @@ def text_table_format(cname, path, data):
 		return "trigrams"
 	if cname == "letterimages":
 		return "letter-images"
+	if cname == "DTEH":
+		return "dte-header"				# (the cursive recogniser's tables: tools/tables/hwrtables.py)
+	if cname == "DTEM":
+		return "dte-main"
+	if cname == "PPDB":
+		return "ppd-main"
+	if cname == "Trigram":
+		return "dte-trigrams"
 	return None
 
 SCORE_HEADER = ("version", "algorithm", "reserved", "repeats")
@@ -2231,7 +2240,7 @@ class Builder:
 # the modules the builder builds with, besides this one: what the stamp is a
 # hash of (all imported above, so a run of any command has them)
 STAMP_MODULES = ("nsfunctions", "nsdecompile", "romdicts", "packages", "romid",
-				 "png", "newtonsfnt", "newtonlex", "newtontables", "inktables", "newtonpict")
+				 "png", "newtonsfnt", "newtonlex", "newtontables", "inktables", "hwrtables", "newtonpict")
 
 
 def builder_stamp():

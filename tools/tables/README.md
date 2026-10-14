@@ -128,3 +128,137 @@ edits read back: a code word's value, a code split to add a value (the
 table's size and count and every later table move), a code that begins
 with another refused, trigram weights, a point moved and a stroke added
 to a picture (every later offset moves).
+
+## The cursive recogniser's letter table, rules and trigrams (`hwrtables.py`)
+
+ParaGraph's cursive ("xr") recogniser (`recognition/ParaGraph.h`) reads
+four binaries of `charsetInfoResources` - `DTEHeader`, `DTEMain`,
+`PPDMain` and `DTETrigrams` (`obj_648ecd` in `romsrc/objects/misc-004.ns`).
+`hwrtables.py` gives each a text form, with the same conventions
+(`format <kind>` first, `#` comments) and the ROM's own bytes for every
+committed file:
+
+| format | what | a line |
+|---|---|---|
+| `dte-header` | `DTEHeader` ('DTEH, 216 bytes): the stale `handle` word, the names in `DTIHeader.fHeader` as `text OFFSET string` (the rest nought; `bytes OFFSET hex` for a run that is not plain text), and the 18 pointer words as `word fName value` | `text 0x84 DTI4EngM2.00` |
+| `dte-main` | `DTEMain` ('DTEM): a `symbol` per engine character code with its descriptor's bytes 1-3; a `variant c.v` per variant - `vex`, `group`, `styles`, `rewcap`, `pos`, `size`; an `xrp c.v.p` per prototype xr - `xr`, `b1`, `flags`, `skip` and the `types`, `heights`, `shifts`, `links` and `dirs` nibble tables as hex digits. The offset table and every count are worked out. | `variant a.0 vex 0 group 1 styles 0xe rewcap 1 pos 0xbd size 0xce` |
+| `ppd-main` | `PPDMain` ('PPDB): the post-processing rules - for each `letter`, `variant` and neighbour (`next c.v n`), `rule c.v own` or `rule c.v n.w`, and the rule's queues as stack-machine code with their weights; the `constant`s; `function` lines naming what `call` calls (`kPPFunctions`). Every header, bit set, offset, size, count and weight index is worked out. | `queue a.0 own -4 : 100 ; xr 1 top ; xr 6 top ; sub ; mul` |
+| `dte-trigrams` | `DTETrigrams` ('Trigram): a weight 1-3 for each three-class sequence that has one, over the 40 classes `_` (space), `a`-`z`, `å ä ç é ï ö ü â è ê î û` and `'`; one not listed is 0 | `the 3` |
+
+The engine's character codes (`symbol`, `letter`, a label `c.v`) are
+`OSToRec`'s: Mac Roman below 0x7f, written as the character (`0x23` for
+`#`, `0x20` for the space); 0x7f-0x83, 0xa0 and 0xa1 are the Swedish
+letters and the pound sign, £ Ä ä Ö ö Å å (`os_rec_ctbl_intl`), which a
+comment says.
+
+What each format's bytes are, and how it was established (every structure
+below is checked when unpacking - a binary that breaks one is refused
+rather than mis-read - and the four committed files keep all of them):
+
+- **Every binary's first word** is not the engine's: `ReadDteResource`
+  steps over it (`dteMain + 4`, `ppdMain + 4`, `trigramData += 4`, and the
+  header's bytes from 4).  By the data it is the build Macintosh's handle
+  for the resource: `DTEHeader`'s stale `fRAMDTE` holds 0x0109b8d8,
+  `DTEMain`'s first word, and `fLearnInfo` and `fPDF` hold neighbouring
+  addresses; `PPDMain`'s first word is "HMEM".  Kept as `handle`.
+- **dte-header.** Bytes 4-0x8f are `DTIHeader.fHeader`, copied and never
+  read: four strings ("english.dti", "s:8/27/1996",
+  "DTE:English:english.dti", "DTI4EngM2.00" - a file name, its date, the
+  DTE's name, its version, by their contents), nought between them.
+  0x90-0xd7 are `DTIHeader`'s pointer words (`ParaGraph.h`: `fRAMDTE` ...
+  `fD0`, at `DTIHeader` offset + 4), which the engine sets on loading;
+  kept as they are.
+- **dte-main.** As `CountSym` (`XrMatrix.cpp`), `GetSymDescriptor`,
+  `GetVarPosSize`, `GetVarGroup`, `CheckVarActive`, `SetDefVexes`
+  (`ParaGraph.cpp`), `GetXrCorr` (`XrPostCalc.cpp`) and `GetVarOfChar`
+  (`XrPostEval.cpp`) read it: 256 words of offsets from the table, then
+  the descriptors.  A descriptor: byte 0 the variant count, bytes 1-3,
+  sixteen bytes each of prototype counts (+4), vexes (+0x14), groups
+  (+0x24: bit 0 not a capital, bits 1-3 the group, 4-7 the letter-set
+  styles), positions (+0x34) and sizes (+0x44: nibbles, as `Xrlv.cpp`'s
+  `GetSymBox` and `SizePenalty` read them), then the prototypes, 0x4c
+  bytes each, variant after variant.  A prototype (`XrMatch`,
+  `CountXrAsm`, `GetXrCorr`): byte 0 the xr written into the trace, byte
+  1, byte 2 flags (bit 7: reads only an xr next to a break), byte 3 the
+  skip penalty, then nibble tables, high nibble first: 64 types (+4), 16
+  heights (+0x24), 16 shifts (+0x2c), 16 links (+0x34), 32 directions
+  (+0x3c).  From the data: 91 descriptors (0x20-0x7f, 0x80-0x83, 0xa0,
+  0xa1), in order of code, one after another with nothing between or
+  after; every byte for a variant past the count is nought (so the
+  packer writes nought there); 3,499 prototypes.  **Not known**: the
+  descriptor's byte 1 (the top byte of `GetVarPosSize`'s answer, which
+  no caller uses: 0x08 for capitals, 0x09 for b d h k l, 0x2a for most
+  x-height letters, 0x2f for j p q y z, 0x0f for digits - a position
+  class, by the data), byte 2 (the code itself, except 0x2d for `_` and
+  0x76 for 0x80-0xa1) and byte 3 (always nought), and a prototype's byte
+  1 (1-15) - nothing in the reconstructed engine reads them, so they are
+  kept as numbers (`b1`, `b2`, `b3`).  A prototype's byte 0 is, in 3,074
+  of the 3,204 prototypes where it is below 64, the type its own table
+  rates highest; 295 have it above 63.
+- **ppd-main.** As `CreatePDFHeader` (`ParaGraph.cpp`), `PDFGetRule` and
+  its helpers (`XrRules.cpp`), `CalculateGroupResult` and
+  `CalculateQueueResult` (`XrPostCalc.cpp`) read it: three words the
+  engine writes the sections' addresses over (stale; `stale`), a word of
+  two halfwords - section 1's and section 2's lengths in halfwords -
+  then section 0, the rules' tree, from +0x10; section 1 (the constants
+  `const` pushes) at the offset in the main header's fourth word, and
+  section 2 (the queues' weights) after it, to the end.  The main
+  header's first three words ("PDF\0", 1, 0) nothing reads (`main`).  A
+  rule: its queue count, each queue's length (+2), each queue's weight's
+  index in section 2 (+0x16), the queues from +0x20 - room for five
+  queues (the weights' indices end at +0x20), and no rule has more.
+  From the data (87 letters, 374 variants, 63 neighbours, 467 rules,
+  1,090 queues): the tree lies depth first in order - main header,
+  letter, its variants, each variant's own rule and then its neighbours'
+  rules - with no gaps and nothing shared, and every header's first word
+  is the size of all under it (a variant's +0x24 the size of its own
+  rule), so packing lays it out again and no offset or size is kept;
+  section 2 has exactly one weight per queue and the queues use them in
+  order (index 0, 1, 2 ...), so a weight is written on its queue's line
+  and the indices are worked out; a rule header's bytes past its queues
+  are nought.  A queue is code up to a nought; only bytecodes 0x0a, 0x0b
+  (numbers), 0x0c (arithmetic), 0x0e (a function), 0x0f (an xr's field)
+  and 0x10 (a constant: six bytes, the last two nought) occur, and every
+  number is in the shortest form that holds it (no 0x0a holds one below
+  256), which is the form packing chooses.  The bytes after the nought
+  are kept as `pad`: a queue's length is not always its code's plus one -
+  347 of the 1,090 have one to three bytes more, mostly nought but 3, 6
+  or 7 in a few (what the rule compiler left there).  Anything the unpacker
+  could not write back the same would be written as `raw HEX` (nothing
+  in the committed file is).  The function names come from
+  `kPPFunctions` (`XrPostCalc.cpp`, in the ROM's `Functions` order) when
+  unpacking; packing reads only the text's own `function` lines.
+- **dte-trigrams.** As `XrlvGetNextSymbols` (`Xrlv.cpp`) reads it: 16,000
+  bytes, the weight of class c after a, b in byte a x 400 + b x 10 +
+  (c >> 2) at bits 2 x (c & 3) - the reading's state holds its last two
+  classes, the older in its second byte, and starts at 0 (two spaces) -
+  and the reader charges a letter 5 less the weight.  A character's
+  class is `triads_mapping[c] - 1` (`XrReaderTables.cpp`): 0 the space,
+  1-26 a-z (with their capitals and some accented forms), 27-38 the
+  accented letters the text names by one of their characters (each with
+  its capital; ä also à, ö also ô, ü also ù), 39 the apostrophe; '@' and
+  '/' map past 39 and are read as 0.  5,612 trigrams have a weight.
+  (This is not the 'Trigrams binary `inktables.py` reads, which nothing
+  in the ROM reads.)
+
+Use:
+
+    python tools/tables/hwrtables.py unpack dte-main X.bin X.txt
+    python tools/tables/hwrtables.py pack X.txt X.bin
+    python tools/tables/hwrtables.py check dte-main X.bin...
+
+As a module: `FORMATS`, `unpack(data, format, path)`,
+`pack_lines(format, lines, base=None)` (the text split on newlines, its
+format line included; `base` is not needed) and `pack(path)`.  Tests:
+`test_hwrtables.py [--rom build/MP2x00US]` - the four committed binaries
+unpack and pack back to the same bytes and the same text (with `--rom`,
+the ROM's own bytes); the names the text gives the engine's codes and the
+trigram classes match `os_rec_ctbl_intl` and `triads_mapping`; and edits
+are read back through Python mirrors of the C++ readers
+(`GetSymDescriptor`/`GetXrCorr`, `CreatePDFHeader`/`PDFGetRule`/
+`CalculateGroupResult`, `XrlvGetNextSymbols`): a header string, a vex, a
+prototype added (every later descriptor moves), a queue's number and
+weight changed and a rule added for a new neighbour (every later offset,
+size and weight index moves, the constants still found), and trigram
+weights; a prototype out of order, an unknown function and a trigram
+given twice are refused.

@@ -2497,6 +2497,15 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/layout.tsv)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/tables/test_inktables.py
                      --rom ${NEWTON_ROM_BUILD_DIR}
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    # the cursive recogniser's letter table, rules and trigrams as text
+    # (tools/tables/hwrtables.py): round trip, edits read back
+    add_test(NAME tools.HWRTables
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/tables/test_hwrtables.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    add_test(NAME tools.HWRTablesROM
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/tables/test_hwrtables.py
+                     --rom ${NEWTON_ROM_BUILD_DIR}
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     # the QuickDraw pictures as text and PNGs (tools/pict/newtonpict.py)
     add_test(NAME tools.NewtonPict
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/pict/test_newtonpict.py

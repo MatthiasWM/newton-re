@@ -2185,6 +2185,21 @@ not its reading:
   kept in the System soup as a 'letterWeights binary for each set that is
   not at its defaults (`PGGetLetterSetInfo`).  `SetRamParaData`/
   `GetRamParaData` replace a table from RAM (`vars.|RamParaGraphData:PARA|`).
+- The four binaries' layouts in full - every byte accounted for, and
+  which few are not understood (a descriptor's bytes 1-3 and a
+  prototype's byte 1, which nothing reads; the bytes some rule queues
+  carry after their terminating nought) - are in tools/tables/README.md
+  ("The cursive recogniser's letter table, rules and trigrams"), and
+  `tools/tables/hwrtables.py` turns each into editable text and back
+  byte for byte.  Established from the readers and checked over the
+  data: the descriptors (91, 3,499 prototypes) and the rules' tree (87
+  letters, 467 rules, 1,090 queues) lie in order with no gaps, every
+  header's first word in the rules is the size of what is under it, and
+  section 2 holds exactly one weight per queue, used in order; each
+  binary's first word, which the engine skips, is the build Macintosh's
+  stale handle for it (`DTEHeader`'s stale `fRAMDTE` word is `DTEMain`'s
+  first word); the trigram table is 40 x 40 x 40 two-bit weights over
+  `triads_mapping`'s classes.
 - The natives: `GetLetterWeights`, `SetLetterWeights`,
   `ResetLetterDefaults`, `UseTrainingDataForRecognition`,
   `GetLearningData`/`SetLearningData` (the orthographic database, with
