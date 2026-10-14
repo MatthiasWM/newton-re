@@ -75,6 +75,20 @@ Pushing to `main` builds and smoke-tests the Windows, Linux and reMarkable
 builds on GitHub's runners, and a `v*` tag publishes them as a release
 ([docs/releases.md](docs/releases.md)).
 
+### The reMarkable Paper Pro
+
+On the owner's reMarkable Paper Pro, newton is an AppLoad application: an
+810x1080 Newton screen drawn at twice its size on the tablet's 1620x2160
+e-paper, the Marker as the pen
+([docs/host-remarkable.md](docs/host-remarkable.md)).
+
+<p align="center"><img src="docs/images/remarkable-notepad.png" width="405" alt="The Notepad on the reMarkable Paper Pro, with handwritten lines recognised as text and the Extras drawer open below"></p>
+
+*The Notepad on the tablet, written in with the Marker and read by the
+ROM's recogniser, the Extras drawer open below (newton's own snapshot of
+its display - `kill -USR2` writes it on the tablet - turned into a PNG by
+`tools/imaging/pgm2png.py`).*
+
 ### The T-Deck Pro
 
 The [LilyGO T-Deck Pro](https://lilygo.cc/products/t-deck-pro) - an
