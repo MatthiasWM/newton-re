@@ -242,6 +242,9 @@ import newtontables					# noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "rex"))
 import rextext						# noqa: E402
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "stores"))
+import newtonstore					# noqa: E402
+
 # where a lexicon an edit has grown past its room goes (romsrc.py build
 # --relayout): an address no ROM data uses, the object file's moved table
 # taking the host from the ROM's address to it (ROMMovedAddress)
@@ -727,12 +730,34 @@ class Extractor:
 		for e in rex["entries"]:
 			cuts |= {e["address"], e["address"] + e["size"]}
 		parts = {}				# a frames part's start -> (its end, its tree's directory)
+		stores = set()			# a soup part's start (a store: tools/stores/newtonstore.py)
 		aligns = {}
 		for p in pkgs:
 			cuts |= {p["base"], p["base"] + p["size"]}
 			name = re.sub(r"[^A-Za-z0-9_]", "_", p["name"])
 			names[p["base"]] = name + ".pkg"
 			for part in p["parts"]:
+				if part["flags"] & 3 == 2 and part["type"] == 0x736f7570 \
+						and part["offset"] + part["size"] == p["size"] - p["directory_size"]:
+					# a soup part, the package's last: a store as text
+					# (tools/stores/newtonstore.py) when it comes back the same
+					first = p["base"] + p["directory_size"] + part["offset"]
+					data = self.rom.rom[first:first + part["size"]]
+					where = os.path.join(self.out, "rex", name)
+					try:
+						newtonstore.unpack(data, where)
+						same = newtonstore.pack(where, warn=None) == data
+					except (newtonstore.Unsupported, RuntimeError, ValueError):
+						same = False
+					if same:
+						cuts.add(first)
+						names[p["base"]] = name + ".head"		# (.txt, or .bin: rex_texts)
+						names[first] = name + "/"
+						stores.add(first)
+					else:
+						import shutil
+						shutil.rmtree(where, ignore_errors=True)
+					continue
 				if part["flags"] & 3 != 1:
 					continue
 				first = p["base"] + p["directory_size"] + part["offset"]
@@ -757,7 +782,9 @@ class Extractor:
 		pieces = []					# (address, end, rel, its text or None)
 		for a, b in zip(cuts, cuts[1:]):
 			name = names.get(a, "bytes_%x" % a)
-			if name.endswith("/"):
+			if a in stores:
+				rel = "rex/" + name		# (a store, written above)
+			elif name.endswith("/"):
 				# a package's frames part: its objects as a tree of their own
 				last, objs, pad, odd = parts[a]
 				rel = "rex/" + name
@@ -781,7 +808,7 @@ class Extractor:
 				elif not rel.endswith("/"):
 					with open(os.path.join(self.out, rel), "wb") as out:
 						out.write(rom[a:b])
-				f.write("%x\t%s\n" % (a, rel))
+				f.write("%x\t%s%s\n" % (a, rel, "\tstore" if a in stores else ""))
 
 	def rex_texts(self, pieces, start, end, tags):
 		"""The pieces of the extension that have a text form
@@ -2063,6 +2090,13 @@ class Builder:
 				head = len(data)
 				data += blob
 				continue
+			if how == "store":
+				# a package's soup part, a store as text (tools/stores/newtonstore.py),
+				# rounded up to a word so that what follows stays aligned (the
+				# store's directory says where its objects end)
+				blob = newtonstore.pack(os.path.join(self.src, rel))
+				data += blob + bytes(-len(blob) % 4)
+				continue
 			if old is None and text is None:
 				raise ValueError("rex.tsv: %s is not from the ROM and not a package to put into its form" % rel)
 			if rel.endswith("/"):
@@ -2379,6 +2413,12 @@ class Builder:
 						raise ValueError("rex.tsv: %s was not in the ROM: the tree builds only with --relayout" % fields[1])
 					if int(fields[0], 16) != base + len(data):
 						raise ValueError("rex.tsv: %s is not where the piece before it ends" % fields[1])
+					if len(fields) > 2 and fields[2] == "store":
+						# a package's soup part, a store as text (tools/stores/newtonstore.py)
+						blob = newtonstore.pack(os.path.join(self.src, fields[1]))
+						placed.append((fields[1], len(data), len(blob)))
+						data += blob
+						continue
 					if fields[1].endswith("/"):
 						# a package's frames part, built from its own tree
 						part_base, part = Builder(os.path.join(self.src, fields[1]), self.newtonscript).build()
@@ -2443,7 +2483,7 @@ class Builder:
 # the modules the builder builds with, besides this one: what the stamp is a
 # hash of (all imported above, so a run of any command has them)
 STAMP_MODULES = ("nsfunctions", "nsdecompile", "romdicts", "packages", "romid",
-				 "png", "newtonsfnt", "newtonlex", "newtontables", "inktables", "hwrtables", "newtonpict", "rextext")
+				 "png", "newtonsfnt", "newtonlex", "newtontables", "inktables", "hwrtables", "newtonpict", "rextext", "newtonstore")
 
 
 def builder_stamp():

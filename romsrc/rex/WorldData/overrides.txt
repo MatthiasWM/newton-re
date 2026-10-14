@@ -1,0 +1,6 @@
+# Objects whose bytes tools/stores/newtonstore.py does not derive: the
+# object's id, what it is, the first 16 hex digits of the SHA-1 of the bytes
+# pack derives for it, and the bytes the part has where they differ
+# (offset:hex ...).  An override is applied only while pack derives those
+# same bytes for that object; an edit that changes the object drops it.
+41	Cities's index on 'country node 1	86286034b5efe96f	7:84

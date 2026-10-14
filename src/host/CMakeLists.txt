@@ -2529,6 +2529,21 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/layout.tsv)
                          --rom ${NEWTON_ROM_BUILD_DIR}
                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     endif()
+    # the WorldData package's store as text (tools/stores/newtonstore.py):
+    # round trip, edits read back; host.NewtonStoreMount mounts an edited
+    # copy in a package of its own and queries it
+    add_test(NAME tools.NewtonStore
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/stores/test_newtonstore.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    add_test(NAME tools.NewtonStoreROM
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/stores/test_newtonstore.py
+                     --rom ${NEWTON_ROM_BUILD_DIR}
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    add_test(NAME host.NewtonStoreMount
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/stores/test_newtonstore.py
+                     --newton $<TARGET_FILE:newton>
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    set_tests_properties(host.NewtonStoreMount PROPERTIES TIMEOUT 300)
     # a collation edit: a and z given each other's weights in the ROM's
     # sorting table, the tree built, and StrCompare on the booted machine
     # puts "zebra" before "apple" (demo/tableedit.ns)

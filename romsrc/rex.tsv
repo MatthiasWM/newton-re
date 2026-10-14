@@ -22,7 +22,8 @@ rex	71fc4c	ce3fc
 7a5700	rex/ScreenDrivers.pkg
 7a67fc	rex/Setup.head.txt
 7a6914	rex/Setup/
-7b4d20	rex/WorldData.pkg
+7b4d20	rex/WorldData.head.txt
+7b4e00	rex/WorldData/	store
 -	rex/newtdev.pkg	rom-form
 -	rex/inetenbl.pkg	rom-form
 -	rex/inetstup.pkg	rom-form

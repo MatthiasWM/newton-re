@@ -56,6 +56,13 @@ def package_bytes():
 	if os.path.exists(PACKAGE):
 		with open(PACKAGE, "rb") as f:
 			return f.read()
+	head = os.path.join(ROMSRC, "rex", "WorldData.head.txt")
+	if os.path.exists(head) and os.path.isdir(TREE):
+		# the tree's: its directory (tools/rex/rextext.py, laid out as rex.tsv
+		# has the pieces) and the store packed
+		sys.path.insert(0, os.path.join(ROOT, "tools", "rex"))
+		import rextext
+		return rextext.parse(head).render(rextext.tree_layout(ROMSRC), "rex/WorldData.head.txt") + ns.pack(TREE)
 	return None
 
 
