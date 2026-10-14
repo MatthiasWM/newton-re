@@ -77,6 +77,11 @@ bool		HostDeviceSpiBusStart(void);
 // mesh's natives then answer for it
 bool		HostDeviceLoraStart(void);
 
+// the GPS receiver (tdeck_gps.cpp): powered, its UART handed to
+// hal/host/HostGPS.h as the source "device" (==> whether it was started);
+// HostGPSStatus then has its fix, and serial port 2 its sentences
+bool		HostDeviceGpsStart(void);
+
 // the cellular module (tdeck_modem.cpp): powered and started with the
 // board, its UART handed to hal/host/HostCellular.h's engine on a task of its
 // own (==> whether it was started); the engine's natives then answer for it

@@ -217,6 +217,9 @@ static HOST_LARGE_STATIC KeptChannel	gChannels[kHostMeshChannelsMax];
 static long						gChannelCount = 0;		// (Public included)
 static bool						gChannelsChanged = false;
 static std::atomic<bool>		gTraceRx(false);
+// the position put in this node's adverts (HostMeshSetLocation)
+static bool						gHasLocation = false;
+static double					gLatitude = 0, gLongitude = 0;
 // the last packet read (logRxRaw), and the last channel packet no channel
 // could decrypt (logRx)
 static uint8_t					gLastRaw[MAX_TRANS_UNIT + 1];
@@ -735,7 +738,15 @@ public:
 
 	void Advertise()
 	{
-		mesh::Packet* advert = createSelfAdvert(gSettings.name);
+		bool has;
+		double latitude, longitude;
+		{
+			std::lock_guard<std::mutex> hold(gLock);
+			has = gHasLocation;
+			latitude = gLatitude;
+			longitude = gLongitude;
+		}
+		mesh::Packet* advert = has ? createSelfAdvert(gSettings.name, latitude, longitude) : createSelfAdvert(gSettings.name);
 		if (advert != NULL)
 			sendFlood(advert, 0, (uint8_t) gSettings.pathHashSize);
 	}
@@ -1390,6 +1401,19 @@ HostMeshLastUnreadable(char* hex, long size)
 		n = (size - 1) / 2;
 	HexOf(gUnreadable, n, hex);
 	return n;
+}
+
+
+void
+HostMeshSetLocation(bool has, double latitude, double longitude)
+{
+	std::lock_guard<std::mutex> hold(gLock);
+	gHasLocation = has && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+	gLatitude = latitude;
+	gLongitude = longitude;
+	gStatus.hasLocation = gHasLocation;
+	gStatus.latitude = latitude;
+	gStatus.longitude = longitude;
 }
 
 

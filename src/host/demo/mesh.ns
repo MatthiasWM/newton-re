@@ -16,7 +16,10 @@
 // no longer saved; channels - #newton-test joined from New's Join
 // Channel (typed in capitals, made small), listed under Public, a message
 // sent on it and Ada's echo filed there, a private channel without its
-// secret refused, the channel left; each screen snapshotted
+// secret refused, the channel left; location (a GPS fixed at -37.81,
+// 144.96: newton --gps) - Send Location in Ada's conversation, her echo of
+// it back, Location in adverts putting the position in the node's adverts
+// and taking it out again; each screen snapshotted
 // (mesh-<width>x<height>-<n>.pgm).  The ctests host.NewtonMesh.<size>:
 //
 //   python tools/mesh/meshrun.py \
@@ -84,6 +87,14 @@ end;
 meEntryWith := func(text) begin
 	foreach e in call meEntries with () do
 		if StrEqual(e.text, text) then
+			return e;
+	nil;
+end;
+
+// the message whose text begins so
+meEntryStarting := func(text) begin
+	foreach e in call meEntries with () do
+		if IsString(e.text) and BeginsWith(e.text, text) then
 			return e;
 	nil;
 end;
@@ -387,6 +398,37 @@ meSteps := [
 		call meCheck with ("left: Public the only channel again", Length(HostMeshChannels()) = 1, "there are " & Length(HostMeshChannels()));
 		call meCheck with ("its messages kept", Length(meApp:ThreadMessages("ch:#newton-test")) = 2,
 			Length(meApp:ThreadMessages("ch:#newton-test")) & " kept");
+		call next with ();
+	end,
+	// location: Send Location in Ada's conversation
+	func(next) begin
+		local mesh := GetGlobalVar('|HostMesh:host|);
+		call meCheck with ("a GPS fix", mesh:Fix() and Abs(mesh:Fix().latitude + 37.81) < 0.001, "there is none");
+		meApp:OpenThread(meAda.key);
+		meApp.headerView:viewClickScript(nil);
+		local picks := meApp.headerView.headerPicks;
+		local popup := meApp.headerView.headerPopup;
+		if popup and popup.viewCObject then popup:Close();
+		meApp.headerView.headerPicks := nil;
+		call meCheck with ("the header offering Send Location", picks and LSearch(picks, 'sendLocation, 0, '|=|, nil),
+			"it offers " & picks);
+		meApp:SendLocation();
+		local sent := call meEntryStarting with ("My location: -37.81000, 144.96000");
+		call meCheck with ("the position sent with a map link", sent and StrPos(sent.text, "https://maps.google.com/?q=-37.81000,144.96000", 0),
+			"it is " & (if sent then sent.text));
+		call waitFor with ("mesh: Ada's echo of the position", func() call meEntryStarting with ("echo: My location: -37.81000"), next, 40);
+	end,
+	// Location in adverts
+	func(next) begin
+		local mesh := GetGlobalVar('|HostMesh:host|);
+		call meCheck with ("Location in adverts off at first", not mesh:ShareLocation() and not HostMeshStatus().location,
+			"it is on");
+		mesh:SetShareLocation(true);
+		local where := HostMeshStatus().location;
+		call meCheck with ("on: the adverts carry the position", where and Abs(where[0] + 37.81) < 0.001 and Abs(where[1] - 144.96) < 0.001,
+			"it is " & where);
+		mesh:SetShareLocation(nil);
+		call meCheck with ("off: none", not HostMeshStatus().location, "it is " & HostMeshStatus().location);
 		call next with ();
 	end,
 	func(next) begin

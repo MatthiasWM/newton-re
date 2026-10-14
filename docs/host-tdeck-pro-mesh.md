@@ -163,6 +163,20 @@ takes a name and, for a private channel, its secret.
   `HostMeshSendChannelText`; meshpeer's `--join` (and `--echo` answers on
   that channel too).
 
+**Location** (the owner's ask, 2026-10-14), where the host has a GPS
+(`HostGPSStatus`: on the board its own u-blox M10, `tdeck_gps.cpp`; a
+desktop's `--gps`):
+
+- the Prefs' **Location in adverts** (shown only with a GPS; off by
+  default, kept in the application's prefs as `shareLocation`) puts this
+  node's position in its adverts (`HostMeshSetLocation`; MeshCore's
+  `createSelfAdvert(name, lat, lon)`), as MeshCore's own firmware can, so
+  that it shows on the mesh's maps; the poll keeps it current once a
+  minute, and switching it on announces at once; `HostMeshStatus().location`
+  is the position the adverts carry (nil: none);
+- every conversation's header offers **Send Location**: "My location: LAT,
+  LON" and a map link, sent as a message (the GPS must have a fix).
+
 **Saved contacts are Names cards** (the owner's choice, 2026-10-14): a
 node's key is kept in one of the Names file's ten custom fields
 (`custom1`..`custom10`, values of class `'|string.custom|`), the one

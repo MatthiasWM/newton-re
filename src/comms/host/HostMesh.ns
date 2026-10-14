@@ -33,7 +33,15 @@
 // its name, as every MeshCore application makes it) or a private one (its
 // secret typed: 32 or 64 hex digits, or base64).  A channel's thread is
 // "ch:" & its name (Public's stays "public"); each is listed under Public,
-// in the order joined, and its header offers Show Key and Leave Channel.  The cards
+// in the order joined, and its header offers Show Key and Leave Channel.
+//
+// Location (the owner's ask, 2026-10-14), where the host has a GPS
+// (HostGPSStatus: the T-Deck Pro's own receiver, tdeck_gps.cpp): the
+// Prefs' "Location in adverts" puts this node's position in its adverts
+// (HostMeshSetLocation, kept current from the poll once a minute), as
+// MeshCore's own firmware can, so that it shows on the mesh's maps; and
+// every conversation's header offers Send Location, the position as a
+// message with a map link.  The cards
 // with a key are given to the engine as MeshCore favourites (HostMesh-
 // SaveContact: kept first across restarts, never the one to make room)
 // whenever the application starts or opens, and a favourite whose card has
@@ -61,6 +69,8 @@
 	lastPrune: nil,
 
 	kMeshKeyLabel: "Mesh Key",
+	kLocationEvery: 60,						// seconds between the adverts' position updates
+	locationAt: nil,
 	saved: nil,								// (the saved cards, by "k" & key: {key, name, entry})
 	savedAt: nil,							// (when they were read, in seconds)
 
@@ -603,6 +613,21 @@
 			]
 		},
 
+		// this node's position sent to the conversation shown
+		SendLocation: func()
+		begin
+			local mesh := :Mesh();
+			local fix := mesh:Fix();
+			if not fix then begin
+				GetRoot():Notify(3, "Mesh", "The GPS has no fix yet: it needs a view of the sky.");
+				return nil;
+			end;
+			local t := :ThreadFor(currentThread);
+			mesh:SendText(currentThread, if t then t.name, mesh:LocationText(fix));
+			:Reload();
+			:Redraw();
+		end,
+
 		// a channel's secret shown, to be typed into another device
 		ShowChannelKey: func(thread)
 		begin
@@ -728,9 +753,10 @@
 			local box := :GlobalBox();
 			local width := Min(box.right - box.left - 12, 260);
 			local switchable := HostMeshPowerSwitchable();
-			local height := 240 + (if switchable then 22 else 0);
+			local gps := HostGPSAvailable();
+			local height := 240 + (if switchable then 22 else 0) + (if gps then 22 else 0);
 			height := Min(height, box.bottom - box.top - 8);
-			prefsSlip := BuildContext({_proto: prefsTemplate, meshApp: self, switchable: switchable,
+			prefsSlip := BuildContext({_proto: prefsTemplate, meshApp: self, switchable: switchable, gps: gps,
 				viewBounds: RelBounds(box.left + (box.right - box.left - width) div 2,
 					box.top + (box.bottom - box.top - height) div 2, width, height)});
 			prefsSlip:Open();
@@ -749,6 +775,7 @@
 			_proto: @179,						// protoFloatNGo
 			meshApp: nil,
 			switchable: nil,
+			gps: nil,
 			theSlip: nil,
 			nameShown: nil,						// (the name when the slip opened)
 			radio: nil,							// (the settings as they are being changed)
@@ -986,6 +1013,20 @@
 					theSlip:ShowPreset();
 				 end},
 				{_proto: @164,					// protoCheckbox
+				 viewBounds: {left: 10, top: 214, right: -10, bottom: 232}, viewJustify: 48,
+				 text: "Location in adverts",
+				 buttonValue: true,
+				 viewValue: nil,
+				 viewSetupFormScript: func()
+				 begin
+					// (only where there is a GPS)
+					if not theSlip.gps then
+						viewFlags := BAnd(viewFlags, BNot(1));
+					viewValue := GetGlobalVar('|HostMesh:host|):ShareLocation();
+					inherited:?viewSetupFormScript();
+				 end,
+				 valueChanged: func() GetGlobalVar('|HostMesh:host|):SetShareLocation(viewValue)},
+				{_proto: @164,					// protoCheckbox
 				 role: 'powerBox,
 				 viewBounds: {left: 10, top: 214, right: -10, bottom: 232}, viewJustify: 48,
 				 text: "The radio on",
@@ -993,6 +1034,9 @@
 				 viewValue: nil,
 				 viewSetupFormScript: func()
 				 begin
+					// (below Location in adverts where that is shown)
+					if theSlip.gps then
+						viewBounds := {left: 10, top: 236, right: -10, bottom: 254};
 					// (only where the board can switch the radio)
 					if not theSlip.switchable then
 						viewFlags := BAnd(viewFlags, BNot(1));
@@ -1153,15 +1197,22 @@
 					local thread := if base.mode = 'thread then base.currentThread;
 					local node := thread and not mesh:IsChannel(thread) and not mesh:SavedCard(thread);
 					local channel := thread and mesh:IsChannel(thread) and not StrEqual(thread, mesh.kPublic);
-					if node or channel then begin
-						local items;
-						if node then begin
-							headerPicks := ['save];
-							items := [{item: "Save to Names", mark: $ }];
-						end else begin
-							headerPicks := ['showKey, 'leave];
-							items := [{item: "Show Key", mark: $ }, {item: "Leave Channel", mark: $ }];
-						end;
+					local items := [];
+					headerPicks := [];
+					if node then begin
+						AddArraySlot(headerPicks, 'save);
+						AddArraySlot(items, {item: "Save to Names", mark: $ });
+					end else if channel then begin
+						AddArraySlot(headerPicks, 'showKey);
+						AddArraySlot(items, {item: "Show Key", mark: $ });
+						AddArraySlot(headerPicks, 'leave);
+						AddArraySlot(items, {item: "Leave Channel", mark: $ });
+					end;
+					if thread and HostGPSAvailable() then begin
+						AddArraySlot(headerPicks, 'sendLocation);
+						AddArraySlot(items, {item: "Send Location", mark: $ });
+					end;
+					if Length(items) > 0 then begin
 						if narrow then begin
 							AddArraySlot(items, 'pickseparator);
 							AddArraySlot(headerPicks, nil);
@@ -1169,8 +1220,11 @@
 							AddArraySlot(headerPicks, 'list);
 						end;
 						headerPopup := DoPopup(items, 0, 0, self);
-					end else if base.mode <> 'list and narrow then
-						base:ShowList();
+					end else begin
+						headerPicks := nil;
+						if base.mode <> 'list and narrow then
+							base:ShowList();
+					end;
 					true;
 				end,
 				headerPicks: nil,
@@ -1186,7 +1240,9 @@
 						if base:Mesh():SaveNode(base.currentThread, if t then t.name) then
 							GetRoot():Notify(3, "Mesh", base:ThreadName(base:ThreadFor(base.currentThread)) & " is saved in Names.");
 						base:Redraw();
-					end else if chosen = 'showKey and base.currentThread then
+					end else if chosen = 'sendLocation and base.currentThread then
+						base:SendLocation()
+					else if chosen = 'showKey and base.currentThread then
 						base:ShowChannelKey(base.currentThread)
 					else if chosen = 'leave and base.currentThread then
 						base:LeaveChannel(base.currentThread)
@@ -1486,6 +1542,53 @@
 	ShortKey: func(key) if StrLen(key) > 8 then SubStr(key, 0, 8) else key,
 
 	/*----------------------------------------------------------------------
+		Location
+	----------------------------------------------------------------------*/
+
+	// the GPS's fix, or nil (no GPS, or no fix yet)
+	Fix: func()
+	begin
+		if not HostGPSAvailable() then return nil;
+		local s := HostGPSStatus();
+		if s and s.fix and s.latitude and s.longitude then s;
+	end,
+
+	ShareLocation: func() (GetAppPrefs(appSymbol, {named: nil})).shareLocation,
+
+	SetShareLocation: func(on)
+	begin
+		local prefs := GetAppPrefs(appSymbol, {named: nil});
+		prefs.shareLocation := if on then true else nil;
+		EntryChange(prefs);
+		:UpdateLocation(true);
+		if on and :Fix() then
+			HostMeshAdvertise();				// (the maps told at once)
+	end,
+
+	// the adverts' position: the fix's while Location in adverts is on, else
+	// none; force: whenever it was last done
+	UpdateLocation: func(force)
+	begin
+		local now := Ticks() div 60;
+		if not force and locationAt and now - locationAt < kLocationEvery then
+			return nil;
+		locationAt := now;
+		local fix := if :ShareLocation() then :Fix();
+		if fix then
+			HostMeshSetLocation(fix.latitude, fix.longitude)
+		else
+			HostMeshSetLocation(nil, nil);
+	end,
+
+	// a position as a message: the degrees, and a map link
+	LocationText: func(fix)
+	begin
+		local lat := FormattedNumberStr(fix.latitude, "%.5f");
+		local lon := FormattedNumberStr(fix.longitude, "%.5f");
+		"My location: " & lat & ", " & lon & " https://maps.google.com/?q=" & lat & "," & lon;
+	end,
+
+	/*----------------------------------------------------------------------
 		Channels
 	----------------------------------------------------------------------*/
 
@@ -1781,6 +1884,10 @@
 			:Prune(nil)
 		onexception |evt.ex| do
 			nil;
+		try
+			:UpdateLocation(nil)
+		onexception |evt.ex| do
+			nil;
 		AddDelayedCall(func() GetGlobalVar('|HostMesh:host|):Poll(), [], kPollMs);
 	end,
 
@@ -1827,6 +1934,10 @@
 					icon: :MakeIcon(), labels: nil, sequence: 31, _tagList: ['_icon, '_noBackup]}, nil);
 		end;
 		:Prune(true);
+		try
+			:UpdateLocation(true)
+		onexception |evt.ex| do
+			nil;
 		try
 			:SyncSaved()
 		onexception |evt.ex| do

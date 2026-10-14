@@ -85,6 +85,15 @@ FHostMeshStatus(RefArg /*rcvr*/)
 	SetSlot(status, "lastDroppedHeader", info.lastDroppedHeader >= 0 ? RefVar(MAKEINT(info.lastDroppedHeader)) : RefVar(NILREF));
 	SetSlot(status, "poolFree", RefVar(MAKEINT(info.poolFree)));
 	SetSlot(status, "lastFreqError", RefVar(MAKEINT(info.lastFreqError)));
+	if (info.hasLocation)
+	{
+		RefVar location(MakeArray(2));
+		SetArraySlot(location, 0, RefVar(MakeReal(info.latitude)));
+		SetArraySlot(location, 1, RefVar(MakeReal(info.longitude)));
+		SetSlot(status, "location", location);
+	}
+	else
+		SetSlot(status, "location", RefVar(NILREF));
 	SetSlot(status, "noiseFloor", RefVar(MAKEINT(info.noiseFloor)));
 	SetSlot(status, "lastRssi", RefVar(MAKEINT((long) info.lastRssi)));
 	SetSlot(status, "lastSnr", RefVar(MAKEINT((long) info.lastSnr)));
@@ -198,6 +207,30 @@ FHostMeshLastUnreadable(RefArg /*rcvr*/)
 	static char hex[2 * 256 + 1];
 	HostMeshLastUnreadable(hex, sizeof(hex));
 	return HostStringOfUTF8(hex);
+}
+
+
+// a number (an integer or a real), or nil
+static bool
+NumberOf(RefArg v, double* value)
+{
+	if (ISINT(v))
+		*value = (double) RINT(v);
+	else if (NOTNIL(v) && IsReal(v))
+		*value = CoerceToDouble(v);
+	else
+		return false;
+	return true;
+}
+
+
+static Ref
+FHostMeshSetLocation(RefArg /*rcvr*/, RefArg latitude, RefArg longitude)
+{
+	double lat, lon;
+	bool has = NumberOf(latitude, &lat) && NumberOf(longitude, &lon);
+	HostMeshSetLocation(has, has ? lat : 0, has ? lon : 0);
+	return MAKEBOOLEAN(has);
 }
 
 
@@ -423,6 +456,7 @@ HostRegisterMeshFunctions(void)
 	SetSlot(functions, "HostMeshStatus", RefVar(MakeCFunction((void*) FHostMeshStatus, 0, nil)));
 	SetSlot(functions, "HostMeshContacts", RefVar(MakeCFunction((void*) FHostMeshContacts, 0, nil)));
 	SetSlot(functions, "HostMeshLastUnreadable", RefVar(MakeCFunction((void*) FHostMeshLastUnreadable, 0, nil)));
+	SetSlot(functions, "HostMeshSetLocation", RefVar(MakeCFunction((void*) FHostMeshSetLocation, 2, nil)));
 	SetSlot(functions, "HostMeshTraceRx", RefVar(MakeCFunction((void*) FHostMeshTraceRx, 1, nil)));
 	SetSlot(functions, "HostMeshChannels", RefVar(MakeCFunction((void*) FHostMeshChannels, 0, nil)));
 	SetSlot(functions, "HostMeshJoinChannel", RefVar(MakeCFunction((void*) FHostMeshJoinChannel, 2, nil)));

@@ -98,6 +98,10 @@
 					HostMeshSendChannelText(channel, text)
 											==> an id for HostMeshSendState
 					HostMeshSetName(name)	this node's name, announced
+					HostMeshSetLocation(latitude, longitude)
+											this node's position in its adverts
+											from the next on (degrees, north
+											and east positive); nil: none
 					HostMeshRegions()		the radio presets' names
 					HostMeshRegion()		the one in use (an index), or nil
 											(the radio set otherwise)
@@ -227,6 +231,8 @@ struct HostMeshStatusInfo
 	int						lastDroppedHeader;	// (its header and path-length bytes: header << 8 | path_len; -1 none)
 	int						poolFree;
 	long					lastFreqError;		// Hz, the radio's estimate for the last packet (0: not told)
+	bool					hasLocation;		// the position in this node's adverts (HostMeshSetLocation)
+	double					latitude, longitude;
 	float					lastRssi, lastSnr;
 };
 void		HostMeshGetStatus(HostMeshStatusInfo* status);
@@ -298,6 +304,9 @@ int			HostMeshGetSendState(long id);
 
 bool		HostMeshAdvertise(void);
 bool		HostMeshSetName(const char* name);
+// this node's position, put in its adverts from the next on (has false:
+// none - adverts without one, as before)
+void		HostMeshSetLocation(bool has, double latitude, double longitude);
 // a contact saved (added by its key alone when not known; name "" or NULL:
 // the one it has, or its id) or no longer saved
 bool		HostMeshSetSaved(const char* key, const char* name, bool saved);

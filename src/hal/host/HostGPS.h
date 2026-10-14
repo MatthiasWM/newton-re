@@ -34,6 +34,10 @@
 				  serial:DEVICE[@BAUD]   a receiver plugged into the host
 				                         (COM3, /dev/ttyUSB0; 4800 unless
 				                         given)
+				  device                 a board's own receiver, its bytes
+				                         read and written by the board
+				                         (HostGPSSetDevice: the T-Deck
+				                         Pro's u-blox M10, tdeck_gps.cpp)
 				LAT and LON in degrees, north and east positive; ALT in
 				metres.  A pretend source makes its own sentences; the
 				others' are passed on as they come (a real receiver's), and
@@ -100,6 +104,16 @@ struct HostGPSFix
 	long long	time;					// seconds since 1970, UTC (0: none)
 	int			millis;					// ... and its milliseconds
 };
+
+// A board's own receiver (the source "device"), set before HostGPSStart:
+// read waits up to timeoutMs for bytes ==> how many (0 none, -1 the
+// receiver is gone - tried again a second later); write sends to it
+struct HostGPSDevice
+{
+	long	(*read)(unsigned char* bytes, long size, long timeoutMs);
+	void	(*write)(const unsigned char* bytes, long size);
+};
+void	HostGPSSetDevice(const HostGPSDevice* device);
 
 // The receiver started on its source (spec as above) ==> whether it was;
 // why says why not.  Once only.

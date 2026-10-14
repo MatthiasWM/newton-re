@@ -53,7 +53,9 @@ const double	kMetresPerDegree = 111320.0;
 const double	kSimRadius = 500.0;			// the pretend receiver's circle, metres
 const double	kKnot = 1852.0 / 3600.0;	// metres a second
 
-enum SourceKind { kSourceNone, kSourceSim, kSourceFixed, kSourceFile, kSourceTCP, kSourceGPSD, kSourceSerial };
+enum SourceKind { kSourceNone, kSourceSim, kSourceFixed, kSourceFile, kSourceTCP, kSourceGPSD, kSourceSerial, kSourceDevice };
+
+static const HostGPSDevice*	gDevice = NULL;		// (the source "device": the board's receiver)
 
 static long long
 Millis(void)
@@ -633,6 +635,8 @@ OpenDevice(Link* link)
 static long
 LinkRead(Link* link, unsigned char* bytes, long size)
 {
+	if (gSource == kSourceDevice)
+		return gDevice->read(bytes, size, 200);
 	if (gSource == kSourceSerial)
 	{
 #if defined(HOST_GPS_NO_SERIAL)
@@ -703,7 +707,9 @@ LinkWrite(Link* link, const unsigned char* bytes, long size)
 {
 	if (size <= 0)
 		return;
-	if (gSource == kSourceSerial)
+	if (gSource == kSourceDevice)
+		gDevice->write(bytes, size);
+	else if (gSource == kSourceSerial)
 	{
 #if defined(HOST_GPS_NO_SERIAL)
 		(void) bytes;
@@ -801,14 +807,15 @@ RunTimed(void)
 static void
 RunRelay(void)
 {
-	char line[kLineSize + 4];
+	// (static: there is one relay, and a board's pthread has a 3 KB stack)
+	static char line[kLineSize + 4];
 	long lineCount = 0;
 	long long lastAstral = 0;
 	for (;;)
 	{
-		unsigned char bytes[512];
+		static unsigned char bytes[512];
 		long got = LinkRead(&gLink, bytes, sizeof(bytes));
-		unsigned char passOn[sizeof(gPassOn)];
+		static unsigned char passOn[sizeof(gPassOn)];
 		long passOnCount;
 		{
 			std::lock_guard<std::mutex> hold(gLock);
@@ -839,7 +846,7 @@ RunRelay(void)
 			}
 		}
 		LinkWrite(&gLink, passOn, passOnCount);
-		if (got < 0 && gSource == kSourceSerial)
+		if (got < 0 && (gSource == kSourceSerial || gSource == kSourceDevice))
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	}
 }
@@ -940,9 +947,18 @@ HostGPSStart(const char* spec, char* why, long size)
 			return false;
 		}
 	}
+	else if (strcmp(spec, "device") == 0)
+	{
+		if (gDevice == NULL)
+		{
+			snprintf(why, size, "this host has no receiver of its own");
+			return false;
+		}
+		gSource = kSourceDevice;
+	}
 	else
 	{
-		snprintf(why, size, "no such source %s (sim, fixed:, nmea:, tcp:, gpsd, serial:)", spec);
+		snprintf(why, size, "no such source %s (sim, fixed:, nmea:, tcp:, gpsd, serial:, device)", spec);
 		return false;
 	}
 	snprintf(gSpec, sizeof(gSpec), "%s", spec);
@@ -954,6 +970,8 @@ HostGPSStart(const char* spec, char* why, long size)
 
 
 bool		HostGPSStarted(void)		{ return gStarted; }
+
+void		HostGPSSetDevice(const HostGPSDevice* device)	{ gDevice = device; }
 
 void
 HostGPSSource(char* spec, long size)
