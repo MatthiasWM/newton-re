@@ -143,6 +143,12 @@ struct HostMeshPlatform
 	bool			(*load)(void* ref, const char* name, void* bytes, long* size);
 	void			(*save)(void* ref, const char* name, const void* bytes, long size);
 	const char*		defaultName;	// this node's name until it is given one
+	// the radio's receive errors so far (NULL: not counted)
+	long			(*radioErrors)(void* ref);
+	// called each time round the engine's loop: a received packet's
+	// interrupt missed is found (its line still raised) and handed on;
+	// ==> how many times so far (NULL: not watched)
+	long			(*radioCheck)(void* ref);
 };
 
 // The engine's thread
@@ -170,6 +176,19 @@ struct HostMeshStatusInfo
 	long					sent;
 	long					packetsHeard;	// on the air, anyone's (MeshCore's dispatcher counts)
 	long					packetsSent;
+	// what the radio hears, to tell a deaf radio from packets dropped later:
+	// packets by MeshCore payload type (PAYLOAD_TYPE_*, repeats included),
+	// channel messages by whether a channel this node has took them, the
+	// radio's receive errors (CRC; -1: the platform does not count them),
+	// and the last packet's signal
+	long					heardByType[16];
+	long					channelKnown;		// GRP_TXT/GRP_DATA a channel of ours decrypted
+	long					channelUnknown;		// ... no channel of ours could
+	int						lastUnknownHash;	// the last of those's channel hash (-1: none)
+	long					radioErrors;
+	long					radioRecoveries;	// the radio's interrupt found missed (-1: not watched)
+	int						noiseFloor;			// dBm, MeshCore's sampling (0: not yet)
+	float					lastRssi, lastSnr;
 };
 void		HostMeshGetStatus(HostMeshStatusInfo* status);
 

@@ -64,6 +64,22 @@ FHostMeshStatus(RefArg /*rcvr*/)
 	SetSlot(status, "sent", RefVar(MAKEINT(info.sent)));
 	SetSlot(status, "packetsHeard", RefVar(MAKEINT(info.packetsHeard)));
 	SetSlot(status, "packetsSent", RefVar(MAKEINT(info.packetsSent)));
+	// what was heard, by MeshCore's payload type (only those heard)
+	static const char* const kTypes[16] = { "req", "response", "text", "ack", "advert", "channelText", "channelData",
+		"anonReq", "path", "trace", "multipart", "control", "type12", "type13", "type14", "raw" };
+	RefVar heard(AllocateFrame());
+	for (int k = 0; k < 16; k++)
+		if (info.heardByType[k] != 0)
+			SetSlot(heard, kTypes[k], RefVar(MAKEINT(info.heardByType[k])));
+	SetSlot(status, "heard", heard);
+	SetSlot(status, "channelKnown", RefVar(MAKEINT(info.channelKnown)));
+	SetSlot(status, "channelUnknown", RefVar(MAKEINT(info.channelUnknown)));
+	SetSlot(status, "lastUnknownHash", info.lastUnknownHash >= 0 ? RefVar(MAKEINT(info.lastUnknownHash)) : RefVar(NILREF));
+	SetSlot(status, "radioErrors", info.radioErrors >= 0 ? RefVar(MAKEINT(info.radioErrors)) : RefVar(NILREF));
+	SetSlot(status, "radioRecoveries", info.radioRecoveries >= 0 ? RefVar(MAKEINT(info.radioRecoveries)) : RefVar(NILREF));
+	SetSlot(status, "noiseFloor", RefVar(MAKEINT(info.noiseFloor)));
+	SetSlot(status, "lastRssi", RefVar(MAKEINT((long) info.lastRssi)));
+	SetSlot(status, "lastSnr", RefVar(MAKEINT((long) info.lastSnr)));
 	return status;
 }
 

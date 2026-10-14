@@ -92,8 +92,11 @@ class TDeckRadioHal : public RadioLibHal
 	uint8_t*				fOut = NULL;		// (internal RAM: DMA-capable)
 	uint8_t*				fIn = NULL;
 	static const size_t		kChunk = 256;
+	void					(*fCallback)(void) = NULL;	// DIO1's (MeshCore's wrapper's setFlag)
+	int64_t					fRaisedSince = 0;			// when DIO1 was first seen raised (0: it is not)
 
 public:
+	long					fRecoveries = 0;
 	TDeckRadioHal() : RadioLibHal(GPIO_MODE_INPUT, GPIO_MODE_OUTPUT, 0, 1, GPIO_INTR_POSEDGE, GPIO_INTR_NEGEDGE) { }
 
 	// (Module::init calls this, not spiBegin: the device is added here)
@@ -129,6 +132,8 @@ public:
 			esp_err_t err = gpio_install_isr_service(0);
 			serviceInstalled = err == ESP_OK || err == ESP_ERR_INVALID_STATE;	// (another driver's already)
 		}
+		fCallback = callback;
+		fRaisedSince = 0;
 		gpio_set_intr_type((gpio_num_t) pin, (gpio_int_type_t) mode);
 		gpio_isr_handler_add((gpio_num_t) pin, InterruptTrampoline, (void*) callback);
 		gpio_intr_enable((gpio_num_t) pin);
@@ -138,6 +143,7 @@ public:
 	{
 		if (pin == RADIOLIB_NC)
 			return;
+		fCallback = NULL;
 		gpio_isr_handler_remove((gpio_num_t) pin);
 		gpio_set_intr_type((gpio_num_t) pin, GPIO_INTR_DISABLE);
 	}
@@ -219,6 +225,32 @@ public:
 	}
 
 	void spiEnd() override { }
+
+	// A missed interrupt (the engine's loop, each time round): DIO1 is raised
+	// on a packet received or sent and lowered when the engine clears the
+	// radio's flags - at most a loop or two later.  Raised for longer, its
+	// rising edge never reached the wrapper, which then waits for an edge
+	// that cannot come (DIO1 stays up) - deaf until its own next transmit.
+	// The edge is handed on, late.
+	long Check()
+	{
+		if (fCallback == NULL || gpio_get_level((gpio_num_t) PIN_LORA_DIO1) == 0)
+		{
+			fRaisedSince = 0;
+			return fRecoveries;
+		}
+		int64_t now = esp_timer_get_time();
+		if (fRaisedSince == 0)
+			fRaisedSince = now;
+		else if (now - fRaisedSince > 250 * 1000)
+		{
+			fRecoveries++;
+			fRaisedSince = 0;
+			printf("[mesh] the radio's interrupt was missed (%ld so far)\n", fRecoveries);
+			fCallback();
+		}
+		return fRecoveries;
+	}
 };
 
 
@@ -413,6 +445,21 @@ Random(void* bytes, size_t size)
 }
 
 
+// (the radio's CRC and read errors: a weak or colliding signal heard)
+static long
+RadioErrors(void*)
+{
+	return (long) gDriver.getPacketsRecvErrors();
+}
+
+
+static long
+RadioCheck(void*)
+{
+	return gRadioUp ? gHal.Check() : 0;
+}
+
+
 static void
 MeshTask(void*)
 {
@@ -454,6 +501,8 @@ HostDeviceLoraStart(void)
 	gPlatform.load = Load;
 	gPlatform.save = Save;
 	gPlatform.defaultName = "T-Deck Newton";
+	gPlatform.radioErrors = RadioErrors;
+	gPlatform.radioCheck = RadioCheck;
 	HostMeshWillRun();					// (the Newton's side boots while the radio starts)
 
 	// the engine's task: its stack in PSRAM (core 0, beside the WiFi's and the

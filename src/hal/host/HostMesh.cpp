@@ -406,6 +406,39 @@ public:
 		RecordMessage("", name, channelName, text, timestamp);
 	}
 
+	// what was heard, counted (HostMeshStatus): every packet the dispatcher
+	// parsed, before it is known to be a repeat
+	void logRxRaw(float snr, float rssi, const uint8_t*, int) override
+	{
+		std::lock_guard<std::mutex> hold(gLock);
+		gStatus.lastRssi = rssi;
+		gStatus.lastSnr = snr;
+	}
+
+	void logRx(mesh::Packet* pkt, int, float) override
+	{
+		uint8_t type = pkt->getPayloadType();
+		int known = -1;
+		if ((type == PAYLOAD_TYPE_GRP_TXT || type == PAYLOAD_TYPE_GRP_DATA) && pkt->payload_len > 3)
+		{
+			known = 0;
+			mesh::GroupChannel channels[4];
+			int n = searchChannelsByHash(&pkt->payload[0], channels, 4);
+			uint8_t data[MAX_PACKET_PAYLOAD];
+			for (int j = 0; j < n && !known; j++)
+				known = mesh::Utils::MACThenDecrypt(channels[j].secret, data, &pkt->payload[1], pkt->payload_len - 1) > 0;
+		}
+		std::lock_guard<std::mutex> hold(gLock);
+		gStatus.heardByType[type & 15]++;
+		if (known > 0)
+			gStatus.channelKnown++;
+		else if (known == 0)
+		{
+			gStatus.channelUnknown++;
+			gStatus.lastUnknownHash = pkt->payload[0];
+		}
+	}
+
 	// commands are for repeaters and room servers: nothing here answers one
 	void onCommandDataRecv(const ContactInfo&, mesh::Packet*, uint32_t, const char*) override { }
 	uint8_t onContactRequest(const ContactInfo&, uint32_t, const uint8_t*, uint8_t, uint8_t*) override { return 0; }
@@ -724,6 +757,10 @@ void
 HostMeshRun(const HostMeshPlatform* platform)
 {
 	gPlatform = platform;
+	{
+		std::lock_guard<std::mutex> hold(gLock);
+		gStatus.lastUnknownHash = -1;
+	}
 	gStarted = true;
 	{
 		std::lock_guard<std::mutex> hold(gLock);
@@ -872,12 +909,16 @@ HostMeshRun(const HostMeshPlatform* platform)
 				advert = true;									// nobody there has heard this node
 		}
 
+		long recoveries = platform->radioCheck != NULL ? platform->radioCheck(platform->ref) : -1;
 		node->CheckSends();
 		node->loop();
 		{
 			std::lock_guard<std::mutex> hold(gLock);
 			gStatus.packetsHeard = (long) (node->getNumRecvFlood() + node->getNumRecvDirect());
 			gStatus.packetsSent = (long) (node->getNumSentFlood() + node->getNumSentDirect());
+			gStatus.radioErrors = platform->radioErrors != NULL ? platform->radioErrors(platform->ref) : -1;
+			gStatus.radioRecoveries = recoveries;
+			gStatus.noiseFloor = platform->radio->getNoiseFloor();
 		}
 
 		unsigned long now = NowMs();

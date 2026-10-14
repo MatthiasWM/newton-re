@@ -149,6 +149,19 @@ only when the other's preamble has already begun).  Found 2026-10-13:
 the board's counters (`HostMeshStatus()`'s `received`, `sent`) matched
 the soup exactly - the message never reached the engine.
 
+**What the radio hears** (added 2026-10-14, to tell a deaf radio from
+packets dropped later): `HostMeshStatus()` also says `heard` (packets the
+dispatcher parsed, by MeshCore payload type - `advert`, `text` (others'
+direct messages, unreadable here), `channelText`, `ack`, ...; repeats
+included), `channelKnown` / `channelUnknown` (channel packets a channel of
+this node's could or could not decrypt, `lastUnknownHash` the last such
+channel hash), `radioErrors` (the radio's CRC errors; nil where not
+counted), `radioRecoveries` (the board's DIO1 found raised for more than
+250 ms - a missed interrupt, handed on late; nil where not watched),
+`noiseFloor` (MeshCore's sampling, dBm), `lastRssi`, `lastSnr`.  On the
+board, 2026-10-14: noise floor -118 dBm, packets decoded down to -127 dBm
+/ SNR -9, no interrupt missed in half an hour.
+
 Laid out for any screen as Messages is (ctests at 240x320, 320x480,
 480x320, 810x1080).
 
