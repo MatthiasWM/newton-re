@@ -30,7 +30,10 @@ puts the machine to sleep, so `host.NewtonPower` now pins its battery
 off the mains (it prints the host's own first); and the BQ27220 stretches
 the I2C clock while it wakes, beyond the ESP32-S3's default bus timeout,
 so the board's bus timeout went to 13 ms (`docs/host-tdeck-pro.md` "The
-battery"). The reMarkable reading is not yet seen on the tablet.
+battery"). On the reMarkable the docked Marker's battery is a Wireless
+supply online, which was being taken for the mains: a supply with a
+capacity of its own no longer counts (`docs/host-remarkable.md` "The
+battery"; read there: 98%, 8.77 V, charging).
 
 ## 2026-10-14: armcpu.ARMProtocols failing now and then
 

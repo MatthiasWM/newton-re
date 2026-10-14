@@ -600,10 +600,20 @@ The window traces itself for this (`run.sh` turns both on):
 **The battery** (2026-10-14): the Newton's `BatteryStatus` is the
 tablet's, read from `/sys/class/power_supply` like any Linux host's
 (`power/host/HostBattery.h`), the battery found by its `type` rather than
-a name (the Paper Pro's is not `BAT0`). Not yet seen on the tablet itself
-(it was not on the network that day): check what the tablet has with
-`ssh root@10.11.99.1 'grep . /sys/class/power_supply/*/type'`, then what
-the Newton makes of it with `BatteryStatus(0)` in a running one.
+a name. The owner's tablet has:
+
+| Supply | Type | What it is |
+|---|---|---|
+| `max1726x_battery` | Battery | the fuel gauge: `capacity`, `status`, `voltage_now` (two cells, ~8.7 V), `current_now`, `temp` - **the one read** |
+| `max77963-bat` | Battery | the charger's view of the cells: no capacity, so passed over |
+| `max77963-charger` | USB | `online` while plugged in - the mains |
+| `max77963-adcin`, `max77963-sys` | Unknown | voltages only |
+| `elants-marker-battery`, `nfc-marker-battery` | Wireless | the Marker's battery; `nfc-` is `online` while the pen is docked - **not the mains** (a supply with a `capacity` of its own is something's battery, so it is not counted) |
+
+Run there headless (a copy in a scratch directory with its own `--store`,
+`--script` printing `BatteryStatus(0)`'s slots): 98%, 8.77 V, mains yes,
+`fastCharging`, 0.178 A charging, 27 C - as sysfs said. The tree is a case
+of `power.PowerManager`.
 
 What only the tablet can tell: the picture on the glass, the waveforms'
 look and speed (is live ink quick enough?), the pen's coordinates through

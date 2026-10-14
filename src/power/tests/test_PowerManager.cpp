@@ -211,6 +211,39 @@ TestSysfs(void)
 	EXPECT(reading.milliamps == -750);
 	EXPECT(reading.mains == 0);
 
+	// the reMarkable Paper Pro's tree (as read on the owner's, 2026-10-14):
+	// the gauge's battery and the charger's, the charger on USB, and the
+	// Marker's battery a Wireless supply online when it is docked - which
+	// is not the mains
+	const char* tablet = "test_PowerManager.rmpp";
+	MakeDirectory(tablet);
+	WriteAttribute(tablet, "elants-marker-battery", "type", "Wireless");
+	WriteAttribute(tablet, "elants-marker-battery", "present", "0");
+	WriteAttribute(tablet, "elants-marker-battery", "capacity", "90");
+	WriteAttribute(tablet, "max1726x_battery", "type", "Battery");
+	WriteAttribute(tablet, "max1726x_battery", "present", "1");
+	WriteAttribute(tablet, "max1726x_battery", "status", "Charging");
+	WriteAttribute(tablet, "max1726x_battery", "capacity", "97");
+	WriteAttribute(tablet, "max1726x_battery", "voltage_now", "8752500");
+	WriteAttribute(tablet, "max1726x_battery", "current_now", "257730");
+	WriteAttribute(tablet, "max1726x_battery", "temp", "260");
+	WriteAttribute(tablet, "max77963-bat", "type", "Battery");
+	WriteAttribute(tablet, "max77963-bat", "voltage_now", "8761896");
+	WriteAttribute(tablet, "max77963-charger", "type", "USB");
+	WriteAttribute(tablet, "max77963-charger", "online", "1");
+	WriteAttribute(tablet, "nfc-marker-battery", "type", "Wireless");
+	WriteAttribute(tablet, "nfc-marker-battery", "online", "1");
+	WriteAttribute(tablet, "nfc-marker-battery", "capacity", "90");
+	EXPECT(HostBatteryReadSysfs(tablet, &reading));
+	EXPECT(reading.percent == 97 && reading.charge == kHostBatteryCharging);
+	EXPECT(reading.millivolts == 8752 && reading.milliamps == 257 && reading.tenthsCelsius == 260);
+	EXPECT(reading.mains == 1);
+	WriteAttribute(tablet, "max77963-charger", "online", "0");
+	WriteAttribute(tablet, "max1726x_battery", "status", "Discharging");
+	EXPECT(HostBatteryReadSysfs(tablet, &reading));
+	EXPECT(reading.mains == 0);								// (the Marker still docked)
+	EXPECT(reading.charge == kHostBatteryDischarging);
+
 	// no tree at all: no battery
 	EXPECT(!HostBatteryReadSysfs("test_PowerManager.nothing", &reading));
 }

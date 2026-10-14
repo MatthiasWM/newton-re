@@ -115,7 +115,8 @@ The stand-ins for the Voyager's hardware are in `hal/host/HostPower.h`
      Linux's supplies are found by their `type`, not by name: the first
      `Battery` present (by name, so `BAT0` before `BAT1`) that is not of
      scope `Device` (a mouse's), and the mains is any other supply
-     online. Its current's sign is taken from its status, since drivers
+     online that has no charge of its own (the reMarkable's docked Marker
+     is a Wireless supply online, with a capacity: not the mains). Its current's sign is taken from its status, since drivers
      disagree on it.
   The driver reports what the host says: the voltage, the current drawn
   (`batteryCurrent`) or charging (`chargeCurrent`), the temperature, the

@@ -119,10 +119,14 @@ HostBatteryReadSysfs(const char* root, HostBatteryReading* reading)
 	{
 		if (!ReadAttribute(root, names[i], "type", line, sizeof(line)))
 			continue;
-		long long value;
+		long long value, now, full;
 		if (strcmp(line, "Battery") != 0)
 		{
-			if (ReadNumber(root, names[i], "online", &value))
+			// (a supply with a charge of its own is something's battery,
+			// not the mains: the reMarkable's Marker docked is a Wireless
+			// supply online, with a capacity)
+			if (ReadNumber(root, names[i], "online", &value) && !ReadNumber(root, names[i], "capacity", &now)
+			&& !(ReadAttribute(root, names[i], "scope", line, sizeof(line)) && strcmp(line, "Device") == 0))
 				mains = (mains == 1 || value != 0) ? 1 : 0;
 			continue;
 		}
@@ -132,7 +136,6 @@ HostBatteryReadSysfs(const char* root, HostBatteryReading* reading)
 			continue;
 		if (ReadNumber(root, names[i], "present", &value) && value == 0)
 			continue;
-		long long now, full;
 		if (ReadNumber(root, names[i], "capacity", &value))
 			reading->percent = (long) value;
 		else if (ReadNumber(root, names[i], "charge_now", &now) && ReadNumber(root, names[i], "charge_full", &full) && full > 0)
