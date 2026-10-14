@@ -1,0 +1,3 @@
+# tools/armpart needs nothing beyond the standard library; capstone only
+# cross-checks the assembler in test_newtonarm.py (skipped without it)
+capstone==5.0.9

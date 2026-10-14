@@ -254,6 +254,13 @@ the manager registers their class infos itself.  DEVIATION: their code
 is ARM, which the host cannot run, so the part goes in with no class
 info registered (`InstallPart`); the host has its own screen driver.
 
+A protocol part as source: `tools/armpart/newtonarm.py` turns one into
+ARM assembly (labels, the class info and strings as data with symbolic
+offsets, the package's relocations as `.rword`s) and assembles it back
+byte for byte, or with code inserted and everything after it moved along;
+`tools/armpart/newtonpkg.py` splits a whole package into its directory as
+text and its parts, and puts it back together (`tools/armpart/README.md`).
+
 ## Units (`src/packages/Units.h`)
 
 A unit is a set of objects one package lends others.  A frames part may
