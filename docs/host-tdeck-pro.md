@@ -780,6 +780,17 @@ own to ask, so the printers are found by the mDNS question of
 static because the browse's thread has ESP-IDF's default 3 KB stack.
 There is no TLS on the board, so an `ipps://` printer cannot be used.
 
+Tried on the owner's board (Wi-Fi at 192.168.1.191), at the NewtonScript
+prompt through `serialcapture.py --send-file`: `HostLookForPrinters()`
+found the owner's HP Color LaserJet Pro M479 at
+`ipp://192.168.1.120:631/ipp/print`, PostScript and PCL, within the
+browse's 2.5 s; `GetGlobalVar('|NetworkPrinters:host|):AddPrinter(found,
+'postScript)` made it the current printer; a note put in the Out Box with
+`Send('print, note)` and sent with `TransportNotify('|print:newton|,
+'SendRequest, ...)` (as `src/host/demo/fax-send.ns` sends a fax) went as
+PostScript, and the printer answered successful-ok and printed it. (The
+board's prompt cuts a long line, so the note was built over several.)
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the
