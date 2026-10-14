@@ -397,7 +397,7 @@ at run time.
 | **The native functions** | `frames/ROMNatives.cpp` (generated), bound by name | no | unchanged |
 | **The ROM extension**: its ten packages (`pkgl`, `GetRExConfigEntry`) | `packages/ROMPackages.cpp`, `FramePartHandler.cpp` (a part in the image is read where it lies), from the "high" file spliced in by `SpliceROMExtension` | yes | nothing at first: the host already runs without an extension. Then the packages as sources (step 2's item 6), installed from the built tree |
 | **The recognisers' lexicons**: 129 tries, C data outside the object area | `recognition/ROMDictionaryData.cpp` (`gROMDictionaryTable`: addresses into the image) | yes | empty at first: every ROM dictionary answers nothing, which that file already allows. Then extracted into `src/` as a generated table, or into the tree as resources |
-| **The ROM parameter block** (`gParamBlock`, 0x1000, a page: `gROMVersion`, `gROMStage`, ...) that a package's native code reads - NTK's stubs choose their entry points by `gROMVersion` | `armcpu/PackageNativeCPU.cpp` (the emulated CPU maps the ROM at 0) | yes | **the object file's block**: `romsrc/romdata/gParamBlock.bin` (`romdata.tsv`), read through `ROMBytesAt` when there is no image. Traced over the fixtures (Mahjongg, NewtHack): 0x13dc is the only ROM address their code reads. Any other ROM address stops the CPU as an unanswered read |
+| **The ROM parameter block** (`gParamBlock`, 0x1000, a page: `gROMVersion`, `gROMStage`, ...) that a package's native code reads - NTK's stubs choose their entry points by `gROMVersion` | `armcpu/PackageNativeCPU.cpp` (the emulated CPU maps the ROM at 0) | yes | **the object file's block**: `romsrc/romdata/gParamBlock.txt` (`romdata.tsv`; its words as text), read through `ROMBytesAt` when there is no image. Traced over the fixtures (Mahjongg, NewtHack): 0x13dc is the only ROM address their code reads. Any other ROM address stops the CPU as an unanswered read |
 | **The other generated tables** (grammar, recognition nets, fonts' metrics tables, CRC, the codecs' tables, ...) | `src/*/…Tables.cpp` | no: compiled in | unchanged |
 
 So the first no-`--rom` boot needs only the first two rows from the built
@@ -551,7 +551,8 @@ objects, functions, maps, a layout and resources, exactly as the object
 area's tree is. The package's bytes around the part are
 `rex/<Package>.head.bin` (its directory) and `.tail.bin`, and the
 builder builds the part and splices it back in. The whole extension is
-still byte for byte the ROM's.
+still byte for byte the ROM's. (Since 2026-10-14 the directories are
+text, `<Package>.head.txt`: below.)
 
 | Package | Objects | Functions as source | Kept as bytecode |
 |---|---|---|---|
@@ -715,6 +716,47 @@ The test of editability is ctest `host.ROMSourceEdit` followed by
 - `host.ROMSourceEditValue` reads the edit back:
   `ROMConstant("canonicalInkShape").romsrcEdited.romsrcNote` is "added by
   edit-test".
+
+### The extension's other pieces as text
+
+(2026-10-14) What lies around the packages' parts in `rex/`, and the
+parameter block in `romdata/`, are text, built by `tools/rex/rextext.py`
+(`tools/rex/README.md`) - every one of them byte for byte:
+
+- **the header** (`header.txt`): signatures, checksum, version words and
+  id kept; each config entry names the `rex.tsv` piece it starts at (and
+  the one it runs up to, for the package list). The length, the start,
+  the count and every entry's offset and length are worked out from
+  where the pieces lie.
+- **the config entries** `dio`, `gpio`, `ralc` as rows of words under
+  column names taken from the code that reads them (`TBIOInterface::Init`
+  0x0026b620, `TGPIOInterface::Init` 0x0026c0d0, `RAMAllocTable`).
+- **the page tables** `ptpt`, `glpt` as runs of small-page descriptors.
+  `UseROMJumpTables` 0x001832e8 hands them to `BuildPatchTablePageTable`
+  0x00183230, which maps them at 0x01a00000 + 0x400000 + id MB: that is
+  where the patch table `jump` is seen, and what its branches are
+  relative to. 'glpt is the same pages 4 MB on, taken instead when a
+  word of `gGlobalsThatLiveAcrossReboot` says the ROM lies there.
+- **the patch table** `jump`: each entry's target address. All eighteen
+  branch into ScreenBuffer's and ScreenDrivers' code.
+- **the export table** `fexp`: its refs, each with its package and the
+  object's path.
+- **the padding**: a fill byte and an alignment, its length worked out.
+- **each package's directory** (`<Package>.head.txt`): its names, flags,
+  dates and part types kept, and the strings as strings. The package's
+  and the directory's sizes, the InfoRefs and the parts' offsets and
+  sizes are worked out from the part that follows.
+- **`gParamBlock`** (`romdata/gParamBlock.txt`): a word to a line, named
+  by the ROM's symbols, with the runs of nought one line each. The two
+  coarse page tables at 0x1400 and 0x1800, which the starting MMU map
+  uses for 0x0c000000 (`docs/memory/mmu-map.md`), are said so.
+
+With `--relayout`, the header and the directories are made when every
+piece is placed, rather than patched by how far things moved. A tree
+with the `.bin` pieces (the tag `romsrc-rom`) still builds as before.
+The unedited tree's object file is the same byte for byte as before the
+change, and so is the one `edit-test` makes, in which every package
+after Cardfile moves.
 
 ### The first intentional edit: the Newton Internet Enabler built in
 

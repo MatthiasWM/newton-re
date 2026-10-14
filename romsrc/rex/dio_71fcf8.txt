@@ -1,0 +1,26 @@
+# a config entry of the ROM extension (written by romsrc.py extract, built by
+# tools/rex/rextext.py): its version, then its rows; the count is worked out
+# 'dio ': the BIO chip's pins (TBIOInterface::Init 0x0026b620 reads it): a row per
+# function, its bit and mask; each other word not nought puts the bit into what
+# Init writes - dir to BIO command 0xc (WriteDIODir), pins to 0xe (WriteDIOPins),
+# pullup to 0xd (WriteDIOPullup), cmd14/cmd11/cmd12 to commands 0x14/0x11/0x12;
+# `unread` is not read there
+format config-table
+version	1
+columns	bit	mask	dir	pins	cmd14	cmd11	cmd12	pullup	unread
+row	10	0x400	0	1	1	1	1	0	1
+row	11	0x800	0	1	0	0	0	0	0
+row	12	0x1000	1	0	0	0	0	0	0
+row	13	0x2000	1	0	0	0	0	0	0
+row	14	0x4000	1	0	0	0	0	0	0
+row	15	0x8000	0	1	1	1	1	0	1
+row	0	0x0	0	0	0	0	0	0	0
+row	0	0x0	0	0	0	0	0	0	0
+row	0	0x0	0	0	0	0	0	0	0
+row	0	0x0	0	0	0	0	0	0	0
+row	0	0x0	0	0	0	0	0	0	0
+row	0	0x0	0	0	0	0	0	0	0
+row	0	0x0	0	0	0	0	0	0	0
+row	0	0x0	0	0	0	0	0	0	0
+row	0	0x0	0	0	0	0	0	0	0
+row	0	0x0	0	0	0	0	0	0	0

@@ -1,0 +1,5 @@
+# padding (written by romsrc.py extract, built by tools/rex/rextext.py): as long as
+# it must be for the piece after it to start on the alignment
+format pad
+fill	0x00
+align	0x1000

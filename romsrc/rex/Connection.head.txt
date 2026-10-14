@@ -1,0 +1,17 @@
+# the directory of Connection (PackageDirectory: tools/newton-rom/analysis/packages.py;
+# written by romsrc.py extract, built by tools/rex/rextext.py): the package's and
+# the directory's sizes, the strings' InfoRefs and each part's offset and size are
+# worked out - the parts are the pieces after this one in rex.tsv
+format package-directory
+signature	package1
+type	'xxxx'
+flags	0x10000000
+version	1
+copyright	"©1993-1997 Apple Computer.  All rights reserved."
+name	"Connection"
+creation	0xaea7c736	# seconds since 1904
+reserved	0x00000000	0x00000000	# the modify date and the directory's checksum in newer packages
+# each part: type, reserved word, flags, "info", "compressor"
+part	'form'	0	0x81	"A Newton Toolkit application"	""
+trailer	"Newton™ ToolKit Package © 1992-1995, Apple Computer, Inc.\u0000"	# Mac Roman bytes nothing points at
+fill	0xff	# what the directory is padded to a word with

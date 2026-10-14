@@ -1,0 +1,9 @@
+# 'glpt, the patch table's page table for a machine whose ROM lies 4 MB further on:
+# 'ptpt's pages 4 MB on - UseROMJumpTables 0x001832e8 takes it instead of 'ptpt
+# when gGlobalsThatLiveAcrossReboot's word +0x20 says so, at its address + 4 MB
+# (written by romsrc.py extract, built by tools/rex/rextext.py): runs of entries,
+# each the page's physical address and the descriptor's flags.  Carried as they are:
+# they name pages of the extension in the ROM, which nothing on the host reads
+format page-table
+0-223	0x00bee000	0xaae	# small page, cached and buffered, AP 2 2 2 2
+224-255	0x00bed000	0xaae	# small page, cached and buffered, AP 2 2 2 2
