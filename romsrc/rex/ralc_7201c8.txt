@@ -1,0 +1,10 @@
+# a config entry of the ROM extension (written by romsrc.py extract, built by
+# tools/rex/rextext.py): its version, then its rows; the count is worked out
+# 'ralc': how RAM is shared out (RAMAllocTable, ROMExtension.h): rows kRAMStoreAlloc,
+# kFramesHeapAlloc, kRDMCacheAlloc - min and max in bytes (0: no limit), pct in 1024ths
+format config-table
+version	1
+columns	min	max	pct
+row	0x0	0x0	0
+row	0x18000	0x3d090	204
+row	0x18000	0x100000	512

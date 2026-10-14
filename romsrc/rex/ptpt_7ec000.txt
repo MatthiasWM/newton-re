@@ -1,0 +1,9 @@
+# 'ptpt, the patch table's page table: the coarse page table that maps the
+# 1 MB at 0x01e00000 + id MB, where the extension's C patch table 'jump is seen
+# (UseROMJumpTables 0x001832e8, BuildPatchTablePageTable 0x00183230)
+# (written by romsrc.py extract, built by tools/rex/rextext.py): runs of entries,
+# each the page's physical address and the descriptor's flags.  Carried as they are:
+# they name pages of the extension in the ROM, which nothing on the host reads
+format page-table
+0-223	0x007ee000	0xaae	# small page, cached and buffered, AP 2 2 2 2
+224-255	0x007ed000	0xaae	# small page, cached and buffered, AP 2 2 2 2

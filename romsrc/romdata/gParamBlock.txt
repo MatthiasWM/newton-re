@@ -1,0 +1,42 @@
+# gParamBlock, the ROM's data at 0x1000 that code reads at its ROM address (written by
+# romsrc.py extract, built by tools/rex/rextext.py): each word at its address,
+# named by the ROM's symbol for it (`word` when it has none); `zeros N` is N bytes of
+# nought.  A line's address must be where the line before it ends
+format words
+at	0x1000
+0x1000	zeros	0x3d4
+0x13d4	gOldCheckSumC	0x00000000
+0x13d8	gOldCheckSumD	0x00000000
+0x13dc	gROMVersion	0x00020002
+0x13e0	gROMStage	0x00008000
+0x13e4	gOldCheckSumA	0x00000000
+0x13e8	gOldCheckSumB	0x00000000
+0x13ec	gHardwareType	0x10003000
+0x13f0	gROMManufacturer	0x01000000
+0x13f4	gDebuggerBits	0x00000040
+0x13f8	gNewtTests	0x00000000
+0x13fc	gNewtConfig	0x00000000
+# the coarse page table g8MegContinuousTableStart (ROM 0x100) maps 0x0c000000 with: 256 small-page descriptors
+# (docs/memory/mmu-map.md); the words not named are its entries
+0x1400	word	0x0400401e
+0x1404	zeros	0x4
+0x1408	word	0x0400414e
+0x140c	word	0x0400501e
+0x1410	word	0x0400514e
+0x1414	word	0x0400440e
+0x1418	word	0x04005c0e
+0x141c	word	0x0400603e
+0x1420	word	0x0400604e
+0x1424	zeros	0x3dc
+# the coarse page table g8MegContinuousTableStartFor4MbK (ROM 0x174) maps 0x0c000000 with: 256 small-page descriptors
+# (docs/memory/mmu-map.md); the words not named are its entries
+0x1800	word	0x0800401e
+0x1804	zeros	0x4
+0x1808	word	0x0800414e
+0x180c	word	0x0800501e
+0x1810	word	0x0800514e
+0x1814	word	0x0800440e
+0x1818	word	0x08005c0e
+0x181c	word	0x0800603e
+0x1820	word	0x0800604e
+0x1824	zeros	0x7dc

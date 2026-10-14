@@ -1,0 +1,23 @@
+# the ROM extension's header (RExHeader, headers/OS600/ROMExtension.h; written by
+# romsrc.py extract, built by tools/rex/rextext.py): its length, its start (rex.tsv's
+# `rex` line), the number of entries and each one's offset and length are worked out
+format rex-header
+signature	'RExB'	'lock'
+checksum	0x000098e6	# nothing in the ROM reads it (docs/rom-free/README.md)
+headerVersion	1
+manufacturer	0x01000000
+version	0x00020000
+id	0	# the patch table 'jump is mapped at 0x01e00000 + id MB (BuildPatchTablePageTable)
+# the config entries: the tag, the piece it starts at, and the piece it runs up to
+# when it covers more than one (`end`: the end of the extension)
+entry	'dio '	rex/dio_71fcf8.txt
+entry	'gpio'	rex/gpio_71ff40.txt
+entry	'ralc'	rex/ralc_7201c8.txt
+entry	'pkgl'	rex/Cardfile.head.txt	rex/pad_7ebfc8.txt
+entry	'pad '	rex/pad_7ebfc8.txt
+entry	'ptpt'	rex/ptpt_7ec000.txt
+entry	'glpt'	rex/glpt_7ec400.txt
+entry	'pad '	rex/pad_7ec800.txt
+entry	'fexp'	rex/fexp_7ed000.txt
+entry	'pad '	rex/pad_7ed298.txt
+entry	'jump'	rex/jump_7ee000.txt

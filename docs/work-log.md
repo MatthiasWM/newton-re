@@ -9,6 +9,36 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-14: The ROM extension's other pieces and the parameter block as text
+
+`romsrc/rex/` kept everything around the packages' frames parts as raw
+binaries, and `romsrc/romdata/gParamBlock.bin` the parameter block. They
+are text now, built by `tools/rex/rextext.py` (`tools/rex/README.md`),
+every one byte for byte. The header's config entries name the `rex.tsv`
+pieces they cover, and its length and offsets are worked out. The `dio`,
+`gpio` and `ralc` tables are rows under column names taken from
+`TBIOInterface::Init` and `TGPIOInterface::Init`. The page tables are
+runs of descriptors, `fexp` refs with their objects' paths, and `jump`
+the branches' targets: it is seen at 0x01e00000 (`UseROMJumpTables`,
+`BuildPatchTablePageTable`), and all eighteen go into ScreenBuffer's
+and ScreenDrivers' code. The padding is a fill byte and an alignment.
+The package directories have their strings as strings and their sizes
+worked out from the parts. `gParamBlock` is a word to a line, named by
+the ROM's symbols; its unnamed words at 0x1400 and 0x1800 are the two
+coarse page tables of the starting MMU map.
+
+`romsrc.py` builds the text pieces in both its paths. With `--relayout`
+the header and the directories are made from where the pieces now lie,
+rather than patched. It still reads `.bin` pieces (the tag
+`romsrc-rom`), and `extract` writes the text forms. Verified:
+
+- the committed tree's object file is unchanged but for the builder's
+  stamp, and so is `edit-test`'s;
+- `--git-ref romsrc-rom --original --check` and `roundtrip` are still
+  the ROM's, and a fresh extraction writes the committed text exactly.
+
+ctests `tools.RExText`, `tools.RExTextROM`.
+
 ## 2026-10-14: Network printers on the reMarkable and the T-Deck Pro
 
 The owner could not print from either device: the reMarkable no longer
