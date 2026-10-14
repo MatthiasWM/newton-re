@@ -213,6 +213,13 @@ not the firmware.  (Its flash was backed up whole first and restored:
 over the board's USB.)  `tools/mesh/meshdecode.py` takes a raw packet
 apart (`HostMeshLastUnreadable()`) and decrypts a channel message.
 
+**Found: a screw missing from the case**, so the board was not held down
+on the antenna's spring contacts.  With the screw in, the same repeater's
+advert came at -102 dBm, SNR +8.8 (from -125 dBm, SNR -9 - about 23 dB),
+and the board heard the mesh through several repeaters, several packets a
+minute.  A board that hears only very strong or very close signals: check
+the antenna's contacts first.
+
 **A message heard by another node but not by this one** is most likely a
 collision: the radio is half-duplex, and a channel message is neither
 acknowledged nor sent again.  A long one is on the air for most of a
