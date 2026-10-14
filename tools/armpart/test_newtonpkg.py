@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Tests for tools/armpart/newtonpkg.py: every package in romsrc/rex (and,
-unless --no-fixtures, every package under fixtures/packages) splits into its
-text form and goes back together byte for byte, and edits - an instruction
+"""Tests for tools/armpart/newtonpkg.py: every package romsrc/rex keeps as
+text (a directory with a package.txt, or a .pkg file) builds and splits
+back into the same text - with the ROM image named by --rom, which names
+the glue as the committed sources do - and, unless --no-fixtures, every
+package under fixtures/packages splits into its text form and goes back
+together byte for byte; and edits - an instruction
 inserted into a protocol part, the package renamed - give a package whose
 parts, relocation chunk and frames parts' refs all moved along.
 
-    python tools/armpart/test_newtonpkg.py [-v] [--packages DIR] [--no-fixtures]
+    python tools/armpart/test_newtonpkg.py [-v] [--packages DIR] [--no-fixtures] [--rom BUILD]
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ import packages			# noqa: E402
 ROOT = os.path.join(HERE, "..", "..")
 PACKAGES_DIR = os.path.join(ROOT, "romsrc", "rex")
 FIXTURES = True		# (fixtures/packages, when the checkout has it)
+ROM_BUILD = None
 
 
 def package_files():
@@ -42,9 +46,23 @@ def package_files():
 	return files
 
 
+def committed():
+	"""The packages romsrc/rex keeps as text: their directories."""
+	return sorted(os.path.dirname(p) for p in glob.glob(os.path.join(PACKAGES_DIR, "*", "package.txt")))
+
+
 def load(name):
-	with open(os.path.join(PACKAGES_DIR, name), "rb") as f:
-		return f.read()
+	"""A package's bytes: name.pkg, or its directory (name without .pkg) built
+	at its base."""
+	path = os.path.join(PACKAGES_DIR, name)
+	if os.path.exists(path):
+		with open(path, "rb") as f:
+			return f.read()
+	return newtonpkg.pack(path[:-len(".pkg")])
+
+
+def base_of(directory):
+	return newtonpkg.read_text(directory).get("base", 0)
 
 
 def directory(data):
@@ -57,9 +75,28 @@ def directory(data):
 
 
 class RoundTrip(unittest.TestCase):
+	def test_committed(self):
+		dirs = committed()
+		self.assertGreaterEqual(len(dirs), 5)
+		rom = newtonarm.RomNames(ROM_BUILD) if ROM_BUILD else None
+		for d in dirs:
+			with self.subTest(package=os.path.relpath(d, ROOT)):
+				data = newtonpkg.pack(d)
+				tmp = tempfile.mkdtemp(prefix="newtonpkg-")
+				try:
+					newtonpkg.unpack(data, tmp, rom, base_of(d))
+					self.assertEqual(newtonpkg.pack(tmp), data)
+					if rom is not None:
+						for name in sorted(os.listdir(d)):
+							with open(os.path.join(d, name), "rb") as a, open(os.path.join(tmp, name), "rb") as b:
+								self.assertEqual(a.read(), b.read(), name)
+				finally:
+					shutil.rmtree(tmp)
+
 	def test_every_package(self):
 		files = package_files()
-		self.assertGreaterEqual(len(files), 5)
+		if not files:
+			self.skipTest("no package files")
 		for path in files:
 			with self.subTest(package=os.path.relpath(path, ROOT)):
 				with open(path, "rb") as f:
@@ -171,4 +208,8 @@ if __name__ == "__main__":
 	if "--no-fixtures" in sys.argv:
 		FIXTURES = False
 		sys.argv.remove("--no-fixtures")
+	if "--rom" in sys.argv:
+		i = sys.argv.index("--rom")
+		ROM_BUILD = sys.argv[i + 1]
+		del sys.argv[i:i + 2]
 	unittest.main()

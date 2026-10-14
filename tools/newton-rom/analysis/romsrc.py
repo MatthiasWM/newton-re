@@ -245,6 +245,10 @@ import rextext						# noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "stores"))
 import newtonstore					# noqa: E402
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "armpart"))
+import newtonpkg					# noqa: E402
+import newtonarm					# noqa: E402
+
 # where a lexicon an edit has grown past its room goes (romsrc.py build
 # --relayout): an address no ROM data uses, the object file's moved table
 # taking the host from the ROM's address to it (ROMMovedAddress)
@@ -731,6 +735,8 @@ class Extractor:
 			cuts |= {e["address"], e["address"] + e["size"]}
 		parts = {}				# a frames part's start -> (its end, its tree's directory)
 		stores = set()			# a soup part's start (a store: tools/stores/newtonstore.py)
+		whole = set()			# a package written whole as text (tools/armpart/newtonpkg.py)
+		self.whole_packages = set()
 		aligns = {}
 		for p in pkgs:
 			cuts |= {p["base"], p["base"] + p["size"]}
@@ -776,14 +782,32 @@ class Extractor:
 		cuts = sorted(c for c in cuts if start <= c <= end)
 		os.makedirs(os.path.join(self.out, "rex"), exist_ok=True)
 		rom = self.rom.rom
+		# a package neither split into a frames tree nor a store (ScreenBuffer,
+		# ScreenDrivers: protocol parts) as text, at its address, when it comes back the same
+		rom_names = None
+		for p in pkgs:
+			if not names.get(p["base"], "").endswith(".pkg"):
+				continue
+			name = names[p["base"]][:-len(".pkg")]
+			where = os.path.join(self.out, "rex", name)
+			try:
+				if rom_names is None:
+					rom_names = newtonarm.RomNames(self.build_dir)
+				newtonpkg.unpack(rom[p["base"]:p["base"] + p["size"]], where, rom_names, p["base"])
+				whole.add(p["base"])
+				self.whole_packages.add("rex/" + name)
+				names[p["base"]] = name + "/"
+			except (newtonpkg.PackageError, newtonarm.AsmError, ValueError):
+				import shutil
+				shutil.rmtree(where, ignore_errors=True)
 		tags = {e["address"]: e["tag"].encode("latin-1") for e in rex["entries"]}
 		# each piece's file: a frames part a tree of its own, a piece that has
 		# a text form (tools/rex/rextext.py) text, any other its bytes
 		pieces = []					# (address, end, rel, its text or None)
 		for a, b in zip(cuts, cuts[1:]):
 			name = names.get(a, "bytes_%x" % a)
-			if a in stores:
-				rel = "rex/" + name		# (a store, written above)
+			if a in stores or a in whole:
+				rel = "rex/" + name		# (a store or a package, written above)
 			elif name.endswith("/"):
 				# a package's frames part: its objects as a tree of their own
 				last, objs, pad, odd = parts[a]
@@ -799,7 +823,10 @@ class Extractor:
 			pieces.append((a, b, rel, None))
 		pieces = self.rex_texts(pieces, start, end, tags)
 		with open(os.path.join(self.out, "rex.tsv"), "w", encoding="utf-8", newline="\n") as f:
-			f.write("# the ROM extension: its pieces in address order (address, file)\n")
+			f.write("# the ROM extension: its pieces in address order (address, file, how): a\n"
+					"# directory a package's frames part as a tree, or with `store` its soup part\n"
+					"# (tools/stores/newtonstore.py), or with `package` the whole package as text\n"
+					"# (tools/armpart/newtonpkg.py)\n")
 			f.write("rex\t%x\t%x\n" % (start, end - start))
 			for a, b, rel, text in pieces:
 				if text is not None:
@@ -808,7 +835,7 @@ class Extractor:
 				elif not rel.endswith("/"):
 					with open(os.path.join(self.out, rel), "wb") as out:
 						out.write(rom[a:b])
-				f.write("%x\t%s%s\n" % (a, rel, "\tstore" if a in stores else ""))
+				f.write("%x\t%s%s\n" % (a, rel, "\tstore" if a in stores else "\tpackage" if a in whole else ""))
 
 	def rex_texts(self, pieces, start, end, tags):
 		"""The pieces of the extension that have a text form
@@ -860,7 +887,15 @@ class Extractor:
 					"# and the package and path of its object; build --relayout moves each with its",
 					"# object and appends the entries of the packages it adds"]))
 			elif t == b"jump":
-				as_text(i, rextext.patch_table_text(data, 0x01a00000 + 0x400000 + (rex_id << 20), where))
+				# (an entry reaching into a package kept whole as source - ScreenBuffer,
+				# ScreenDrivers - names it, so that it follows the package when it moves)
+				def piece_of(address):
+					for pa, pb, prel, _ in out:
+						if prel.endswith("/") and pa <= address < pb and prel[:-1] in self.whole_packages:
+							return prel, address - pa
+					return None
+				as_text(i, rextext.patch_table_text(data, 0x01a00000 + 0x400000 + (rex_id << 20), where,
+													piece_of, layout()))
 			elif t == b"pad ":
 				# (the alignment the piece after it starts on, to a page at most -
 				# what rex_relaid_out keeps)
@@ -2083,12 +2118,24 @@ class Builder:
 				data += b"\0" * ((after - new) % align)
 				continue
 			if how == "rom-form":
-				with open(os.path.join(self.src, rel), "rb") as piece:
-					blob = self.patched(piece.read(), os.path.join(self.src, os.path.splitext(rel)[0] + ".patches.tsv"))
+				if rel.endswith("/"):
+					# a package as text (tools/armpart/newtonpkg.py), built as the package file
+					blob = newtonpkg.pack(os.path.join(self.src, rel))
+				else:
+					with open(os.path.join(self.src, rel), "rb") as piece:
+						blob = piece.read()
+				blob = self.patched(blob, os.path.join(self.src, rel.rstrip("/").rsplit(".", 1)[0] + ".patches.tsv"))
 				blob, entries = rexpackages.rom_form_package(blob, new, fexp_next + len(new_fexp), units)
 				new_fexp += entries
 				head = len(data)
 				data += blob
+				continue
+			if how == "package":
+				# a whole package as text (tools/armpart/newtonpkg.py: its directory,
+				# its protocol parts as ARM source) built at the address it now
+				# falls at, so that its branches out keep reaching the ROM
+				head = len(data)
+				data += newtonpkg.pack(os.path.join(self.src, rel), base=new)
 				continue
 			if how == "store":
 				# a package's soup part, a store as text (tools/stores/newtonstore.py),
@@ -2413,6 +2460,12 @@ class Builder:
 						raise ValueError("rex.tsv: %s was not in the ROM: the tree builds only with --relayout" % fields[1])
 					if int(fields[0], 16) != base + len(data):
 						raise ValueError("rex.tsv: %s is not where the piece before it ends" % fields[1])
+					if len(fields) > 2 and fields[2] == "package":
+						# a whole package as text (tools/armpart/newtonpkg.py)
+						blob = newtonpkg.pack(os.path.join(self.src, fields[1]), base=base + len(data))
+						placed.append((fields[1], len(data), len(blob)))
+						data += blob
+						continue
 					if len(fields) > 2 and fields[2] == "store":
 						# a package's soup part, a store as text (tools/stores/newtonstore.py)
 						blob = newtonstore.pack(os.path.join(self.src, fields[1]))
@@ -2483,7 +2536,7 @@ class Builder:
 # the modules the builder builds with, besides this one: what the stamp is a
 # hash of (all imported above, so a run of any command has them)
 STAMP_MODULES = ("nsfunctions", "nsdecompile", "romdicts", "packages", "romid",
-				 "png", "newtonsfnt", "newtonlex", "newtontables", "inktables", "hwrtables", "newtonpict", "rextext", "newtonstore")
+				 "png", "newtonsfnt", "newtonlex", "newtontables", "inktables", "hwrtables", "newtonpict", "rextext", "newtonstore", "newtonpkg", "newtonarm", "armv4")
 
 
 def builder_stamp():

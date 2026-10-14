@@ -1,0 +1,21 @@
+# A Newton package's directory: python tools/armpart/newtonpkg.py pack DIR OUT.pkg
+# (sizes, offsets, the relocation chunk and the parts' origins are worked out)
+signature package0
+type ' no '
+flags 0x00000000
+version 1
+copyright "© 1994-97 Apple Computer, Inc.\0"
+name "ScreenDrivers\0"
+date 0x00000000
+reserved2 0x00000000
+reserved3 0x00000000
+trailer ""
+pad 0x00
+base 0x7a5700	# the package's address: each part's origin is its address
+
+part 0
+	file part0.s
+	type 0x00000000
+	flags 0x10
+	info ""
+	compressor ""

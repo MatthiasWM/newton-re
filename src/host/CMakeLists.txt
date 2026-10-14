@@ -58,6 +58,9 @@ if(romsrc_can_build AND Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/l
          ${CMAKE_SOURCE_DIR}/../tools/lexicons/*.py
          ${CMAKE_SOURCE_DIR}/../tools/tables/*.py
          ${CMAKE_SOURCE_DIR}/../tools/rex/*.py
+         ${CMAKE_SOURCE_DIR}/../tools/pict/*.py
+         ${CMAKE_SOURCE_DIR}/../tools/stores/*.py
+         ${CMAKE_SOURCE_DIR}/../tools/armpart/*.py
          ${CMAKE_SOURCE_DIR}/../tools/imaging/*.py)
     add_custom_command(OUTPUT ${NEWTON_OBJECTS_FILE}
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/newton-rom/analysis/romsrc.py
@@ -2014,7 +2017,7 @@ set_tests_properties(host.NewtonStream PROPERTIES TIMEOUT 120
 # built into the ROM extension of the object file the default boot runs on
 # (romsrc/rex, romsrc/README.md), so none of these installs it.
 set(NIE_DIR ${CMAKE_SOURCE_DIR}/../fixtures/packages/apple/NIE2)
-if(EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/rex/inetenbl.pkg)
+if(EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/rex/inetenbl/package.txt)
     # the NIE built in (demo/nie-builtin.ns): its three packages active on no
     # store, Internet Setup in the Extras drawer's Setup folder as a
     # built-in, the link grabbed and localhost looked up by its domain
@@ -2529,6 +2532,16 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/layout.tsv)
                          --rom ${NEWTON_ROM_BUILD_DIR}
                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     endif()
+    # the protocol parts as ARM source and packages as text
+    # (tools/armpart/): every committed package builds and splits back to
+    # its text, every protocol part assembles back, edits move what follows
+    add_test(NAME tools.ARMPart
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/armpart/test_newtonarm.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    add_test(NAME tools.NewtonPackageText
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/armpart/test_newtonpkg.py
+                     --rom ${NEWTON_ROM_BUILD_DIR}
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     # the WorldData package's store as text (tools/stores/newtonstore.py):
     # round trip, edits read back; host.NewtonStoreMount mounts an edited
     # copy in a package of its own and queries it

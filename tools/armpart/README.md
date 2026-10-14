@@ -123,10 +123,12 @@ As modules:
 
 In instructions, a branch target, the address of `ldr rd, <e>` (a
 pc-relative load, also `ldrb`/`ldrh`/...) and of `adr rd, <e>` (`add|sub
-rd, pc, #imm`) are expressions. A number as a branch target is an offset
-from the part's start: one outside the part (the ROM extension's parts
-branch straight into the ROM, e.g. `b 0x165aa00` in ScreenBuffer's class
-info) keeps reaching the same place wherever the instruction moves. `adr
+rd, pc, #imm`) are expressions. A number as a target is an address:
+`.origin` plus its offset from the part's start. One outside the part
+keeps reaching the same address wherever the instruction or the part
+moves - the ROM extension's own parts, unpacked with their package's
+address as `base` (below), branch straight into the ROM's patch table:
+`b 0x1e00000` is ScreenBuffer's `fSizeofBranch`. `adr
 rd, label, #30` gives the immediate's rotation: the compiler (Norcroft)
 sometimes rotates a small offset by 30 where the canonical encoding would
 not rotate it, and the source keeps that choice. `#imm8, #rot` is the
@@ -249,6 +251,14 @@ too (its pointer refs are offsets in the package; `packages.py`'s
 longer info string gives a consistent package. Frames parts stay bytes:
 making them source trees is separate work (`romsrc/`'s NewtonScript
 trees).
+
+A package that lies at an address - the ROM extension's own, in the form
+the ROM keeps its packages in (no relocation chunk; refs and branches the
+addresses they reach) - is unpacked with that address as its base
+(`unpack(data, dir, rom, base)`): package.txt then has a `base` line, each
+part's origin is its address, and `pack(dir, base)` builds it at another
+address with its branches out of the part still reaching the same places.
+`romsrc/rex/ScreenBuffer/` and `ScreenDrivers/` are such packages.
 
 `unpack` refuses a package laid out otherwise than this reads (strings
 overlapping, bytes between parts or after the last, a relocation chunk not

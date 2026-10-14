@@ -1,0 +1,105 @@
+# A Newton package's directory: python tools/armpart/newtonpkg.py pack DIR OUT.pkg
+# (sizes, offsets, the relocation chunk and the parts' origins are worked out)
+signature package1
+type 'xxxx'
+flags 0x46000000
+version 2001
+copyright "Copyright ©1997 Newton, Inc.  All rights reserved.\0"
+name "Newton Internet Enabler\0"
+date 0xb0558164
+reserved2 0x00000000
+reserved3 0x00000000
+trailer "Newton Toolkit 1.6.4b2c2\0"
+pad 0xff
+relocation-page-size 1024
+relocation-base 0x0
+relocation-reserved 0x0
+relocation-slack 376
+
+part 0
+	file part0.bin
+	type 'auto'
+	flags 0x81
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+	linked-at 0x804
+
+part 1
+	file part1.bin
+	type 'auto'
+	flags 0x81
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+	linked-at 0x14a0
+
+part 2
+	file part2.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 3
+	file part3.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 4
+	file part4.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 5
+	file part5.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 6
+	file part6.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 7
+	file part7.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 8
+	file part8.bin
+	type 'auto'
+	flags 0x81
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+	linked-at 0x35960
+
+part 9
+	file part9.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 10
+	file part10.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 11
+	file part11.bin
+	type 'auto'
+	flags 0x81
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+	linked-at 0x3e5bc

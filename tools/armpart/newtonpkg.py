@@ -38,8 +38,16 @@ directory (and of the relocation chunk), each but the last padded to four
 with nought.  unpack refuses a package laid out otherwise (with
 overlapping strings, say, or bytes between its parts).
 
-As a module: unpack(data, dir, rom=None), pack(dir) -> bytes,
-roundtrips(data) -> bool.
+A package that lies at an address of its own - one of the ROM
+extension's, in the form the ROM keeps them in (no relocation chunk, its
+refs and branches the addresses they reach) - is unpacked with that
+address as its `base` (a `base` line in package.txt): each part's origin
+is then its address, so a protocol part's branches out of it are written
+as the addresses they reach (the ROM's patch table at 0x01e00000, say),
+and pack(dir, base) puts the parts at another address keeping them so.
+
+As a module: unpack(data, dir, rom=None, base=0), pack(dir, base=None)
+-> bytes, roundtrips(data) -> bool.
 """
 
 from __future__ import annotations
@@ -185,8 +193,9 @@ def build_relocation_chunk(offsets, page_size: int, base: int, reserved: int, sl
 	return struct.pack(">5I", reserved, 20 + len(body) + slack, page_size, len(pages), base) + body + bytes(slack)
 
 
-def read(data: bytes):
-	"""The package's directory as a dict and its parts' bytes; raises
+def read(data: bytes, base: int = 0):
+	"""The package's directory as a dict and its parts' bytes (each part's
+	origin its offset in the package plus base); raises
 	PackageError when the layout is not NTK's (which pack would not give
 	back)."""
 	sig = data[:8]
@@ -266,7 +275,7 @@ def read(data: bytes):
 		start = parts_base + offset
 		blobs.append(data[start:start + psize])
 		part = pkg["parts"][i]
-		part["origin"] = start
+		part["origin"] = base + start
 		part["relocations"] = sorted(r - start for r in relocs if start <= r < start + psize)
 		if any(data[start + psize:start + psize + (-psize % 4)]):
 			raise PackageError("part %d is padded with something other than nought" % i)
@@ -300,10 +309,13 @@ def default_layout(pkg):
 	return keys + ["trailer"]
 
 
-def unpack(data: bytes, directory: str, rom=None) -> None:
+def unpack(data: bytes, directory: str, rom=None, base: int = 0) -> None:
 	"""Writes the package's text form to directory (made afresh); raises
-	PackageError unless packing it gives the package back exactly."""
-	pkg, blobs = read(data)
+	PackageError unless packing it gives the package back exactly.  base:
+	the package's address, when it lies at one (the ROM extension's)."""
+	pkg, blobs = read(data, base)
+	if base and pkg["flags"] & RELOCATION_FLAG:
+		raise PackageError("a package with a relocation chunk is linked at 0, not at a base")
 	if os.path.isdir(directory):
 		shutil.rmtree(directory)
 	os.makedirs(directory)
@@ -326,6 +338,8 @@ def unpack(data: bytes, directory: str, rom=None) -> None:
 	lines += [
 		"pad 0x%02x" % pkg["pad"],
 	]
+	if base:
+		lines.append("base 0x%x\t# the package's address: each part's origin is its address" % base)
 	if "relocation" in pkg:
 		r = pkg["relocation"]
 		lines += ["relocation-page-size %d" % r["page_size"], "relocation-base 0x%x" % r["base"],
@@ -365,7 +379,7 @@ def read_text(directory: str):
 	part = None
 	with open(os.path.join(directory, "package.txt"), encoding="utf-8") as f:
 		for number, raw in enumerate(f, 1):
-			s = raw.strip()
+			s = raw.split("#", 1)[0].strip() if raw.lstrip().startswith("base ") else raw.strip()
 			if not s or s.startswith("#"):
 				continue
 			key, _, value = s.partition(" ")
@@ -394,7 +408,7 @@ def read_text(directory: str):
 					pkg["signature"] = value
 				elif key == "type":
 					pkg["type"] = fourcc_value(value)
-				elif key in ("flags", "version", "date", "reserved2", "reserved3", "pad"):
+				elif key in ("flags", "version", "date", "reserved2", "reserved3", "pad", "base"):
 					pkg[key] = int(value, 0)
 				elif key in ("copyright", "name"):
 					pkg[key] = utf16_bytes(value)
@@ -412,10 +426,13 @@ def read_text(directory: str):
 	return pkg
 
 
-def pack(directory: str) -> bytes:
-	"""The package built from its text form."""
+def pack(directory: str, base: int = None) -> bytes:
+	"""The package built from its text form, at base (the package's address:
+	package.txt's `base`, 0 if it has none, unless given)."""
 	import packages			# tools/newton-rom/analysis: rebase_frames_part
 	pkg = read_text(directory)
+	if base is None:
+		base = pkg.get("base", 0)
 	parts = pkg["parts"]
 	align = 8 if pkg["signature"] == "package0" else 4
 	# the directory: header, entries, strings (offsets worked out)
@@ -460,6 +477,8 @@ def pack(directory: str) -> bytes:
 	chunk = b""
 	reloc = pkg.get("relocation")
 	if pkg["flags"] & RELOCATION_FLAG:
+		if base:
+			raise PackageError("a package with a relocation chunk is linked at 0, not at a base")
 		reloc = reloc or {"page_size": 1024, "base": 0, "reserved": 0, "slack": 0}
 		chunk_size = 20
 		for _ in range(16):
@@ -479,7 +498,7 @@ def pack(directory: str) -> bytes:
 	else:
 		built = {}
 		for p, off in zip(parts, offsets):
-			built[id(p)] = place(p, sources, dir_size + off, directory, packages, align)
+			built[id(p)] = place(p, sources, base + dir_size + off, directory, packages, align)
 			if built[id(p)][1]:
 				raise PackageError("part %d has relocations but the package has no kRelocationFlag" % p["index"])
 	body = bytearray()

@@ -1,0 +1,94 @@
+# A Newton package's directory: python tools/armpart/newtonpkg.py pack DIR OUT.pkg
+# (sizes, offsets, the relocation chunk and the parts' origins are worked out)
+signature package1
+type 'xxxx'
+flags 0x06000000
+version 1
+copyright "Copyright ©1997 Newton, Inc.  All rights reserved.\0"
+name " Newton Devices\0"
+date 0xb0557fe4
+reserved2 0x00000000
+reserved3 0x00000000
+trailer "Newton Toolkit 1.6.4b2c2"
+pad 0x00
+relocation-page-size 1024
+relocation-base 0x0
+relocation-reserved 0x0
+relocation-slack 256
+
+part 0
+	file part0.bin
+	type 'auto'
+	flags 0x81
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+	linked-at 0x5a0
+
+part 1
+	file part1.bin
+	type 'auto'
+	flags 0x81
+	info ":ObjectsNoDebug:NameServerInterface.sym@0x0000029C"
+	compressor ""
+	linked-at 0xae0
+	relocations 0x2d8 0x42c 0x600 0x838 0x87c 0x880 0x884
+
+part 2
+	file part2.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 3
+	file part3.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 4
+	file part4.s
+	type 'cdhl'
+	flags 0x1b0
+	info "TLanternCardHandler"
+	compressor ""
+
+part 5
+	file part5.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 6
+	file part6.bin
+	type 'auto'
+	flags 0x81
+	info ":ObjectsNoDebug:LanternNewtAPI.sym@0x00002B28"
+	compressor ""
+	linked-at 0x6c48
+	relocations 0x2c78 0x2cf8 0x33e8 0x362c 0x3c6c 0x3ed0 0x3ed4 0x3ed8
+
+part 7
+	file part7.bin
+	type 'auto'
+	flags 0x81
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+	linked-at 0xc95c
+
+part 8
+	file part8.s
+	type 0x00000000
+	flags 0x30
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+
+part 9
+	file part9.bin
+	type 'auto'
+	flags 0x81
+	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
+	compressor ""
+	linked-at 0x1095c

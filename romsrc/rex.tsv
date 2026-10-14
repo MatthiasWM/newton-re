@@ -1,6 +1,9 @@
-# the ROM extension: its pieces in address order (address, file); a piece at
-# address - was not in the ROM - `rom-form` is a package file put into the
-# form the ROM keeps its packages in where it falls (romsrc/README.md)
+# the ROM extension: its pieces in address order (address, file, how): a
+# directory a package's frames part as a tree, or with `store` its soup part
+# (tools/stores/newtonstore.py), or with `package` the whole package as text
+# (tools/armpart/newtonpkg.py); a piece at address - was not in the ROM -
+# `rom-form` is a package (as text, newtonpkg.py's) put into the form the
+# ROM keeps its packages in where it falls (romsrc/README.md)
 rex	71fc4c	ce3fc
 71fc4c	rex/header.txt
 71fcf8	rex/dio_71fcf8.txt
@@ -18,15 +21,15 @@ rex	71fc4c	ce3fc
 774070	rex/help_book/
 7850d0	rex/ListView.head.txt
 78517c	rex/ListView/
-7a5554	rex/ScreenBuffer.pkg
-7a5700	rex/ScreenDrivers.pkg
+7a5554	rex/ScreenBuffer/	package
+7a5700	rex/ScreenDrivers/	package
 7a67fc	rex/Setup.head.txt
 7a6914	rex/Setup/
 7b4d20	rex/WorldData.head.txt
 7b4e00	rex/WorldData/	store
--	rex/newtdev.pkg	rom-form
--	rex/inetenbl.pkg	rom-form
--	rex/inetstup.pkg	rom-form
+-	rex/newtdev/	rom-form
+-	rex/inetenbl/	rom-form
+-	rex/inetstup/	rom-form
 7ebfc8	rex/pad_7ebfc8.txt
 7ec000	rex/ptpt_7ec000.txt
 7ec400	rex/glpt_7ec400.txt

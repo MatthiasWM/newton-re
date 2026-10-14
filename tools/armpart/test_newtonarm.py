@@ -8,8 +8,9 @@ along, and the assembler's encodings mean what capstone says they mean
 
     python tools/armpart/test_newtonarm.py [-v] [--packages DIR]
 
-DIR (default romsrc/rex) holds ScreenBuffer.pkg, ScreenDrivers.pkg,
-newtdev.pkg, inetenbl.pkg and inetstup.pkg.
+DIR (default romsrc/rex) holds ScreenBuffer, ScreenDrivers, newtdev,
+inetenbl and inetstup, each a .pkg or the directory newtonpkg.py unpacks
+one into.
 """
 
 from __future__ import annotations
@@ -43,12 +44,22 @@ except ImportError:
 	capstone = None
 
 
+def package_bytes(name):
+	"""A package's bytes: DIR/name, or the directory romsrc keeps it as
+	(tools/armpart/newtonpkg.py) built at its base."""
+	path = os.path.join(PACKAGES_DIR, name)
+	if os.path.exists(path):
+		with open(path, "rb") as f:
+			return f.read()
+	import newtonpkg
+	return newtonpkg.pack(path[:-len(".pkg")])
+
+
 def corpus():
 	"""(package name, ProtocolPart) for every protocol part."""
 	out = []
 	for name in PACKAGES:
-		with open(os.path.join(PACKAGES_DIR, name), "rb") as f:
-			pkg = f.read()
+		pkg = package_bytes(name)
 		for pp in newtonarm.protocol_parts(pkg):
 			out.append((name, pp))
 	return out
@@ -123,8 +134,11 @@ class RoundTrip(unittest.TestCase):
 			for r in pp.relocations:
 				self.assertEqual(struct.unpack_from(">I", moved.data, r)[0],
 					struct.unpack_from(">I", pp.data, r)[0] + 0x100)
+			pkg = os.path.join(tmp, "ScreenBuffer.pkg")
+			with open(pkg, "wb") as f:
+				f.write(package_bytes("ScreenBuffer.pkg"))
 			with contextlib.redirect_stdout(io.StringIO()) as out:
-				self.assertEqual(newtonarm.main(["check", os.path.join(PACKAGES_DIR, "ScreenBuffer.pkg")]), 0)
+				self.assertEqual(newtonarm.main(["check", pkg]), 0)
 			self.assertIn("part 0: identical", out.getvalue())
 		finally:
 			shutil.rmtree(tmp)
@@ -237,7 +251,7 @@ class Edits(unittest.TestCase):
 		msg = r.labels["msg"]
 		self.assertEqual(w(0), armv4.encode("add r0, pc, #%d" % (msg - 8)))
 		self.assertEqual(w(4), armv4.encode("ldr r1, [pc, #%d]" % (r.labels["value"] - 12)))
-		self.assertEqual(w(12) & 0xFFFFFF, (0x1000 - 20) >> 2)
+		self.assertEqual(w(12) & 0xFFFFFF, (0x1000 - 0x100 - 20) >> 2)		# (an address: .origin + offset)
 		self.assertEqual(w(r.labels["value"]), 0x100 + msg)
 		self.assertEqual(r.relocations, [r.labels["value"]])
 		self.assertEqual(w(r.labels["value"] + 4), msg - (r.labels["value"] + 4))

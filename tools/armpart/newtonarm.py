@@ -38,9 +38,11 @@ The source (tools/armpart/README.md has the details):
     .byte n, ...  .ascii "..."  .asciz "..."  .space n  .align n
     b loc_0124 / ldr r1, lit_00c8 / adr r0, ClassInfoTable / ...
                                 ARMv4 instructions (armv4.py has the syntax);
-                                a branch to a number goes to that offset
-                                from the part's start (one outside the part
-                                keeps reaching the same place); `adr rd,
+                                a branch (or pc-relative load) to a number
+                                goes to that address - .origin plus its
+                                offset from the part's start - so one out of
+                                the part keeps reaching the same place when
+                                the part moves; `adr rd,
                                 label, #30` keeps a rotation the compiler chose
 
 As a module: unpack(part, path, relocations=(), origin=0, rom=None) ->
@@ -495,6 +497,14 @@ class Part:
 							t = candidate
 					except AsmError:
 						pass
+				elif insn.ref is not None and self.origin:
+					# a target outside the part: the address it reaches (.origin + offset)
+					candidate = insn.template.format(armv4.hexaddr(self.origin + insn.ref[1]))
+					try:
+						if armv4.encode(candidate, self.origin + a) == w:
+							t = candidate
+					except AsmError:
+						pass
 				lines.append(line("\t" + t, comment))
 				a += 4
 				continue
@@ -772,6 +782,7 @@ def assemble(text: str, origin=None, name: str = "<source>") -> Assembled:
 			raise AsmError("%s:%d: %s" % (name, number, e))
 	if origin is None:
 		origin = file_origin
+	placed = {k: origin + v for k, v in labels.items()}		# (the labels' addresses)
 	out = bytearray()
 	relocations = []
 	for number, at, kind, arg in items:
@@ -784,7 +795,10 @@ def assemble(text: str, origin=None, name: str = "<source>") -> Assembled:
 				out += struct.pack(">I", (origin + evaluate(arg, labels, at)) & 0xFFFFFFFF)
 				relocations.append(at)
 			else:
-				out += struct.pack(">I", armv4.encode(arg, at, lambda e: evaluate(e, labels, at)))
+				# encoded at its address, .origin + offset: a target given as a
+				# number is an address, and stays one when the part moves
+				here = origin + at
+				out += struct.pack(">I", armv4.encode(arg, here, lambda e: evaluate(e, placed, here)))
 		except (AsmError, ValueError, KeyError, IndexError) as e:
 			raise AsmError("%s:%d: %s" % (name, number, e))
 	return Assembled(bytes(out), relocations, origin, labels, {number: at for number, at, _, _ in items})

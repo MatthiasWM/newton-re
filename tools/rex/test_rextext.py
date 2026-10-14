@@ -43,6 +43,16 @@ def committed():
 	return layout, out
 
 
+def whole_package_at(layout, address):
+	"""(a package rex.tsv keeps whole as text - a directory with a
+	package.txt - that address is in, the offset), or None."""
+	for rel, offset, size in layout.pieces:
+		if rel.endswith("/") and os.path.exists(os.path.join(ROMSRC, rel, "package.txt")) \
+				and layout.base + offset <= address < layout.base + offset + size:
+			return rel, address - layout.base - offset
+	return None
+
+
 def text_piece(text):
 	return rextext._from_text(text)
 
@@ -55,7 +65,7 @@ def read(rel):
 class RoundTrip(unittest.TestCase):
 	def test_committed(self):
 		layout, pieces = committed()
-		self.assertEqual(len(pieces), 19)			# the header, 3 config tables, 7 directories, 3 pads, 2 page tables, 'fexp, 'jump; gParamBlock
+		self.assertEqual(len(pieces), 20)			# the header, 3 config tables, 8 directories, 3 pads, 2 page tables, 'fexp, 'jump; gParamBlock
 		rom = None
 		if ROM_BUILD:
 			with open(os.path.join(ROM_BUILD, "rom.bin"), "rb") as f:
@@ -82,7 +92,7 @@ class RoundTrip(unittest.TestCase):
 		if isinstance(piece, rextext.Refs):
 			return rextext.refs_text(data)
 		if isinstance(piece, rextext.PatchTable):
-			return rextext.patch_table_text(data, piece.at)
+			return rextext.patch_table_text(data, piece.at, piece_of=lambda a: whole_package_at(layout, a), layout=layout)
 		if isinstance(piece, rextext.Pad):
 			return rextext.pad_text(data, address, piece.align)
 		if isinstance(piece, rextext.PackageDirectory):
@@ -154,13 +164,22 @@ class Edits(unittest.TestCase):
 		self.assertEqual(after[base + info_off:base + info_off + info_len], b"A Newton Toolkit application")
 
 	def test_patch_target(self):
+		layout, _ = committed()
 		text = read("rex/jump_7ee000.txt")
-		piece = text_piece(text.replace("0x007a5698", "0x007a56a8", 1))
-		word = struct.unpack_from(">I", piece.data(), 4)[0]
+		# an entry given as an address
+		piece = text_piece(text.replace("rex/ScreenBuffer/\t+0x144", "0x007a56a8", 1))
+		word = struct.unpack_from(">I", piece.render(layout, "rex/jump_7ee000.txt"), 4)[0]
 		self.assertEqual(rextext.branch(0x01e00004, 0x007a56a8, "test"), word)
 		self.assertEqual(word >> 24, 0xea)
 		with self.assertRaises(ValueError):
-			text_piece(text.replace("0x007a5698", "0x007a5699", 1)).data()		# not a word's address
+			text_piece(text.replace("rex/ScreenBuffer/\t+0x144", "0x007a5699", 1)).render(layout, "rex/jump_7ee000.txt")		# not a word's address
+		# an entry naming a piece follows it where it lies
+		moved = rextext.Layout(layout.base, layout.length, [(rel, offset + (0x100 if rel == "rex/ScreenBuffer/" else 0), size)
+														  for rel, offset, size in layout.pieces])
+		word = struct.unpack_from(">I", text_piece(text).render(moved, "rex/jump_7ee000.txt"), 4)[0]
+		self.assertEqual(rextext.branch(0x01e00004, 0x007a5554 + 0x100 + 0x144, "test"), word)
+		with self.assertRaises(ValueError):
+			text_piece(text).data()						# (it needs the layout)
 
 	def test_param_block(self):
 		text = read("romdata/gParamBlock.txt")

@@ -1,24 +1,26 @@
 # the ROM extension's C patch table 'jump (written by romsrc.py extract, built by
 # tools/rex/rextext.py): ARM branches, each encoded relative to its own virtual address
 # - `at` the table's (0x01e00000 + the extension's id MB: BuildPatchTablePageTable
-# 0x00183230, the page tables 'ptpt and 'glpt) - each line the address it branches to
+# 0x00183230, the page tables 'ptpt and 'glpt) - each line the address it branches to,
+# or the piece of rex.tsv it branches into and the offset there (built where the piece
+# now lies)
 format patch-table
 at	0x01e00000
-0x007a5690	# 0: ScreenBuffer.pkg +0x13c
-0x007a5698	# 1: ScreenBuffer.pkg +0x144
-0x007a569c	# 2: ScreenBuffer.pkg +0x148
-0x007a56a0	# 3: ScreenBuffer.pkg +0x14c
-0x007a56cc	# 4: ScreenBuffer.pkg +0x178
-0x007a5878	# 5: ScreenDrivers.pkg +0x178
-0x007a5bfc	# 6: ScreenDrivers.pkg +0x4fc
-0x007a5e48	# 7: ScreenDrivers.pkg +0x748
-0x007a587c	# 8: ScreenDrivers.pkg +0x17c
-0x007a5880	# 9: ScreenDrivers.pkg +0x180
-0x007a5a04	# 10: ScreenDrivers.pkg +0x304
-0x007a5ea4	# 11: ScreenDrivers.pkg +0x7a4
-0x007a5a84	# 12: ScreenDrivers.pkg +0x384
-0x007a5adc	# 13: ScreenDrivers.pkg +0x3dc
-0x007a5bf4	# 14: ScreenDrivers.pkg +0x4f4
-0x007a5ea0	# 15: ScreenDrivers.pkg +0x7a0
-0x007a5a7c	# 16: ScreenDrivers.pkg +0x37c
-0x007a5a80	# 17: ScreenDrivers.pkg +0x380
+rex/ScreenBuffer/	+0x13c	# 0: 0x007a5690
+rex/ScreenBuffer/	+0x144	# 1: 0x007a5698
+rex/ScreenBuffer/	+0x148	# 2: 0x007a569c
+rex/ScreenBuffer/	+0x14c	# 3: 0x007a56a0
+rex/ScreenBuffer/	+0x178	# 4: 0x007a56cc
+rex/ScreenDrivers/	+0x178	# 5: 0x007a5878
+rex/ScreenDrivers/	+0x4fc	# 6: 0x007a5bfc
+rex/ScreenDrivers/	+0x748	# 7: 0x007a5e48
+rex/ScreenDrivers/	+0x17c	# 8: 0x007a587c
+rex/ScreenDrivers/	+0x180	# 9: 0x007a5880
+rex/ScreenDrivers/	+0x304	# 10: 0x007a5a04
+rex/ScreenDrivers/	+0x7a4	# 11: 0x007a5ea4
+rex/ScreenDrivers/	+0x384	# 12: 0x007a5a84
+rex/ScreenDrivers/	+0x3dc	# 13: 0x007a5adc
+rex/ScreenDrivers/	+0x4f4	# 14: 0x007a5bf4
+rex/ScreenDrivers/	+0x7a0	# 15: 0x007a5ea0
+rex/ScreenDrivers/	+0x37c	# 16: 0x007a5a7c
+rex/ScreenDrivers/	+0x380	# 17: 0x007a5a80

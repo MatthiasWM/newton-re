@@ -508,33 +508,57 @@ def branch(at: int, target: int, where: str) -> int:
 
 
 class PatchTable(Piece):
+	"""Each entry the address its branch reaches, or a piece of rex.tsv (a
+	package built from source, which moves when the pieces before it grow)
+	and the offset in it: `rex/ScreenBuffer/ +0x13c`."""
 	format = "patch-table"
 
 	def __init__(self, body):
 		self.at = None
-		self.targets = []
+		self.targets = []				# (address or None, piece or None, offset, where)
 		for where, t in body:
 			if t[0] == "at":
 				expect(t, 2, where)
 				self.at = number(t[1], where)
+				continue
+			if self.at is None:
+				raise ValueError("%s: an entry before `at`" % where)
+			if len(t) == 2 and isinstance(t[1], str) and t[1].startswith("+"):
+				self.targets.append((None, t[0], number(t[1][1:], where), where))
 			else:
 				expect(t, 1, where)
-				if self.at is None:
-					raise ValueError("%s: an entry before `at`" % where)
-				self.targets.append((number(t[0], where), where))
+				self.targets.append((number(t[0], where), None, 0, where))
+		self.needs_layout = any(piece is not None for _, piece, _, _ in self.targets)
+
+	def size(self, address):
+		return 4 * len(self.targets)
 
 	def data(self):
-		return b"".join(struct.pack(">I", branch(self.at + 4 * i, target, where))
-						for i, (target, where) in enumerate(self.targets))
+		if self.needs_layout:
+			raise ValueError("a patch-table whose entries name pieces needs the pieces around it")
+		return self.render(None, None)
+
+	def render(self, layout, rel):
+		out = []
+		for i, (target, piece, offset, where) in enumerate(self.targets):
+			if piece is not None:
+				target = layout.base + layout.at(piece, where)[0] + offset
+			out.append(struct.pack(">I", branch(self.at + 4 * i, target, where)))
+		return b"".join(out)
 
 
-def patch_table_text(data: bytes, at: int, comment=lambda address: None):
+def patch_table_text(data: bytes, at: int, comment=lambda address: None, piece_of=None, layout=None):
+	"""piece_of(address) -> (rel, offset) or None: an entry reaching into a
+	piece that moves with the layout, written as that piece and the offset
+	(checked against layout)."""
 	if len(data) % 4:
 		return None
 	text = ["# the ROM extension's C patch table 'jump (written by romsrc.py extract, built by",
 			"# tools/rex/rextext.py): ARM branches, each encoded relative to its own virtual address",
 			"# - `at` the table's (0x01e00000 + the extension's id MB: BuildPatchTablePageTable",
-			"# 0x00183230, the page tables 'ptpt and 'glpt) - each line the address it branches to",
+			"# 0x00183230, the page tables 'ptpt and 'glpt) - each line the address it branches to,",
+			"# or the piece of rex.tsv it branches into and the offset there (built where the piece",
+			"# now lies)",
 			"format patch-table",
 			"at\t0x%08x" % at]
 	for i, w in enumerate(struct.unpack(">%dI" % (len(data) // 4), data)):
@@ -545,8 +569,14 @@ def patch_table_text(data: bytes, at: int, comment=lambda address: None):
 			offset -= 0x1000000
 		target = (at + 4 * i + 8 + 4 * offset) & 0xffffffff
 		c = comment(target)
-		text.append("0x%08x\t# %d%s" % (target, i, ": " + c if c else ""))
+		found = piece_of(target) if piece_of else None
+		if found:
+			text.append("%s\t+0x%x\t# %d: 0x%08x" % (found[0], found[1], i, target))
+		else:
+			text.append("0x%08x\t# %d%s" % (target, i, ": " + c if c else ""))
 	text = "\n".join(text) + "\n"
+	if layout is not None:
+		return text if _rendered(text, layout, None) == data else None
 	return text if _packed(text) == data else None
 
 
