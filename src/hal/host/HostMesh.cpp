@@ -406,6 +406,8 @@ public:
 		RecordMessage("", name, channelName, text, timestamp);
 	}
 
+	int ErrFlags() const { return _err_flags; }
+
 	// what was heard, counted (HostMeshStatus): every packet the dispatcher
 	// parsed, before it is known to be a repeat
 	void logRxRaw(float snr, float rssi, const uint8_t*, int) override
@@ -918,6 +920,10 @@ HostMeshRun(const HostMeshPlatform* platform)
 			gStatus.packetsSent = (long) (node->getNumSentFlood() + node->getNumSentDirect());
 			gStatus.radioErrors = platform->radioErrors != NULL ? platform->radioErrors(platform->ref) : -1;
 			gStatus.radioRecoveries = recoveries;
+			long idleMs = 0;
+			gStatus.radioIdleRestarts = platform->radioIdle != NULL ? platform->radioIdle(platform->ref, &idleMs) : -1;
+			gStatus.radioIdleMs = idleMs;
+			gStatus.errFlags = node->ErrFlags();
 			gStatus.noiseFloor = platform->radio->getNoiseFloor();
 		}
 

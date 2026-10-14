@@ -149,6 +149,9 @@ struct HostMeshPlatform
 	// interrupt missed is found (its line still raised) and handed on;
 	// ==> how many times so far (NULL: not watched)
 	long			(*radioCheck)(void* ref);
+	// how often the radio was found out of receive (neither receiving nor
+	// sending) and put back, and for how long all told (NULL: not watched)
+	long			(*radioIdle)(void* ref, long* idleMs);
 };
 
 // The engine's thread
@@ -187,6 +190,9 @@ struct HostMeshStatusInfo
 	int						lastUnknownHash;	// the last of those's channel hash (-1: none)
 	long					radioErrors;
 	long					radioRecoveries;	// the radio's interrupt found missed (-1: not watched)
+	long					radioIdleRestarts;	// the radio found out of receive, put back (-1: not watched)
+	long					radioIdleMs;		// ... how long it had been out, all told
+	int						errFlags;			// MeshCore's dispatcher's (ERR_EVENT_*: 1 pool full, 2 channel busy too long, 4 not receiving for 8 s)
 	int						noiseFloor;			// dBm, MeshCore's sampling (0: not yet)
 	float					lastRssi, lastSnr;
 };

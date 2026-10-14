@@ -158,7 +158,17 @@ this node's could or could not decrypt, `lastUnknownHash` the last such
 channel hash), `radioErrors` (the radio's CRC errors; nil where not
 counted), `radioRecoveries` (the board's DIO1 found raised for more than
 250 ms - a missed interrupt, handed on late; nil where not watched),
-`noiseFloor` (MeshCore's sampling, dBm), `lastRssi`, `lastSnr`.  On the
+`radioIdleRestarts` / `radioIdleMs` (the board reads the chip's own mode
+every 100 ms; out of receive for more than a second while MeshCore's
+wrapper thinks it is receiving, it is put back and counted - nil where
+not watched), `errFlags` (MeshCore's dispatcher's: 1 packet pool full, 2
+channel busy too long, 4 not receiving for 8 s), `noiseFloor` (MeshCore's
+sampling, dBm), `lastRssi`, `lastSnr`.  **RadioLib's
+`SX126x::getStatus()` always says 0** (it reads no byte after the
+command); the board reads the status byte itself
+(`TDeckRadioHal::ReadStatus`) - the first try at the watchdog used
+`getStatus`, took every reading for "out of receive" and restarted the
+receiver each second.  On the
 board, 2026-10-14: noise floor -118 dBm, packets decoded down to -127 dBm
 / SNR -9, no interrupt missed in half an hour.
 

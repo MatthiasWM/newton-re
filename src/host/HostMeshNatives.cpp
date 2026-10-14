@@ -77,6 +77,9 @@ FHostMeshStatus(RefArg /*rcvr*/)
 	SetSlot(status, "lastUnknownHash", info.lastUnknownHash >= 0 ? RefVar(MAKEINT(info.lastUnknownHash)) : RefVar(NILREF));
 	SetSlot(status, "radioErrors", info.radioErrors >= 0 ? RefVar(MAKEINT(info.radioErrors)) : RefVar(NILREF));
 	SetSlot(status, "radioRecoveries", info.radioRecoveries >= 0 ? RefVar(MAKEINT(info.radioRecoveries)) : RefVar(NILREF));
+	SetSlot(status, "radioIdleRestarts", info.radioIdleRestarts >= 0 ? RefVar(MAKEINT(info.radioIdleRestarts)) : RefVar(NILREF));
+	SetSlot(status, "radioIdleMs", RefVar(MAKEINT(info.radioIdleMs)));
+	SetSlot(status, "errFlags", RefVar(MAKEINT(info.errFlags)));
 	SetSlot(status, "noiseFloor", RefVar(MAKEINT(info.noiseFloor)));
 	SetSlot(status, "lastRssi", RefVar(MAKEINT((long) info.lastRssi)));
 	SetSlot(status, "lastSnr", RefVar(MAKEINT((long) info.lastSnr)));

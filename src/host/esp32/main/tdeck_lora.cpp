@@ -226,6 +226,26 @@ public:
 
 	void spiEnd() override { }
 
+	// The chip's status byte, read itself: GetStatus (0xC0) answers with it
+	// on the byte after the command.  (RadioLib's SX126x::getStatus reads no
+	// bytes after the command and so always says 0.)  The engine's thread
+	// only, between RadioLib's own exchanges; BUSY is waited for as RadioLib
+	// waits for it.
+	uint8_t ReadStatus()
+	{
+		int64_t until = esp_timer_get_time() + 10 * 1000;
+		while (gpio_get_level((gpio_num_t) PIN_LORA_BUSY) != 0)
+			if (esp_timer_get_time() > until)
+				return 0;
+		uint8_t out[2] = { 0xC0, 0x00 }, in[2] = { 0, 0 };
+		spiBeginTransaction();
+		digitalWrite(PIN_LORA_CS, 0);
+		spiTransfer(out, 2, in);
+		digitalWrite(PIN_LORA_CS, 1);
+		spiEndTransaction();
+		return in[1];
+	}
+
 	// A missed interrupt (the engine's loop, each time round): DIO1 is raised
 	// on a packet received or sent and lowered when the engine clears the
 	// radio's flags - at most a loop or two later.  Raised for longer, its
@@ -453,10 +473,66 @@ RadioErrors(void*)
 }
 
 
+// The radio out of receive (the engine's loop, each time round): the chip's
+// own mode read every 100 ms (TDeckRadioHal::ReadStatus, bits 6-4: 2/3 standby, 4 frequency
+// synthesis, 5 receiving, 6 transmitting).  Standing by is brief between a
+// packet and the next startReceive, or a send and the next; for more than a
+// second while MeshCore's wrapper thinks it is receiving, the radio is deaf
+// and nothing in MeshCore notices (its own check sees only the wrapper's
+// state) - it is put back into receive.
+static long			gIdleRestarts = 0;
+static long			gIdleMs = 0;
+static int64_t		gIdleSince = 0, gLastModeCheck = 0;
+
+static void
+CheckMode(void)
+{
+	int64_t now = esp_timer_get_time();
+	if (now - gLastModeCheck < 100 * 1000)
+		return;
+	gLastModeCheck = now;
+	if (!gDriver.isInRecvMode())
+	{
+		gIdleSince = 0;							// (sending, or between: MeshCore's business)
+		return;
+	}
+	uint8_t mode = (gHal.ReadStatus() >> 4) & 7;
+	if (mode == 0)
+		return;									// (not read: BUSY stayed up)
+	if (mode == 5 || mode == 6)
+	{
+		gIdleSince = 0;
+		return;
+	}
+	if (gIdleSince == 0)
+		gIdleSince = now;
+	else if (now - gIdleSince > 1000 * 1000)
+	{
+		gIdleRestarts++;
+		gIdleMs += (long) ((now - gIdleSince) / 1000);
+		printf("[mesh] the radio was out of receive (mode %d) for %ld ms: put back (%ld so far)\n", mode,
+			   (long) ((now - gIdleSince) / 1000), gIdleRestarts);
+		gIdleSince = 0;
+		gRadio.startReceive();
+	}
+}
+
+
 static long
 RadioCheck(void*)
 {
-	return gRadioUp ? gHal.Check() : 0;
+	if (!gRadioUp)
+		return 0;
+	CheckMode();
+	return gHal.Check();
+}
+
+
+static long
+RadioIdle(void*, long* idleMs)
+{
+	*idleMs = gIdleMs;
+	return gIdleRestarts;
 }
 
 
@@ -503,6 +579,7 @@ HostDeviceLoraStart(void)
 	gPlatform.defaultName = "T-Deck Newton";
 	gPlatform.radioErrors = RadioErrors;
 	gPlatform.radioCheck = RadioCheck;
+	gPlatform.radioIdle = RadioIdle;
 	HostMeshWillRun();					// (the Newton's side boots while the radio starts)
 
 	// the engine's task: its stack in PSRAM (core 0, beside the WiFi's and the
