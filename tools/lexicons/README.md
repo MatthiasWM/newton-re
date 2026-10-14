@@ -89,3 +89,16 @@ edits read back as they should); `lexicon_edit_test.py` (ctest
 `host.ROMSourceLexiconEdit`: "zorbleflax" added to
 `gEnum80sh_words.words`, the tree built, and `LookupWord` on the booted
 machine knows it).
+
+## The locales' dictionaries (`romsrc/resources/AirusA/`)
+
+Seven more Airus dictionaries are NewtonScript binaries of class
+`'AirusA` rather than ROM data: the locale bundles' `dateDictionary`,
+`timeDictionary`, `numberDictionary` and `phoneDictionary` (and
+`obj_4a1d1d`), the grammars a locale other than the built-in one gives
+the date, time, number and phone readers. They are the same dictionaries
+without the size word in front, so `romsrc/` keeps them in the same text:
+`lexicon('AirusA, "resources/AirusA/<addr>.lex")` in the object files,
+which `romsrc.py build` packs with `newtonlex.pack` and takes the size
+word off (`romsrc.py extract` writes them so when they come back the
+same; all seven do).

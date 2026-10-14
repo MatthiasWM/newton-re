@@ -144,6 +144,11 @@ constructors of its own):
                     locale's break table ('Intl) as text whose `format`
                     line says which: tools/tables/newtontables.py packs it
                     (tools/tables/README.md)
+    lexicon('AirusA, "resources/AirusA/addr.lex")   an Airus dictionary
+                    (a locale's date, time, number or phone grammar) as the
+                    text tools/lexicons/newtonlex.py writes for the ROM's
+                    lexicons: a word list (.words) or a lexical graph (.lex);
+                    packed on build (tools/lexicons/README.md)
     sound('samples, "resources/samples/addr.wav")   the samples of a
                     simple sound (8-bit, uncompressed: offset binary, as a
                     WAV file's 8-bit samples are); the sampling rate stays
@@ -932,6 +937,20 @@ class Extractor:
 			except ValueError:
 				pass
 			os.remove(where)
+		if cname == "AirusA" and not self.in_function and len(data) > 1 and (data[1] & 7) in (1, 2, 3, 5, 7):
+			sized = struct.pack(">I", len(data)) + data
+			rel = "resources/%s/%x%s" % (folder, o, newtonlex.text_suffix(sized))
+			where = os.path.join(self.out, rel)
+			os.makedirs(os.path.dirname(where), exist_ok=True)
+			try:
+				newtonlex.unpack(sized, where)
+				if newtonlex.pack(where) == sized:
+					return "lexicon(%s, \"%s\")" % (self.value(cls, path + "^"), rel)
+			except (ValueError, IndexError, KeyError):
+				pass
+			os.remove(where)
+		if cname == "instructions" and not self.in_function and len(data) <= 64:
+			return "bytes(%s, \"%s\")" % (self.value(cls, path + "^"), data.hex())
 		if cname == "sfnt" and not self.in_function:
 			rel = "resources/%s/%x" % (folder, o)
 			where = os.path.join(self.out, rel)
@@ -1444,7 +1463,7 @@ class Reader:
 		if kind == "name" and text in ("nil", "true"):
 			self.take()
 			return Imm(2 if text == "nil" else 0x1a)
-		if kind == "name" and text in ("real", "string", "binary", "array", "map", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "tonescore", "shorts", "fixed", "hexfile", "sfnt", "texttable") \
+		if kind == "name" and text in ("real", "string", "binary", "array", "map", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "tonescore", "shorts", "fixed", "hexfile", "sfnt", "texttable", "lexicon") \
 				and self.toks[self.i + 1][1] == "(":
 			self.take()
 			self.take("(")
@@ -1452,7 +1471,7 @@ class Reader:
 			while self.peek()[1] != ")":
 				if text in ("real", "fixed") and self.peek()[0] == "number":
 					args.append(float(self.take()[1]))
-				elif text in ("string", "binary", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "hexfile", "sfnt", "texttable") and self.peek()[0] == "string":
+				elif text in ("string", "binary", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "hexfile", "sfnt", "texttable", "lexicon") and self.peek()[0] == "string":
 					args.append(self.take()[1])
 				elif text == "bitmap" and self.peek()[0] == "number":
 					args.append(self.take()[1])
@@ -1480,6 +1499,8 @@ class Reader:
 				return Obj("binary", args[0], data=newtonsfnt.pack(os.path.join(self.root, args[1][1:-1])))
 			if text == "texttable":
 				return Obj("binary", args[0], data=newtontables.pack(os.path.join(self.root, args[1][1:-1])))
+			if text == "lexicon":
+				return Obj("binary", args[0], data=newtonlex.pack(os.path.join(self.root, args[1][1:-1]))[4:])
 			if text == "hexfile":
 				with open(os.path.join(self.root, args[1][1:-1]), encoding="utf-8") as f:
 					return Obj("binary", args[0], data=hex_file_bytes(f.read()))
