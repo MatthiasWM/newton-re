@@ -193,6 +193,23 @@ FHostMeshSaveContact(RefArg /*rcvr*/, RefArg key, RefArg name, RefArg saved)
 
 
 static Ref
+FHostMeshLastUnreadable(RefArg /*rcvr*/)
+{
+	static char hex[2 * 256 + 1];
+	HostMeshLastUnreadable(hex, sizeof(hex));
+	return HostStringOfUTF8(hex);
+}
+
+
+static Ref
+FHostMeshTraceRx(RefArg /*rcvr*/, RefArg on)
+{
+	HostMeshTraceRx(NOTNIL(on));
+	return NILREF;
+}
+
+
+static Ref
 FHostMeshChannels(RefArg /*rcvr*/)
 {
 	if (!HostMeshStarted())
@@ -405,6 +422,8 @@ HostRegisterMeshFunctions(void)
 	SetSlot(functions, "HostMeshAvailable", RefVar(MakeCFunction((void*) FHostMeshAvailable, 0, nil)));
 	SetSlot(functions, "HostMeshStatus", RefVar(MakeCFunction((void*) FHostMeshStatus, 0, nil)));
 	SetSlot(functions, "HostMeshContacts", RefVar(MakeCFunction((void*) FHostMeshContacts, 0, nil)));
+	SetSlot(functions, "HostMeshLastUnreadable", RefVar(MakeCFunction((void*) FHostMeshLastUnreadable, 0, nil)));
+	SetSlot(functions, "HostMeshTraceRx", RefVar(MakeCFunction((void*) FHostMeshTraceRx, 1, nil)));
 	SetSlot(functions, "HostMeshChannels", RefVar(MakeCFunction((void*) FHostMeshChannels, 0, nil)));
 	SetSlot(functions, "HostMeshJoinChannel", RefVar(MakeCFunction((void*) FHostMeshJoinChannel, 2, nil)));
 	SetSlot(functions, "HostMeshLeaveChannel", RefVar(MakeCFunction((void*) FHostMeshLeaveChannel, 1, nil)));

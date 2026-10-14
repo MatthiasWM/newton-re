@@ -54,3 +54,21 @@ printed it; stops the peers when the main command ends and exits with its
 status (1 past `--seconds`, 300).  The ctests `hal.MeshPeers` and
 `host.NewtonMesh.<size>` are run with it (`src/hal/tests/CMakeLists.txt`,
 `src/host/CMakeLists.txt`).  Standard library only.
+
+## meshdecode.py - a packet taken apart
+
+    python tools/mesh/meshdecode.py HEX [--channel "#name" | --secret KEY]...
+
+Takes a MeshCore packet as the radio gave it - `HostMeshLastUnreadable()` on
+a newton with a mesh node keeps the last channel packet no channel of its
+could decrypt - and prints its header (version, route, type), transport
+codes, path (each repeater's hash) and payload.  For a channel message it
+shows the channel hash and, for the Public channel and each `--channel`
+(a hashtag channel: SHA-256 of its name) or `--secret` (hex or base64),
+the hash and MAC each makes; the one that matches is decrypted (timestamp,
+flags, text).  When none matches it tries the ciphertext cut short and with
+a byte left out at each place, to tell a packet damaged on its way from the
+radio from one on a channel this node is not in.  MeshCore 1.10's layout
+and cryptography (HMAC-SHA256, AES-128-ECB written out here); standard
+library only.  Checked against FIPS-197's AES vector and against a
+desktop newton's capture of a meshpeer's `#newton-test` message.

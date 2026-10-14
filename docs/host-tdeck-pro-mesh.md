@@ -193,6 +193,26 @@ free one is labelled so the first time a node is saved.  A card shows
   oldest node not saved now goes.  A message sent to a key the table does
   not hold adds it (the first then floods).
 
+**Why the board misses messages another node shows** (2026-10-14, a day's
+work with the owner's TTGO LoRa module - external antenna, the same radio
+settings - on the same desk): **the board's internal antenna.**  The
+per-packet trace (`HostMeshTraceRx(true)`) showed every packet the board
+decoded arriving through one repeater (VIC-Macleod-EDG-01, hash 64/6473)
+at -124 to -127 dBm, SNR -7 to -9 - at the edge of what SF7 decodes -
+while the TTGO heard more repeaters.  Ruled out on the way, each by
+measurement: the radio left out of receive or an interrupt missed (both
+watched: never); packets dropped by MeshCore's parser or a full packet
+pool (counted: none); the frequency (the board's crystal is within ~200
+Hz of the repeaters'; the *TTGO* is 8 kHz off; the TCXO voltage, 1.8 or
+2.4 V, changes nothing); the 4G modem (a message was missed with it off);
+our MeshCore against upstream (identical).  Messages on other channels
+(hashes 153, 154, 40 seen) are rightly unread.  **lilyphone1, flashed on
+the same board beside the TTGO, missed the same messages** - the board,
+not the firmware.  (Its flash was backed up whole first and restored:
+`esptool.py read_flash 0 0x1000000` / `write_flash 0`, 33 minutes to read
+over the board's USB.)  `tools/mesh/meshdecode.py` takes a raw packet
+apart (`HostMeshLastUnreadable()`) and decrypts a channel message.
+
 **A message heard by another node but not by this one** is most likely a
 collision: the radio is half-duplex, and a channel message is neither
 acknowledged nor sent again.  A long one is on the air for most of a

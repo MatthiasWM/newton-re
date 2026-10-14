@@ -261,6 +261,15 @@ struct HostMeshChannel
 };
 long		HostMeshGetChannels(HostMeshChannel* channels, long max);
 
+// each packet heard printed (stderr): its type, route, path (the hash of
+// each repeater it came through), RSSI, SNR and frequency error - to see
+// which nodes are heard, and how far off-tune each is
+void		HostMeshTraceRx(bool on);
+
+// the last channel packet heard that no channel of this node's could
+// decrypt, as the radio gave it (its bytes in hex, "" none) - to see why
+long		HostMeshLastUnreadable(char* hex, long size);
+
 enum HostMeshJoin { kHostMeshJoined, kHostMeshJoinBadName, kHostMeshJoinBadSecret, kHostMeshJoinFull, kHostMeshJoinAlready, kHostMeshJoinNoNode };
 // a channel joined: secret NULL or "" for a hashtag channel, else 32 or 64
 // hex digits, or the same in base64 (24 or 44 characters, as MeshCore's

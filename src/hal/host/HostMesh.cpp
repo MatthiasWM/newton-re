@@ -216,6 +216,13 @@ const long						kChannelsMagic = 0x4D434831;	// "MCH1"
 static HOST_LARGE_STATIC KeptChannel	gChannels[kHostMeshChannelsMax];
 static long						gChannelCount = 0;		// (Public included)
 static bool						gChannelsChanged = false;
+static std::atomic<bool>		gTraceRx(false);
+// the last packet read (logRxRaw), and the last channel packet no channel
+// could decrypt (logRx)
+static uint8_t					gLastRaw[MAX_TRANS_UNIT + 1];
+static int						gLastRawLength = 0;
+static uint8_t					gUnreadable[MAX_TRANS_UNIT + 1];
+static int						gUnreadableLength = 0;
 
 // contacts saved (MeshCore's favourites) or forgotten, by key
 struct ContactAsk
@@ -548,6 +555,11 @@ public:
 			}
 		}
 		long frequencyError = gPlatform->radioFrequencyError != NULL ? gPlatform->radioFrequencyError(gPlatform->ref) : 0;
+		if (len > 0 && len <= (int) sizeof(gLastRaw))
+		{
+			memcpy(gLastRaw, raw, len);
+			gLastRawLength = len;
+		}
 		std::lock_guard<std::mutex> hold(gLock);
 		gStatus.lastRssi = rssi;
 		gStatus.lastSnr = snr;
@@ -573,6 +585,23 @@ public:
 			for (int j = 0; j < n && !known; j++)
 				known = mesh::Utils::MACThenDecrypt(channels[j].secret, data, &pkt->payload[1], pkt->payload_len - 1) > 0;
 		}
+		if (gTraceRx)
+		{
+			static const char* const kTypes[16] = { "req", "response", "text", "ack", "advert", "channelText", "channelData",
+				"anonReq", "path", "trace", "multipart", "control", "type12", "type13", "type14", "raw" };
+			char path[3 * 64 + 1] = "";
+			int hashes = pkt->getPathHashCount(), size = pkt->getPathHashSize();
+			for (int k = 0; k < hashes && (k + 1) * size * 2 + k < (int) sizeof(path) - 1; k++)
+				for (int b = 0; b < size; b++)
+					snprintf(path + strlen(path), sizeof(path) - strlen(path), "%s%02X", b == 0 && k > 0 ? "," : "", pkt->path[k * size + b]);
+			HostMeshStatusInfo s;
+			{
+				std::lock_guard<std::mutex> hold(gLock);
+				s = gStatus;
+			}
+			printf("[mesh] rx %s %s path [%s] rssi %.0f snr %.1f ferr %ld\n", kTypes[type & 15],
+					pkt->isRouteFlood() ? "flood" : "direct", path, s.lastRssi, s.lastSnr, s.lastFreqError);
+		}
 		std::lock_guard<std::mutex> hold(gLock);
 		gStatus.heardByType[type & 15]++;
 		if (known > 0)
@@ -581,6 +610,8 @@ public:
 		{
 			gStatus.channelUnknown++;
 			gStatus.lastUnknownHash = pkt->payload[0];
+			memcpy(gUnreadable, gLastRaw, gLastRawLength);
+			gUnreadableLength = gLastRawLength;
 		}
 	}
 
@@ -1347,6 +1378,25 @@ SecretOf(const char* text, uint8_t* secret)
 		}
 	}
 	return 0;
+}
+
+
+long
+HostMeshLastUnreadable(char* hex, long size)
+{
+	std::lock_guard<std::mutex> hold(gLock);
+	long n = gUnreadableLength;
+	if (2 * n + 1 > size)
+		n = (size - 1) / 2;
+	HexOf(gUnreadable, n, hex);
+	return n;
+}
+
+
+void
+HostMeshTraceRx(bool on)
+{
+	gTraceRx = on;
 }
 
 
