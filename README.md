@@ -83,6 +83,13 @@ ESP32-S3 (two 240 MHz Xtensa cores, 8 MB of PSRAM, 16 MB of flash) with a
 runs the same tree as the desktops, built with ESP-IDF through PlatformIO
 ([src/host/esp32/README.md](src/host/esp32/README.md) says how to build,
 bake and flash it; [tools/tdeck/](tools/tdeck/README.md) has the tools).
+
+<p align="center"><img src="docs/images/tdeck-pro-extras.png" width="240" alt="The Extras drawer on the T-Deck Pro's 240x320 e-paper panel, with the Mesh and Messages applications beside the built-in ones"></p>
+
+*The Extras drawer as the board's panel shows it (the panel's frame,
+read back over the serial port by `tools/tdeck/panelshot.py`, at twice its
+size).*
+
 On the owner's board:
 
 * **The OS boots in about 3 seconds**: the ROM's objects baked on the
