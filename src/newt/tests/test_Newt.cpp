@@ -32,6 +32,7 @@
 #include "os600/kernel/Boot.h"
 #include "OSErrors.h"
 #include "ExternalNewtEvents.h"
+#include "power/host/HostBattery.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -413,6 +414,10 @@ Scenario(void)
 		newtPort.SendRPC(&replySize, &aborted, sizeof(aborted), &aborted, sizeof(aborted));
 		gAbortOk = aborted.fError == 0 && aborted.fResult == 1;
 		// BatteryStatus: the host's power plant, as a script sees it
+		// (a host with no battery: the machine's fresh cells, whatever the
+		// host running the test has - power/host/HostBattery.h)
+		HostBatteryReading noBattery = { 100, kHostBatteryUnknown, kHostBatteryUnknown, kHostBatteryUnknown, 0, kHostBatteryDischarging };
+		HostBatteryPin(&noBattery, false);
 		TRunScriptEvent battery("testApp", "battery");
 		newtPort.SendRPC(&replySize, &battery, sizeof(battery), &battery, sizeof(battery));
 		gBatteryOk = battery.fError == 0 && battery.fResult == 1;

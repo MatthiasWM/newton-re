@@ -11,7 +11,7 @@ endforeach()
 list(APPEND sources ${NEWTON_FORWARDED})
 # (the DDK's own directory as -I too: three of its headers include others
 #  with <...>, and none of its file names is a system header's)
-idf_component_register(SRCS esp32main.cpp newtonmain.cpp tdeck_panel.cpp tdeck_input.cpp tdeck_store.cpp tdeck_profile.cpp tdeck_wifi.cpp tdeck_modem.cpp tdeck_lora.cpp ${sources}
+idf_component_register(SRCS esp32main.cpp newtonmain.cpp tdeck_panel.cpp tdeck_input.cpp tdeck_store.cpp tdeck_profile.cpp tdeck_wifi.cpp tdeck_modem.cpp tdeck_lora.cpp tdeck_battery.cpp ${sources}
                        INCLUDE_DIRS . ${NEWTON_SRC}/ddk
                        REQUIRES driver esp_partition spi_flash esp_timer esp_psram vfs freertos lwip nvs_flash esp_wifi esp_netif esp_event)
 
@@ -55,6 +55,8 @@ set_source_files_properties(newtonmain.cpp PROPERTIES COMPILE_OPTIONS "${all_quo
 # (the board's modem driver hands its UART to hal/host/HostCellular.h's engine,
 #  which is plain C++ - none of the Newton's headers)
 set_source_files_properties(tdeck_modem.cpp PROPERTIES COMPILE_OPTIONS "-iquote${NEWTON_SRC}/hal/host")
+# (and its battery's gauge is given to power/host/HostBattery.h, plain C++ too)
+set_source_files_properties(tdeck_battery.cpp PROPERTIES COMPILE_OPTIONS "-iquote${NEWTON_SRC}/power/host")
 
 # The LoRa mesh (docs/host-tdeck-pro-mesh.md): MeshCore and what it needs
 # (thirdparty/meshcore, as its CMakeLists.txt lists them for the desktops),
@@ -141,7 +143,7 @@ mesh_forward(radio_wrapper ${radio_wrapper})
 target_sources(${COMPONENT_LIB} PRIVATE ${mesh_sources} ${radiolib_sources} ${radio_wrapper})
 set(mesh_includes -I${MESHCORE}/compat -I${MESHCORE}/MeshCore/src -I${MESHCORE}/Crypto/src -I${MESHCORE}/ed25519/src
                   -I${MESHCORE}/base64/src -I${MESHCORE}/RadioLib/src)
-set(mesh_definitions MAX_CONTACTS=64 MAX_GROUP_CHANNELS=4 ED25519_NO_SEED=1 RADIOLIB_GODMODE=1 RADIOLIB_STATIC_ONLY=1
+set(mesh_definitions MAX_CONTACTS=64 MAX_GROUP_CHANNELS=8 ED25519_NO_SEED=1 RADIOLIB_GODMODE=1 RADIOLIB_STATIC_ONLY=1
                      MESHCORE_RADIOLIB=1 LORA_FREQ=916.575 LORA_BW=62.5 LORA_SF=7 LORA_CR=8 LORA_TX_POWER=22
                      SX126X_DIO3_TCXO_VOLTAGE=2.4 SX126X_CURRENT_LIMIT=140
                      SX126X_DIO2_AS_RF_SWITCH=true SX126X_RX_BOOSTED_GAIN=1)

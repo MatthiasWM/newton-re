@@ -376,6 +376,10 @@ HostDeviceInputStart(void)
 		printf("newton: no I2C - no touch panel or keyboard\n");
 		return;
 	}
+	// the fuel gauge (tdeck_battery.cpp) stretches the clock while it wakes,
+	// far longer than the bus's own timeout (2^10 cycles of its 40 MHz
+	// clock, 26 us): 2^19 cycles, 13 ms
+	i2c_set_timeout(I2C_PORT, 19);
 	const size_t kStack = 4 * 1024;
 	StackType_t* stack = (StackType_t*) heap_caps_malloc(kStack, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 	StaticTask_t* control = (StaticTask_t*) heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);

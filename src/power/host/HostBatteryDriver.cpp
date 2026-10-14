@@ -6,11 +6,10 @@
 */
 
 #include "power/host/HostBatteryDriver.h"
+#include "power/host/HostBattery.h"
 #include "power/BatteryDriver.h"
 #include "OSErrors.h"
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 PROTOCOL PMainBatteryDriver : public PBatteryDriver
@@ -39,57 +38,17 @@ PROTOCOL_IMPL_SOURCE_MACRO(PMainBatteryDriver)
 PROTOCOL_CLASSINFO(PMainBatteryDriver, "PBatteryDriver", "", 0, 0, nil)
 
 static const Fixed kFixedOne = 0x00010000;
+static const long kLowPercent = 10;			// the battery called low (MainBatteryCheck warns at it)
 
 
-// The first of a sysfs directory's files as a line, or false.
-static bool
-ReadLine(const char* path, char* line, size_t size)
+// A host's figure in thousandths (millivolts, milliamps) as a Fixed, or
+// -1 (cannot say) where the host does not say.
+static Fixed
+FixedThousandths(long value)
 {
-	FILE* f = fopen(path, "r");
-	if (f == nil)
-		return false;
-	bool ok = fgets(line, (int) size, f) != nil;
-	fclose(f);
-	if (ok)
-		line[strcspn(line, "\r\n")] = 0;
-	return ok;
-}
-
-
-// The host's battery, where it can be read: its capacity (per cent),
-// whether it is charging or full, and whether the mains is on.
-static bool
-ReadHostBattery(long* capacity, long* chargeState, long* acPower)
-{
-	char line[64];
-	const char* batteries[] = { "/sys/class/power_supply/BAT0", "/sys/class/power_supply/BAT1" };
-	for (size_t i = 0; i < sizeof(batteries) / sizeof(batteries[0]); i++)
-	{
-		char path[128];
-		snprintf(path, sizeof(path), "%s/capacity", batteries[i]);
-		if (!ReadLine(path, line, sizeof(line)))
-			continue;
-		*capacity = strtol(line, nil, 10);
-		*chargeState = kChargeDischarging;
-		snprintf(path, sizeof(path), "%s/status", batteries[i]);
-		if (ReadLine(path, line, sizeof(line)))
-		{
-			if (strcmp(line, "Charging") == 0)
-				*chargeState = kChargeFast;
-			else if (strcmp(line, "Full") == 0)
-				*chargeState = kChargeTrickle;
-		}
-		*acPower = 0;
-		const char* supplies[] = { "/sys/class/power_supply/AC/online", "/sys/class/power_supply/AC0/online", "/sys/class/power_supply/ADP1/online" };
-		for (size_t j = 0; j < sizeof(supplies) / sizeof(supplies[0]); j++)
-			if (ReadLine(supplies[j], line, sizeof(line)))
-			{
-				*acPower = strtol(line, nil, 10) != 0;
-				break;
-			}
-		return true;
-	}
-	return false;
+	if (value == kHostBatteryUnknown)
+		return -1;
+	return (Fixed) ((long long) value * kFixedOne / 1000);
 }
 
 
@@ -120,27 +79,52 @@ PMainBatteryDriver::Status(ULong which, PowerPlantStatus* status)
 }
 
 
-// A reading taken now: the host's battery where it says, else full.
+// A reading taken now (power/host/HostBattery.h).  A host with a battery
+// of its own is reported as it says: its charge, its voltage, the current
+// drawn from it or charging it, its temperature (-1, cannot say, where the
+// host does not say), the mains, and low at 10% - the machine warns of it
+// (MainBatteryCheck) as of a MessagePad's.  Dead is 0%: only then does the
+// machine hold itself asleep (FMinimumBatteryCheck), the host's own
+// shutdown coming first.  A host with none (a desktop computer) is a
+// machine on fresh cells: full, nothing drawn, no mains, at room
+// temperature.
 NewtonErr
 PMainBatteryDriver::RawStatus(ULong which, PowerPlantStatus* status)
 {
 	if (which != 0 || status == nil)
 		return kError_Bad_Parameters;
-	long capacity = 100, chargeState = kChargeDischarging, acPower = 0;
-	ReadHostBattery(&capacity, &chargeState, &acPower);
+	HostBatteryReading host;
+	bool present = HostBatteryRead(&host);
 	status->fBatteryType = fType;
-	status->fBatteryVoltage = (Fixed) (4 * kFixedOne + (2 * kFixedOne) * capacity / 100);		// four cells, 1 to 1.5 V each
-	status->fBatteryCapacity = capacity;
+	status->fBatteryCapacity = host.percent;
+	status->fBatteryVoltage = (Fixed) (4 * kFixedOne + (2 * kFixedOne) * host.percent / 100);		// four cells, 1 to 1.5 V each
 	status->fBatteryLow = 0;
 	status->fBatteryDead = 0;
 	status->fBatteryCurrent = 0;
-	status->fACPower = acPower;
-	status->fACVoltage = acPower ? 7 * kFixedOne : 0;
-	status->fChargeState = chargeState;
+	status->fACPower = 0;
+	status->fChargeState = kChargeDischarging;
 	status->fChargeRate = 0;
 	status->fChargeCurrent = 0;
 	status->fAmbientTemp = 20 * kFixedOne;
 	status->fBatteryTemp = 20 * kFixedOne;
+	if (present)
+	{
+		if (host.millivolts != kHostBatteryUnknown)
+			status->fBatteryVoltage = FixedThousandths(host.millivolts);
+		status->fBatteryLow = kLowPercent;
+		status->fACPower = host.mains == 1;
+		if (host.charge == kHostBatteryCharging)
+			status->fChargeState = kChargeFast;
+		else if (host.charge == kHostBatteryFull)
+			status->fChargeState = kChargeFullyCharged;
+		// (the current drawn from the battery, and the current charging it)
+		status->fBatteryCurrent = host.milliamps == kHostBatteryUnknown ? -1 : host.milliamps < 0 ? FixedThousandths(-host.milliamps) : 0;
+		status->fChargeCurrent = host.milliamps == kHostBatteryUnknown ? -1 : host.milliamps > 0 ? FixedThousandths(host.milliamps) : 0;
+		status->fChargeRate = -1;
+		status->fAmbientTemp = -1;
+		status->fBatteryTemp = host.tenthsCelsius == kHostBatteryUnknown ? -1 : (Fixed) ((long long) host.tenthsCelsius * kFixedOne / 10);
+	}
+	status->fACVoltage = status->fACPower ? 7 * kFixedOne : 0;
 	fLast = *status;
 	return noErr;
 }

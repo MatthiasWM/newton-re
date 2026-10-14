@@ -34,6 +34,7 @@ The POSIX code that was Linux-only, and what it now does on macOS:
 | `host/HostRestart.cpp` the program's own path | `/proc/self/exe` | `_NSGetExecutablePath` |
 | `host/HostObjectsFile.cpp` the program's directory | `/proc/self/exe` | `_NSGetExecutablePath` (was already there) |
 | `hal/host/HostSockets.cpp` a send to a reset connection | `MSG_NOSIGNAL`, `SIGPIPE` ignored | `SIGPIPE` ignored (macOS has no `MSG_NOSIGNAL`) |
+| `power/host/HostBattery.cpp` the host's battery | `/sys/class/power_supply` | IOKit's power sources (`IOPSCopyPowerSourcesInfo`: the internal battery's capacity, state, charging, voltage, current); `power/CMakeLists.txt` links IOKit and CoreFoundation |
 | `print/host/dnssd/HostDNSSD.cpp` printers on the network | `avahi-browse` | nothing found (the `#else` branch) until a `dns_sd.h` browse is written |
 | `print/host/tls/HostTLS.cpp` ipps:// | OpenSSL | OpenSSL if CMake finds one (Homebrew's), else no ipps |
 | `src/host/CMakeLists.txt` the window and the sound | X11, ALSA | neither found: no window (headless) and silent - the `win32` files' `#else` branches |

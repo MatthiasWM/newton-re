@@ -9,7 +9,9 @@
 // 'powr, the root's GotoSleep), each sleep ended by a tap (HostWakeAfter:
 // what the window's pen does while the machine sleeps), and the
 // applications told - RegPowerOff's function asked before each sleep,
-// RegPowerOn's after it.
+// RegPowerOn's after it.  The host's own battery is shown, then a battery
+// pinned (HostSetBattery: off the mains, so the idle timer may sleep on a
+// laptop that is plugged in) for the rest.
 //
 //   build/host/host/newton --display 320x480 --headless 200 \
 //       --script src/host/demo/power.ns
@@ -31,6 +33,7 @@ switchOff := func() begin
 			& NumberStr(pwrOnCalls) & " power-on calls, the last for " & SPrintObject(pwrOnReason));
 		UnRegPowerOff('|powerDemo:Newton|);
 		UnRegPowerOn('|powerDemo:Newton|);
+		HostSetBattery(nil);
 		Print("power: done");
 		HostQuit();
 	end, 30);
@@ -50,7 +53,11 @@ idleOff := func() begin
 end;
 
 call walkSetup with (name, func() begin
-	// step 1: the batteries
+	// step 1: the batteries - the host's own, then one pinned
+	local own := BatteryStatus(0);
+	Print("power: the host's battery " & NumberStr(own.batteryCapacity) & "%, mains " & SPrintObject(own.acPower)
+		& ", " & SPrintObject(own.chargeState));
+	HostSetBattery({percent: 80, millivolts: 5600});
 	local status := BatteryStatus(0);
 	Print("power: " & NumberStr(BatteryCount()) & " battery, " & NumberStr(status.batteryCapacity) & "% "
 		& SPrintObject(status.batteryType) & ", mains " & SPrintObject(status.acPower));

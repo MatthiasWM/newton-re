@@ -597,6 +597,14 @@ The window traces itself for this (`run.sh` turns both on):
 
 ## On the device
 
+**The battery** (2026-10-14): the Newton's `BatteryStatus` is the
+tablet's, read from `/sys/class/power_supply` like any Linux host's
+(`power/host/HostBattery.h`), the battery found by its `type` rather than
+a name (the Paper Pro's is not `BAT0`). Not yet seen on the tablet itself
+(it was not on the network that day): check what the tablet has with
+`ssh root@10.11.99.1 'grep . /sys/class/power_supply/*/type'`, then what
+the Newton makes of it with `BatteryStatus(0)` in a running one.
+
 What only the tablet can tell: the picture on the glass, the waveforms'
 look and speed (is live ink quick enough?), the pen's coordinates through
 AppLoad, the folio's keys, what the power button and sleep do, and whether

@@ -25,6 +25,6 @@
 
 void	HostRegisterPowerSwitch(void);			// the interrupt source registered (InitializePowerInterrupt)
 void	HostPowerSwitchPress(ULong type);		// 'powr or 'bklt pressed - from any thread
-void	HostInstallPowerGlobals(void);			// the scripts' HostPowerSwitch(), HostBacklightButton(), HostWakeAfter(ms), HostSleepCount()
+void	HostInstallPowerGlobals(void);			// the scripts' HostPowerSwitch(), HostBacklightButton(), HostWakeAfter(ms), HostSleepCount(), HostSetBattery(frame)
 
 #endif	/* __HOSTPOWERSWITCH_H */

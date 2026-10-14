@@ -746,6 +746,24 @@ reconstruction and, once the battery was fitted, registered on its
 network - the start of making the board a phone, with the ROM's own
 Phone transport and Calls log: `docs/host-tdeck-pro-phone.md`.
 
+## The battery (2026-10-14)
+
+`BatteryStatus(0)` on the board is the board's own battery
+(`src/host/esp32/main/tdeck_battery.cpp`, a source for
+`power/host/HostBattery.h`): the BQ27220 fuel gauge at 0x55 (state of
+charge, voltage, current, temperature, and BATTPRES for whether a battery
+is fitted) and the BQ25896 charger at 0x6B (REG0B: power good - USB is the
+Newton's mains - and charging or done). On the owner's board, on USB with
+the battery in: 100%, 4127 mV, 0 mA, the charger done, then topping up
+(the BQ25896 restarts a charge by itself).
+
+The gauge stretches the clock while it wakes from sleep, far beyond the
+ESP32-S3 I2C controller's default timeout (2^10 cycles of 40 MHz, 26 us):
+the first read after the gauge has been idle failed with
+`ESP_ERR_TIMEOUT` and the next one worked. The bus's timeout is now 2^19
+cycles, 13 ms (`tdeck_input.cpp`, where the bus is installed), and a
+gauge read is tried twice.
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the

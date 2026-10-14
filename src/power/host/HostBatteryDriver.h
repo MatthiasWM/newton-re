@@ -7,13 +7,13 @@
 				MP2x00's own Cirrus driver - so it stands where a machine's
 				own driver would.  Host only (not in the ROM).
 
-				It reports the host's own battery where the host says what
-				it is in a way plain C can read - Linux's
-				/sys/class/power_supply (the first battery's capacity and
-				status, and whether the mains is on) - and otherwise a
-				machine on fresh cells: full, nothing drawn, no mains, at
-				room temperature.  The kind of cells is what the machine is
-				told (the Prefs' battery picker, SetBatteryType).
+				It reports the host's own battery (power/host/HostBattery.h:
+				a board's fuel gauge, or what the operating system says -
+				Windows, macOS, Linux's /sys/class/power_supply), its low
+				mark at 10%; and on a host with none a machine on fresh
+				cells: full, nothing drawn, no mains, at room temperature.
+				The kind of cells is what the machine is told (the Prefs'
+				battery picker, SetBatteryType).
 */
 
 #ifndef __HOSTBATTERYDRIVER_H

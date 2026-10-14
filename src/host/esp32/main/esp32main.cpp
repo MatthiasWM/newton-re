@@ -310,6 +310,7 @@ app_main(void)
 	HostDeviceSpiBusStart();				// (the panel's and the radio's)
 	HostDevicePanelStart();
 	HostDeviceInputStart();
+	HostDeviceBatteryStart();				// (on the input's I2C bus)
 	HostDeviceStoreStart();
 	gHostDeviceWifi = HostDeviceWifiStart();
 	HostDeviceCellStart();

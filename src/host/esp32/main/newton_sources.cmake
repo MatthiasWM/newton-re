@@ -289,6 +289,7 @@ set(NEWTON_SOURCES
     pcmcia/PCMCIA20Parser.cpp
     power/BatteryDriver.cpp
     power/PowerManager.cpp
+    power/host/HostBattery.cpp
     power/host/HostBatteryDriver.cpp
     power/host/HostPowerSwitch.cpp
     print/DitherTables.cpp
@@ -1828,6 +1829,7 @@ set(NEWTON_GROUP_33_INCLUDES
 set(NEWTON_GROUP_34_SOURCES
     power/BatteryDriver.cpp
     power/PowerManager.cpp
+    power/host/HostBattery.cpp
     power/host/HostBatteryDriver.cpp
     power/host/HostPowerSwitch.cpp
 )

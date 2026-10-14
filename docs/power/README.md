@@ -40,9 +40,8 @@ the power switch.
     `PCirrusBatteryDriver` (the Cirrus chip's ADC and charger: hardware,
     NOT YET RECONSTRUCTED).
   - The host registers its own `PMainBatteryDriver`
-    (`host/HostBatteryDriver.cpp`). It reports the host's battery where
-    plain C can read it (Linux's `/sys/class/power_supply`), and fresh cells
-    at 100% otherwise.
+    (`host/HostBatteryDriver.cpp`), which reports the host's own battery -
+    see "The host's battery" below.
 - **The sleep** is `CyclePower`, which `FPowerOff` reaches through
   `SleepUntilNextWakeup`:
   1. Every handler is told `'pwof`.
@@ -97,24 +96,71 @@ The stand-ins for the Voyager's hardware are in `hal/host/HostPower.h`
   - **With no window and no wake armed**, nothing could wake it, so it does
     not sleep at all.
 - **The backlight button** is **F11**.
+- **The host's battery** (`host/HostBattery.h`, plain C++ so that a
+  board's code can use it) is read, each time the driver is asked, from the
+  first of:
+  1. a reading pinned by a test or a script (`HostSetBattery`);
+  2. a board's own gauge, registered with `HostBatterySetSource` - the
+     T-Deck Pro's BQ27220 fuel gauge and BQ25896 charger
+     (`src/host/esp32/main/tdeck_battery.cpp`);
+  3. the operating system:
+
+     | Host | Where | What it says |
+     |---|---|---|
+     | Windows | `GetSystemPowerStatus` | per cent, mains, charging |
+     | macOS | IOKit's power sources (the internal battery) | per cent, mains, charging, mV, mA - **not yet built on a Mac** |
+     | Linux, the reMarkable | `/sys/class/power_supply` | per cent (or charge/energy of full), status, mV, mA, temperature, mains |
+     | ESP32 | none of its own: the board's gauge | |
+
+     Linux's supplies are found by their `type`, not by name: the first
+     `Battery` present (by name, so `BAT0` before `BAT1`) that is not of
+     scope `Device` (a mouse's), and the mains is any other supply
+     online. Its current's sign is taken from its status, since drivers
+     disagree on it.
+  The driver reports what the host says: the voltage, the current drawn
+  (`batteryCurrent`) or charging (`chargeCurrent`), the temperature, the
+  mains, and the charge state (charging is `fastCharging`; on the mains
+  and not charging, "Full" or Linux's "Not charging", `fullyCharged`). What
+  the host cannot say is -1, so `BatteryStatus` leaves it out. Charging
+  without a word on the mains means it is on the mains. `batteryLow` is
+  10%: the ROM's `MainBatteryCheck` warns when the charge falls to it, off
+  the mains, as a MessagePad's does. `batteryDead` is 0%: only then does
+  `FMinimumBatteryCheck` hold the machine asleep.
+  A host with no battery (a desktop computer) is reported as before: a
+  machine on fresh cells, full, no mains, never low - so it still sleeps
+  when idle. A laptop on the mains does not: the root's idle script
+  leaves a Newton on the mains awake.
+  The kind of cells is whatever the machine is told (`SetBatteryType`,
+  the Prefs), whatever the host's battery is.
 - **The display** (`THostScreenDriver`) keeps the drawing and shows it again
   as it was afterwards:
   - asleep, it is blank;
   - with the backlight on, the ink is shown a quarter lighter, as an
     electroluminescent panel washes it out.
 - **Script functions** (`host/HostPowerSwitch.cpp`): `HostPowerSwitch()`,
-  `HostBacklightButton()`, `HostWakeAfter(ms)`, `HostSleepCount()`.
+  `HostBacklightButton()`, `HostWakeAfter(ms)`, `HostSleepCount()`,
+  `HostSetBattery(frame)` - the host's battery pinned:
+  `{percent, mains, charge: 'charging | 'full | nil, millivolts, milliamps,
+  tenthsCelsius}` (charging or full, it is on the mains);
+  `HostSetBattery('none)` a host with no battery; `HostSetBattery(nil)` the
+  host's own again.
 - **Tracing:** `NEWTON_TRACE_POWER` prints each press the manager takes and
   each wake with its event word.
 
 ## Tests
 
 - **`power.PowerManager`** starts the manager and asks it for the battery
-  count, a status and a new battery kind. It then sleeps the platform and
-  translates the event word.
+  count, a status and a new battery kind. It pins host readings (charging
+  on the mains, low off it, held full, no battery, a board's gauge) and
+  checks what the driver makes of each, and reads a `power_supply` tree it
+  writes itself (a mouse's battery and an absent one passed over, a
+  reMarkable-style name, the current's sign, energy instead of a
+  percentage). It then sleeps the platform and translates the event word.
 - **`host.NewtonPower`** (`src/host/demo/power.ns`) runs on the whole
   machine:
-  - the batteries are shown through a `protoBatteryGauge`;
+  - the host's own battery is printed, then one is pinned (80%, off the
+    mains: a laptop on the mains would otherwise never idle to sleep) and
+    shown through a `protoBatteryGauge`;
   - the backlight is turned on, then off by its button;
   - the idle timer puts the machine to sleep, and a tap wakes it;
   - the power switch puts it to sleep, and a tap wakes it;

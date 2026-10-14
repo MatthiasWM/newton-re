@@ -677,7 +677,7 @@ set_tests_properties(host.NewtonBeamNobody PROPERTIES TIMEOUT 400
 # woken by a tap each time, the power-off and power-on functions called
 add_test(NAME host.NewtonPower COMMAND newton --display 320x480 --headless 200 --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/power.ns WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
 set_tests_properties(host.NewtonPower PROPERTIES TIMEOUT 300
-                     PASS_REGULAR_EXPRESSION "power: 1 battery, [0-9]+% .*power: the battery gauge shows [0-9]+ .*power: backlight on.*power: the backlight button turned it off.*power: the idle timer put it to sleep, a tap woke it.*power: the switch put it to sleep, a tap woke it. 2 power-off calls, 2 power-on calls.*power: done"
+                     PASS_REGULAR_EXPRESSION "power: the host's battery [0-9]+%.*power: 1 battery, 80% .*power: the battery gauge shows [0-9]+ .*power: backlight on.*power: the backlight button turned it off.*power: the idle timer put it to sleep, a tap woke it.*power: the switch put it to sleep, a tap woke it. 2 power-off calls, 2 power-on calls.*power: done"
                      FAIL_REGULAR_EXPRESSION "waited in vain|fell over")
 
 # the tablet's calibration (recognition/Inker.h, hal/host/HostTablet.h;

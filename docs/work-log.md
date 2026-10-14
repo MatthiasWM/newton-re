@@ -9,6 +9,29 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-14: The host's battery on every host
+
+The host's battery driver (`power/host/HostBatteryDriver.cpp`) read only
+Linux's `BAT0`/`BAT1` and the mains as `AC`, `AC0` or `ADP1` - which
+missed WSL's `AC1` - and nothing on Windows or a board. The reading is now
+its own seam, `power/host/HostBattery.h` (plain C++, so board code can use
+it): a pinned reading (`HostSetBattery`, for tests), else a board's gauge
+(`HostBatterySetSource`), else the operating system - Windows'
+`GetSystemPowerStatus`, macOS's IOKit power sources (written, not yet
+built on a Mac), Linux's `/sys/class/power_supply` with the supplies found
+by type (the reMarkable's battery is not `BAT0`). The T-Deck Pro's
+`tdeck_battery.cpp` reads its BQ27220 gauge and BQ25896 charger. The
+driver now reports the voltage, currents, temperature and charge state
+the host gives, and `batteryLow` at 10% so the ROM's `MainBatteryCheck`
+warns; a host with no battery is still a machine on fresh cells.
+
+Found on the way: on a laptop on the mains the ROM's idle script never
+puts the machine to sleep, so `host.NewtonPower` now pins its battery
+off the mains (it prints the host's own first); and the BQ27220 stretches
+the I2C clock while it wakes, beyond the ESP32-S3's default bus timeout,
+so the board's bus timeout went to 13 ms (`docs/host-tdeck-pro.md` "The
+battery"). The reMarkable reading is not yet seen on the tablet.
+
 ## 2026-10-14: armcpu.ARMProtocols failing now and then
 
 `armcpu.ARMProtocols` failed about one run in five under `--repeat

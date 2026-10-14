@@ -82,6 +82,11 @@ bool		HostDeviceLoraStart(void);
 // own (==> whether it was started); the engine's natives then answer for it
 bool		HostDeviceCellStart(void);
 
+// the battery (tdeck_battery.cpp): the fuel gauge and the charger on the
+// input's I2C bus, given to power/host/HostBattery.h as the board's own
+// source (started after the input; ==> whether there is a gauge)
+bool		HostDeviceBatteryStart(void);
+
 // the sampling profiler of core 1 (tdeck_profile.cpp): started with the
 // board, a phase's start marked, the samples printed (and the profiler
 // stopped) - tools/tdeck/profile.py reads them
