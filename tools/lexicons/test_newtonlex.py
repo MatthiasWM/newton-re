@@ -6,7 +6,8 @@
 Every lexicon of romsrc/ (romsrc/lexicons.tsv) is packed, unpacked and
 packed again to the same bytes and the same text; with --rom, the bytes
 must be the ROM's own at the lexicon's address (rom.bin), and the ROM's
-bytes unpacked must give the committed text.  Then a word list is edited -
+bytes unpacked must give the committed text.  So must the locales' seven
+dictionaries of class 'AirusA (romsrc/resources/AirusA/).  Then a word list is edited -
 a word added, a word taken out, an attribute changed - and read back, and
 a lexical graph has a character added to one of its sets.
 """
@@ -52,6 +53,33 @@ class RoundTrip(unittest.TestCase):
 					if rom is not None:
 						size = int.from_bytes(rom[address:address + 4], "big")
 						self.assertEqual(data, rom[address:address + 4 + size], "%s is not the ROM's" % name)
+
+
+	def test_locale_dictionaries(self):
+		"""The seven locale dictionaries of class 'AirusA (resources/AirusA/<addr>.lex,
+		lexicon(...) in the object files): the object's data is the dictionary
+		without the size word; with --rom it is the ROM object's at <addr>."""
+		rom = None
+		if ROM_BUILD:
+			with open(os.path.join(ROM_BUILD, "rom.bin"), "rb") as f:
+				rom = f.read()
+		folder = os.path.join(ROMSRC, "resources", "AirusA")
+		names = sorted(n for n in os.listdir(folder) if n.endswith((".lex", ".words")))
+		self.assertEqual(len(names), 7)
+		with tempfile.TemporaryDirectory() as tmp:
+			for name in names:
+				with self.subTest(name):
+					path = os.path.join(folder, name)
+					data = newtonlex.pack(path)
+					again = os.path.join(tmp, name)
+					newtonlex.unpack(data, again)
+					self.assertEqual(newtonlex.pack(again), data)
+					with open(path, encoding="utf-8") as a, open(again, encoding="utf-8") as b:
+						self.assertEqual(a.read(), b.read())
+					if rom is not None:
+						address = int(os.path.splitext(name)[0], 16) - 1
+						size = int.from_bytes(rom[address:address + 4], "big") >> 8
+						self.assertEqual(data[4:], rom[address + 12:address + size], "%s is not the ROM's" % name)
 
 
 def _words(data):
