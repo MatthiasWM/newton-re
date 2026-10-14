@@ -2497,6 +2497,14 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/layout.tsv)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/tables/test_inktables.py
                      --rom ${NEWTON_ROM_BUILD_DIR}
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    # the QuickDraw pictures as text and PNGs (tools/pict/newtonpict.py)
+    add_test(NAME tools.NewtonPict
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/pict/test_newtonpict.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    add_test(NAME tools.NewtonPictROM
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/pict/test_newtonpict.py
+                     --rom ${NEWTON_ROM_BUILD_DIR}
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     # a collation edit: a and z given each other's weights in the ROM's
     # sorting table, the tree built, and StrCompare on the booted machine
     # puts "zebra" before "apple" (demo/tableedit.ns)

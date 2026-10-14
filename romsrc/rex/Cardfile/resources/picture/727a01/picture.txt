@@ -1,0 +1,44 @@
+# A QuickDraw picture as text: tools/pict/newtonpict.py (tools/pict/README.md).
+# Rects are top left bottom right, points v h; `#` starts a comment.
+picSize auto		# 0x008d: the picture's length, low 16 bits
+picFrame 7 0 16 216
+version 1
+Clip 7 0 16 216		# the clip region: its rect, then any more of it in hex
+PnSize 3 1		# v h
+ShortLine 10 0 6 -3		# from v h, by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 3		# by dh dv
+ShortLineFrom 6 -3		# by dh dv
+OpEndPic

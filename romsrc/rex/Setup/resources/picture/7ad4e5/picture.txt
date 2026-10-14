@@ -1,0 +1,14 @@
+# A QuickDraw picture as text: tools/pict/newtonpict.py (tools/pict/README.md).
+# Rects are top left bottom right, points v h; `#` starts a comment.
+picSize auto		# 0x0942: the picture's length, low 16 bits
+picFrame 210 334 347 568
+version 1
+Clip 0 0 400 704		# the clip region: its rect, then any more of it in hex
+PackBitsRect bits1.png		# 240 x 137 pixels, black a set bit
+	rowBytes auto		# 30: the width in bytes, rounded up to even
+	bounds 210 328 347 568	# top left bottom right: the PNG's size
+	srcRect 210 334 347 568
+	dstRect 210 334 347 568
+	mode srcCopy
+	packing classic		# Apple's PackBits: runs of 3+ bytes, and a row's last two if equal
+OpEndPic

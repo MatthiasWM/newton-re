@@ -207,13 +207,16 @@ per topic and does not scroll, so each topic is one page: a heading
 (`layout: 32`, 14 pixels), text in the book's own fonts, a picture.  The
 bottom fifteen pixels or so are under the Topics and close buttons.
 
-The pictures (`resources/picture/unistroke-letters.pict`,
-`unistroke-others.pict`) are made from the classifier's own templates by
-`test_Unistroke --pict letters|others <file>`: a PICT file's 512-byte
-header, then a version 2 picture of one 1-bit bitmap (PackBitsRect), as
-the help's own pictures are; each cell a label in a 5x7 font and the
-stroke with a dot where it starts.  Regenerate them when a template
-changes.
+The pictures (`resources/picture/unistroke-letters/`,
+`unistroke-others/`: `picture.txt` and the bitmap's PNG, as
+`tools/pict/newtonpict.py` unpacks a picture) are made from the
+classifier's own templates by `test_Unistroke --pict letters|others
+<file>`: a PICT file's 512-byte header, then a version 2 picture of one
+1-bit bitmap (PackBitsRect), as the help's own pictures are; each cell a
+label in a 5x7 font and the stroke with a dot where it starts.
+Regenerate them when a template changes, and unpack the file into the
+tree: `python tools/pict/newtonpict.py unpack <file>
+romsrc/rex/help_book/resources/picture/unistroke-letters`.
 
 ## Order of work
 

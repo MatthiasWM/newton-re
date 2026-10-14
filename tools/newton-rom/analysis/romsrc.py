@@ -158,6 +158,13 @@ constructors of its own):
     pict('picture, "resources/picture/addr.pict")   a QuickDraw picture: a
                     PICT file (512 bytes of nought, then the picture), as a
                     Macintosh drawing program reads and writes it
+    picture('picture, "resources/picture/addr")   a QuickDraw picture as
+                    the directory tools/pict/newtonpict.py unpacks it into:
+                    picture.txt, its opcodes as text (rects top left bottom
+                    right; sizes, rowBytes and PackBits counts worked out),
+                    and a PNG per bitmap (black the set pixels); packed on
+                    build (tools/pict/README.md).  A picture the text form
+                    would not give back byte for byte stays a pict(...)
     sfnt('sfnt, "resources/sfnt/addr")   a font - an sfnt container of
                     Apple's bitmap and metric tables, with no outlines, so
                     not a TrueType font - as the directory
@@ -211,6 +218,9 @@ import png							# noqa: E402
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "fonts"))
 import newtonsfnt					# noqa: E402
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "pict"))
+import newtonpict					# noqa: E402
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "lexicons"))
 import newtonlex					# noqa: E402
@@ -922,6 +932,16 @@ class Extractor:
 					w.writeframes(struct.pack("<%dh" % (len(pcm) // 2), *struct.unpack(">%dh" % (len(pcm) // 2), pcm)))
 				return "imasound(%s, \"%s\")" % (self.value(cls, path + "^"), rel)
 		if cname == "picture" and not self.in_function:
+			rel = "resources/%s/%x" % (folder, o)
+			where = os.path.join(self.out, rel)
+			try:
+				newtonpict.unpack(data, where)
+				if newtonpict.pack(where) == data:
+					return "picture(%s, \"%s\")" % (self.value(cls, path + "^"), rel)
+			except newtonpict.PictError:
+				pass
+			import shutil
+			shutil.rmtree(where, ignore_errors=True)
 			rel = "resources/%s/%x.pict" % (folder, o)
 			os.makedirs(os.path.join(self.out, os.path.dirname(rel)), exist_ok=True)
 			with open(os.path.join(self.out, rel), "wb") as f:
@@ -1472,7 +1492,7 @@ class Reader:
 		if kind == "name" and text in ("nil", "true"):
 			self.take()
 			return Imm(2 if text == "nil" else 0x1a)
-		if kind == "name" and text in ("real", "string", "binary", "array", "map", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "tonescore", "shorts", "fixed", "hexfile", "sfnt", "texttable", "lexicon") \
+		if kind == "name" and text in ("real", "string", "binary", "array", "map", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "tonescore", "shorts", "fixed", "hexfile", "sfnt", "texttable", "lexicon", "picture") \
 				and self.toks[self.i + 1][1] == "(":
 			self.take()
 			self.take("(")
@@ -1480,7 +1500,7 @@ class Reader:
 			while self.peek()[1] != ")":
 				if text in ("real", "fixed") and self.peek()[0] == "number":
 					args.append(float(self.take()[1]))
-				elif text in ("string", "binary", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "hexfile", "sfnt", "texttable", "lexicon") and self.peek()[0] == "string":
+				elif text in ("string", "binary", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "hexfile", "sfnt", "texttable", "lexicon", "picture") and self.peek()[0] == "string":
 					args.append(self.take()[1])
 				elif text == "bitmap" and self.peek()[0] == "number":
 					args.append(self.take()[1])
@@ -1508,6 +1528,8 @@ class Reader:
 				return Obj("binary", args[0], data=newtonsfnt.pack(os.path.join(self.root, args[1][1:-1])))
 			if text == "texttable":
 				return Obj("binary", args[0], data=newtontables.pack(os.path.join(self.root, args[1][1:-1])))
+			if text == "picture":
+				return Obj("binary", args[0], data=newtonpict.pack(os.path.join(self.root, args[1][1:-1])))
 			if text == "lexicon":
 				return Obj("binary", args[0], data=newtonlex.pack(os.path.join(self.root, args[1][1:-1]))[4:])
 			if text == "hexfile":
@@ -2209,7 +2231,7 @@ class Builder:
 # the modules the builder builds with, besides this one: what the stamp is a
 # hash of (all imported above, so a run of any command has them)
 STAMP_MODULES = ("nsfunctions", "nsdecompile", "romdicts", "packages", "romid",
-				 "png", "newtonsfnt", "newtonlex", "newtontables", "inktables")
+				 "png", "newtonsfnt", "newtonlex", "newtontables", "inktables", "newtonpict")
 
 
 def builder_stamp():
