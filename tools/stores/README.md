@@ -21,7 +21,8 @@ standard library only:
     python tools/stores/newtonstore.py chartables ROMSRC
 
 `PART` is the part's bytes; with `--package` it is a package file and its
-first `'soup` part is taken (`romsrc/rex/WorldData.pkg`).  `unpack`
+first `'soup` part is taken (Apple's WorldData package, which `romsrc/`
+keeps unpacked: `romsrc/rex/WorldData/`).  `unpack`
 writes `DIR` and then packs it again, failing unless that gives back the
 part's bytes exactly.  `pack` makes the part out of a directory, edited
 or not.  `check` says whether each part comes back the same.

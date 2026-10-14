@@ -39,7 +39,7 @@ boot has it with no store and no `--package` - Internet Setup is in the
 Extras drawer's Setup folder, and HostLink.ns registers the host's link
 as it does for a stored copy.  The one change the NIE needed to live in
 the ROM (a package in the ROM has no pkgRef, which it names its state
-after) is `romsrc/rex/inetenbl.patches.tsv`.  A copy installed over it is
+after) is an edit to its source, `romsrc/rex/inetenbl/README.md`.  A copy installed over it is
 kept on its store but not activated, as the ROM does for any package of a
 name already in use (ctest `host.NewtonNIEOverBuiltIn`).  Its modules
 (Ethernet, LocalTalk, Modem & Serial) are still packages to install; they

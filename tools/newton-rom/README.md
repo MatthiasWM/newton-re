@@ -92,7 +92,7 @@ tools/newton-rom/
                           --natives (NTK's native-compiled functions: code offset and length in their binary),
                           --native-disasm HOLDER|0xREF (their ARM code, capstone), --where SLOT=INT (the frames
                           holding those integers) and --slots HOLDER|0xREF (a frame's slots, each with the file
-                          offset of its word - what romsrc/rex/<package>.patches.tsv names)
+                          offset of its word - what the NIE's byte patches named)
     protousers.py         the ROM's own users of a proto: BUILD @n [--view-class N] [--packages DIR] lists the
                           ROM frames whose _proto is it (or whose viewClass is N) and searches the extracted
                           packages for its magic pointer (how protoTXView was found to have none)

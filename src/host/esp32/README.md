@@ -133,7 +133,7 @@ to upright changed nothing, and the OK rebuilt the display (and put up
 the button bar's "couldn't hold all the icons") for nothing
 (`romsrc/functions/obj_642059.Open.ns`).  Internet Setup's edit slip
 takes the bounds its walk-through layout has, which fit the screen, and
-its keyboard is the slip's width (`romsrc/rex/inetstup.patches.tsv`); the
+its keyboard is the slip's width (`romsrc/rex/inetstup/README.md`); the
 Typewriter keyboard is the screen's width where its small size will not
 fit (`obj_630d25.viewSetupFormScript.ns`) - a keyboard view makes its
 keys to fit its bounds.  The slip that asks for what a worksite or the

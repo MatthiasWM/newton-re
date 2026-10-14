@@ -9,6 +9,33 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-15: Every binary of romsrc/ as text
+
+The owner asked for the binary files left in `romsrc/` to be decoded into
+forms that can be edited.  Every one has a text form now, built back byte
+for byte (`docs/rom-free/README.md`, "Every binary as text", has the
+table): the locales' Airus dictionaries as `.lex` graphs; the ink code
+books, trigrams, Letter Shapes strokes and the cursive recogniser's
+trained tables as `texttable`s (`tools/tables/inktables.py`,
+`hwrtables.py`); the 32 QuickDraw pictures as opcode text and PNGs
+(`tools/pict/`); WorldData's store as its entries, indexes and word hints
+rebuilt by replaying the ROM's soup code (`tools/stores/newtonstore.py`);
+the protocol parts and NTK native modules as ARM source with our own
+ARMv4 assembler and disassembler (`tools/armpart/`); and the NIE's three
+packages as directories whose frames parts are NewtonScript trees.  The
+object file the tree builds stayed the same through each step but for
+the builder's stamp, until two deliberate changes: ScreenBuffer's and
+ScreenDrivers' branches into the patch table now follow `--relayout`
+(22 had been 0x1a00 off), and the NIE's byte patches became source
+edits.  All 476 ctests pass.
+
+Found on the way: `Rtrig` (the 'Trigrams table) is read by nothing in the
+ROM, and @145 is `Rparagraphcodebook2`, the ink code book
+(`tools/tables/README.md`); a compiled frame spells a symbol as the
+compiler first met it, so `same()` paths now match slots whatever their
+case; NTK's bytecode fallbacks have a three-slot argFrame where the
+host's compiler makes none (the ` argframe=` record flag).
+
 ## 2026-10-14: The ROM extension's other pieces and the parameter block as text
 
 `romsrc/rex/` kept everything around the packages' frames parts as raw

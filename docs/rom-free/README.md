@@ -72,7 +72,8 @@ choosing it.
     hex, 16 to a line, under comments saying what each part is (the
     modifier table; each key table with its characters spelt out beside
     it).
-- **Still `.bin` (32), and why:**
+- **Still `.bin` (32) when this was written, and why** (all of them have a
+  text form now: "Every binary as text", below):
   - the recognisers' data, where the edit form would be a generator, not
     the bytes: the Airus dictionaries (`AirusA`, 7, tries that
     `recognition/Airus.h` walks; a word list and a trie builder are the
@@ -237,12 +238,13 @@ reported as the decompiler's was.
    - 19 stay `.bin`: `TDTMFCodec` parameters, the ring tones as tone
      sequences, 50 bytes each. That is a table, not sampled sound.
 5. **Pictures and fonts. Done.**
-   - The 7 QuickDraw pictures (version 1, opcode 0x1101) are `.pict`
+   - The 7 QuickDraw pictures (version 1, opcode 0x1101) were `.pict`
      files: 512 bytes of nought, then the picture, which is the form a
-     Macintosh drawing program reads and writes. They are written as
-     `pict('picture, "resources/picture/<addr>.pict")`, and the builder
-     drops the 512 bytes. No PNG is made beside them yet: that waits on
-     the host drawing a picture's text (`qd/PicPlay.h`).
+     Macintosh drawing program reads and writes, written as
+     `pict('picture, "resources/picture/<addr>.pict")`. They (and the
+     extension's 25) are now directories, `picture('picture,
+     "resources/picture/<addr>")`: the opcodes as text and a PNG per
+     bitmap (`tools/pict/README.md`).
    - The 13 fonts are sfnt containers (version 0x00010000) with no
      outlines, so not TrueType fonts: five bitmap fonts (`bdat`, `bloc`,
      `cmap`, `head`, `hhea`, `hmtx`, `hsty`, `maxp`, `name`, `post`) and
@@ -311,8 +313,8 @@ There are some 6,500 files, about 19 MB on disk (NTFS). In bytes that is
 
 What it is not yet:
 
-- The compressed sounds (IMA ADPCM), the ring tones' `TDTMFCodec`
-  parameters and the tables are still `.bin` files.
+- (Done since: every binary of the tree has a text form - "Every binary
+  as text", below.)
 - Inline objects are named by path in the manifest (`obj_x.slot`,
   `obj_x[2]`), and **an edit that moves them needs no change to the
   manifest**; `--relayout` does the rest:
@@ -774,9 +776,10 @@ Newton Internet Enabler, built in", has the whole of it).
   entries and imports resolved to them - what Apple's ROM build did to
   the ten, since the ROM's loader relocates nothing in the ROM and never
   installs a ROM part's imports.
-- One change to the NIE itself was needed, kept as a checked byte patch
-  beside it (`rex/inetenbl.patches.tsv`): it names its state after its
-  package's id, and a package in the ROM has no pkgRef.
+- One change to the NIE itself was needed, kept at first as a checked
+  byte patch beside it and now an edit to its source
+  (`rex/inetenbl/README.md`): it names its state after its package's id,
+  and a package in the ROM has no pkgRef.
 - The extension grows by 0x92000 bytes to end at 0x880048; the padding
   keeps the page tables and the patch table on pages.
 - `build --original` leaves the additions out, which is how
@@ -847,3 +850,45 @@ whatever file it is in.
   Newton build tools (the Rex builder, the ARM tools). It could check
   step 5's packages and ROM extension against Apple's builder, byte for
   byte.
+
+## Every binary as text
+
+The last of the tree's binaries were given text forms on the branch
+`romsrc-binaries-as-text` (2026-10-15).  Each round-trips byte for byte -
+the object file the committed tree builds was the same before and after
+each step but for the builder's stamp - and each has its tool, README and
+ctests:
+
+| What | Form | Tool | ctests |
+|---|---|---|---|
+| The locales' 7 Airus dictionaries (`'AirusA`) | `.lex` graphs, `lexicon(...)` | `tools/lexicons/newtonlex.py` | `tools.NewtonLexicons(ROM)` |
+| The ink codec's 2 code books (`'Comp`), the letter trigrams (`'Trigrams`), the Letter Shapes pictures (`'letterimages`) | `texttable(...)`: `code-book`, `trigrams`, `letter-images` | `tools/tables/inktables.py` | `tools.InkTables(ROM)` |
+| The cursive recogniser's DTEHeader, DTEMain, PPDMain, DTETrigrams | `texttable(...)`: `dte-header`, `dte-main`, `ppd-main`, `dte-trigrams` | `tools/tables/hwrtables.py` | `tools.HWRTables(ROM)` |
+| The 32 QuickDraw pictures | `picture(...)`: `picture.txt` and PNGs | `tools/pict/newtonpict.py` | `tools.NewtonPict(ROM)` |
+| The extension's header, config entries, page/export/patch tables, padding, package directories; `gParamBlock` | text pieces of `rex.tsv`/`romdata.tsv` | `tools/rex/rextext.py` | `tools.RExText(ROM)` |
+| WorldData's soup part | `rex/WorldData/` (`store`): its entries as NewtonScript, indexes and hints rebuilt | `tools/stores/newtonstore.py` | `tools.NewtonStore(ROM)`, `host.NewtonStoreMount` |
+| ScreenBuffer, ScreenDrivers; the protocol parts and native modules of the NIE's packages | `package.txt` and ARM source (`.s`) | `tools/armpart/newtonpkg.py`, `newtonarm.py` | `tools.ARMPart`, `tools.NewtonPackageText` |
+| The NIE's packages' frames parts | source trees, `rex/<package>/partN/` | `romsrc.py package unpack|pack` | `host.NewtonNIEBuiltIn`, ... |
+
+Two changes to the built bytes came with them, both on purpose:
+
+- ScreenBuffer's and ScreenDrivers' branches into the ROM's patch table
+  (0x01e00000) are written as the addresses they reach, so when
+  `--relayout` moves the packages (by 0x1a00 in the committed tree) the
+  22 branches still reach it - they were 0x1a00 off before - and the
+  patch table names the piece it branches into (`rex/ScreenBuffer/
+  +0x13c`) and follows it.
+- The NIE's packages are built from their source, so the byte patches
+  they had (`inetenbl.patches.tsv`, `inetstup.patches.tsv`) became edits
+  to the source (`rex/inetenbl/README.md`, `rex/inetstup/README.md`):
+  the NIE comes out 20 bytes longer, Internet Setup 60 shorter.
+
+Left as bytes: 6 of the NIE's functions, kept as bytecode as the
+extractor keeps any it cannot decompile so that it compiles back the same
+(`bytecode.tsv` in their trees says why: a `set-lex-scope` the decompiler
+does not follow, literals or tags the compiler gives otherwise) - their
+instructions are `bytes(...)` in the source or a `.bin` beside it.  The
+NTK's bytecode fallbacks (`bcFunc`) have an argFrame with only its three
+header slots where the host's compiler makes none; their records say so
+(` argframe=P,I` on the `@@` line), and the builder gives them one, which
+made 14 of them source.

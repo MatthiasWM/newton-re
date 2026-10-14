@@ -83,8 +83,12 @@ binary but strings and reals is kept as its bytes):
                      entries and the ten built-in packages), cut into pieces
                      in address order - a package with a frames part its
                      directory (<Package>.head.txt) and the part as a tree of
-                     its own (<Package>/), any other a .pkg file as the ROM
-                     holds it (its frames parts' refs ROM addresses: see
+                     its own (<Package>/); a soup part (WorldData) a store as
+                     text (`store`: tools/stores/newtonstore.py); any other
+                     package whole as text (`package`: package.txt and its
+                     protocol parts as ARM source, tools/armpart/newtonpkg.py,
+                     built at the address it falls at) or a .pkg file as the
+                     ROM holds it (its frames parts' refs ROM addresses: see
                      tools/newton-rom/analysis/packages.py), the header,
                      config entries, page, export and patch tables and the
                      padding text (tools/rex/rextext.py: what records where
@@ -93,11 +97,14 @@ binary but strings and reals is kept as its bytes):
                      they are put together; a .bin piece, its bytes, is read
                      too, as the tree tagged romsrc-rom has them) - which the
                      builder puts back together;
-                     a piece at address `-` was added (an ordinary package
-                     file, `rom-form`, put into the ROM's form where it
-                     falls, with <name>.patches.tsv applied first when there
-                     is one - the Newton Internet Enabler, romsrc/README.md),
-                     and build --original leaves such pieces out
+                     a piece at address `-` was added (a package, `rom-form`,
+                     put into the ROM's form where it falls - the Newton
+                     Internet Enabler, romsrc/README.md: a directory, its
+                     frames parts trees built as if the package lay at
+                     PACKAGE_BASE (`romsrc.py package unpack|pack`), or a
+                     package file, with <name>.patches.tsv applied first
+                     when there is one), and build --original leaves such
+                     pieces out
     magic.tsv        the magic-pointer table (gROMMagicPointerTable): each
                      entry's index and what it is - an object's path in
                      the layout, or a value

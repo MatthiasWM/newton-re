@@ -26,10 +26,10 @@ are kept. How it was made, and why it is shaped as it is, is in
 | `objects/*.ns` | The objects, as definitions `name := value;` in a notation that is a subset of NewtonScript's literals. A file holds the definitions one root object dominates, named after it (`Rbuiltinfunctions.ns`, `calendar_mp18.ns`). What several roots share is in `misc-NNN.ns`. |
 | `functions/*.ns` | Each NewtonScript function, as the decompiler wrote it (`tools/newton-rom/analysis/nsdecompile.py`), named by the slot that holds it: `Rbuiltinfunctions.AddAlarm.ns`. |
 | `maps.ns` | The frame maps (the slot names of the ROM's frames). |
-| `resources/` | The binaries: bitmaps as PNG (`bits`, `mask`, `cbits`), simple sounds as WAV, pictures as PICT, fonts as directories - a BDF file per bitmap strike and a text file per other table, which the builder packs back into the `'sfnt` binary (`tools/fonts/README.md`; what the tables hold, `docs/qd/fonts-sfnt.md`). The Unicode frame's tables (the encodings' maps, the character classes and case tables), the sorting tables and the locales' word- and line-break tables are text too, `texttable(...)`, each saying its format (`tools/tables/README.md`). What has no editable form yet (compressed sounds, the recognisers' trained data) is `.bin`. |
+| `resources/` | The binaries: bitmaps as PNG (`bits`, `mask`, `cbits`), simple sounds as WAV, QuickDraw pictures as directories - `picture.txt`, the opcodes as text, and a PNG per bitmap (`tools/pict/README.md`) - fonts as directories - a BDF file per bitmap strike and a text file per other table, which the builder packs back into the `'sfnt` binary (`tools/fonts/README.md`; what the tables hold, `docs/qd/fonts-sfnt.md`). The Unicode frame's tables (the encodings' maps, the character classes and case tables), the sorting tables, the locales' word- and line-break tables, the ink codec's code books, the letter trigrams, the Letter Shapes pictures and the cursive recogniser's trained tables (DTEHeader, DTEMain, PPDMain, DTETrigrams) are text too, `texttable(...)`, each saying its format (`tools/tables/README.md`). The locales' Airus dictionaries (`'AirusA`) are `.lex` graphs as the lexicons are (`lexicon(...)`). Nothing here is `.bin` any more. |
 | `lexicons/`, `lexicons.tsv` | The recognisers' lexicons, with their ROM addresses: the word lists as `.words` files (a word to a line, with its attribute after a tab where the list gives one - add or take out a line to add or take out a word) and the lexical grammars - dates, times, numbers, money, phone numbers - as `.lex` graphs of character sets. The builder makes the ROM's Airus dictionaries out of them, byte for byte (`tools/lexicons/README.md`); a list grown past its room in the ROM needs `--relayout`, which moves it. |
 | `romdata/`, `romdata.tsv` | The ROM's other data that code reads at its ROM address: the parameter block `gParamBlock` (0x1000, a page - `gROMVersion`, `gROMStage`, `gHardwareType`, ...), whose version words a package's native code reads (`armcpu`), as text: `gParamBlock.txt` names each word by the ROM's symbol (`0x13dc gROMVersion 0x00020002`) with the runs of nought one line each (`tools/rex/README.md`, format `words`). Added with `romsrc.py romdata build/MP2x00US romsrc`, the extractor's own code for it. |
-| `rex/`, `rex.tsv` | The ROM extension, in pieces: its header and config entries, and the ten packages. The pieces around the packages are text (`tools/rex/README.md`): the header (`header.txt` - its config entries name the pieces they cover, and its length and offsets are worked out on build), the config entries `dio`, `gpio` and `ralc` as rows of words, the page tables `ptpt`/`glpt`, the export table `fexp` (each ref with its package and object), the patch table `jump` (each branch's target) and the padding (a fill byte and an alignment). A package with a frames part is `<Package>.head.txt` (its directory: names, flags and strings, the sizes and offsets worked out from the part) and the part as a tree of its own in `<Package>/` (the same layout as this one); ScreenBuffer, ScreenDrivers and WorldData are `.pkg` files still. The three packages added to it (`newtdev.pkg`, `inetenbl.pkg`, `inetstup.pkg`, at address `-`) are ordinary package files, with `inetenbl.patches.tsv` beside the one that needed changing. |
+| `rex/`, `rex.tsv` | The ROM extension, in pieces: its header and config entries, and the ten packages. The pieces around the packages are text (`tools/rex/README.md`): the header (`header.txt` - its config entries name the pieces they cover, and its length and offsets are worked out on build), the config entries `dio`, `gpio` and `ralc` as rows of words, the page tables `ptpt`/`glpt`, the export table `fexp` (each ref with its package and object), the patch table `jump` (each branch's target) and the padding (a fill byte and an alignment). A package with a frames part is `<Package>.head.txt` (its directory: names, flags and strings, the sizes and offsets worked out from the part) and the part as a tree of its own in `<Package>/` (the same layout as this one). WorldData is `WorldData.head.txt` and its soup part `WorldData/` (`rex.tsv`: `store`), the store as text - its 753 countries and cities one entry to a line in `entries.ns`, its indexes and word hints made on build (`tools/stores/README.md`). ScreenBuffer and ScreenDrivers are directories (`package`): `package.txt` and each protocol part as ARM source, `part0.s`, assembled where the package falls (`tools/armpart/README.md`). The three packages added to it (`newtdev/`, `inetenbl/`, `inetstup/`, at address `-`, `rom-form`) are directories too: `package.txt`, each frames part a tree (`partN/`), each protocol part and native module ARM source; each has a README, which for the two that needed changing says what was changed and why. |
 | `magic.tsv` | The magic-pointer table: `@index` and the object it names. |
 | `layout.tsv` | The manifest: every object's address, path in the source and header flags, each frame's map, and aliases (shared objects that a compiled function makes afresh). |
 | `bytecode.tsv` (in a part's tree) | The functions kept as bytecode, with the reason, when any are. None are now. |
@@ -71,7 +71,7 @@ python tools/newton-rom/analysis/romsrc.py build romsrc --relayout -o build/obje
   upright (`obj_642059.Open`), the Typewriter keyboard is made the
   screen's width when its small size does not fit
   (`obj_630d25.viewSetupFormScript`), Internet Setup's edit slip and
-  its keyboard fit the screen (`rex/inetstup.patches.tsv`), and so does
+  its keyboard fit the screen (`rex/inetstup/README.md`), and so does
   the slip that asks for a missing piece of a worksite or the owner's
   card - Time Zones' "choose the closest city" (`obj_646cf1`, @508) - and it
   may be changed further to enhance the
@@ -191,13 +191,13 @@ MMU entries naming the patch table's physical page, 0x7ee000) are carried
 unchanged - nothing on the host reads them; a MessagePad would need them
 to name the table's new page, 0x880000.
 
-**What the NIE needed changing** (`rex/inetenbl.patches.tsv`, applied by
-the builder, each change checked against the bytes it replaces): the NIE
-keeps its state in a global named after its package's id,
-`GetPkgRefInfo(ObjectPkgRef(...)).id`, and a package in the ROM has no
-pkgRef - `ObjectPkgRef` answers nil and `GetPkgRefInfo(nil)` throws, so
-`InetStartUp` could not start. Four functions' five bytes each make the
-name `"PkgVars_id"` instead. Nothing else in the three packages minds
+**What the NIE needed changing** (`rex/inetenbl/README.md`; first a
+byte patch, now an edit to the source - four places marked `//
+DEVIATION`): the NIE keeps its state in a global named after its
+package's id, `GetPkgRefInfo(ObjectPkgRef(...)).id`, and a package in the
+ROM has no pkgRef - `ObjectPkgRef` answers nil and `GetPkgRefInfo(nil)`
+throws, so `InetStartUp` could not start. The four functions that make
+the name use `'id` instead, so the name is `"PkgVars_id"`. Nothing else in the three packages minds
 where it lies: the NTK unit glue waits on the "Packages" soup as it does
 for a stored copy (a change to it during the boot sets it off), and
 marking a package in the ROM busy does nothing.
