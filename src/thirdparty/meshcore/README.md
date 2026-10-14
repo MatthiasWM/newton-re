@@ -32,6 +32,12 @@ Left out (not used, or Arduino-only):
   Arduino/RPi HALs (the board's HAL is `src/host/esp32/main`'s).
   `RadioLib.h` includes only those modules.
 
+Changed: base64's `base64.hpp` defines its functions in the header, so a
+second file including it (`hal/host/HostMesh.cpp` beside `BaseChatMesh.cpp`)
+met the first's definitions at link time ("multiple definition of
+`binary_to_base64`" from GNU ld on Linux; the Windows zig build happened to
+link).  Its eight definitions are marked `inline`; nothing else differs.
+
 Added: `compat/` - a minimal `Arduino.h` (the C library's headers) and
 `Stream.h` (the interface `Identity` and `Utils` name), so the sources build
 without Arduino on a desktop and under plain ESP-IDF on the board, and
