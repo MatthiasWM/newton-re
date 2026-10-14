@@ -92,6 +92,20 @@ it for large binaries written piecemeal.
   `InitPackageSoups` (0x00162a1c) registers it and the
   `TPackageStorePartHandler` for parts of type `'soup`; `gPackageStores`
   holds the store frames made from mounted packages.
+
+  What is in one: WorldData's 2128 objects are a store exactly as the
+  soup code writes it (formatted, nine soups created, 753 entries added),
+  its ids the order the objects were made in, renumbered from 0 (the
+  root): the root, the name index's info, the map and symbol
+  tables, the store frame's bucket, text and frame, then per soup its
+  index infos, its frame, and per entry the buckets its new maps and
+  symbols made, its text object, its object and the B-tree nodes its
+  index adds made (the indexes taken last to first, `AlterIndexes`).
+  Established by `tools/stores/newtonstore.py`, which replays that
+  history through a Python re-expression of the writer, the hash tables
+  and `TSoupIndex` and gets every byte back but one node's stale parent
+  id (`tools/stores/README.md`), and which turns such a store into text
+  and back.
 * **`THostStore`** (`src/stores/host/HostStore.cpp`): the host's internal
   store, kept in host memory - a re-expression of the contract above, not
   a reconstruction (no ROM citations): objects in a table by id, ids never
