@@ -44,6 +44,8 @@ Setup assistant, then the Notepad.  Useful options:
 | `--package FILE.pkg` | install a package (or drop one onto the window) |
 | `--card FILE` | a PC Card (memory or ATA) from a host image |
 | `--ipp-printer URI` | print to a network printer by IPP (printers can also be found and added from the Newton itself) |
+| `--cell-port PORT` | a cellular modem (or `tools/modem/fakecell.py`) for calls and text messages; the Messages application appears with it |
+| `--mesh-air lan[:port]` | a pretend LoRa air over UDP multicast, for the Mesh application (MeshCore) between desktops |
 | `--rom IMAGE` | boot the original ROM image instead, for comparison |
 
 Handwriting is read by both of the ROM's recognisers, ink is kept, the
@@ -55,8 +57,66 @@ does and what is still NOT YET is in [docs/](docs/) -
 [docs/newt/README.md](docs/newt/README.md) for the boot, and
 [docs/next-steps.md](docs/next-steps.md) for what is left.
 
-Run the tests with `ctest --test-dir build/host` (about 400 of them; a
+Run the tests with `ctest --test-dir build/host` (about 460 of them; a
 build without the ROM image simply skips the few that compare against it).
+
+### Where it runs
+
+| Host | State | Page |
+|---|---|---|
+| Windows (x86-64) | the development host: zig toolchain, a window, sound, printing, docking | this README |
+| Linux (x86-64) | the system's clang; X11 and ALSA; every ctest passes (checked under WSL 2) | [docs/host-lp64.md](docs/host-lp64.md) |
+| 32-bit x86 Linux | built and tested under WSL by `tools/host/wsl32.sh`; the proof that the tree is correct at 32 bits | [docs/host-lp64.md](docs/host-lp64.md) |
+| reMarkable Paper Pro | runs from AppLoad on the tablet's e-paper, written on with the Marker | [docs/host-remarkable.md](docs/host-remarkable.md) |
+| LilyGO T-Deck Pro | **boots and runs on the board** (ESP32-S3, e-paper, touch, keyboard) - below | [docs/host-tdeck-pro.md](docs/host-tdeck-pro.md) |
+| macOS | planned: the POSIX seams are in the source, the window and sound are not written | [docs/host-macos.md](docs/host-macos.md) |
+
+Pushing to `main` builds and smoke-tests the Windows, Linux and reMarkable
+builds on GitHub's runners, and a `v*` tag publishes them as a release
+([docs/releases.md](docs/releases.md)).
+
+### The T-Deck Pro
+
+The [LilyGO T-Deck Pro](https://lilygo.cc/products/t-deck-pro) - an
+ESP32-S3 (two 240 MHz Xtensa cores, 8 MB of PSRAM, 16 MB of flash) with a
+240x320 one-bit e-paper panel, a capacitive touch screen and a keyboard -
+runs the same tree as the desktops, built with ESP-IDF through PlatformIO
+([src/host/esp32/README.md](src/host/esp32/README.md) says how to build,
+bake and flash it; [tools/tdeck/](tools/tdeck/README.md) has the tools).
+On the owner's board:
+
+* **The OS boots in about 3 seconds**: the ROM's objects baked on the
+  development machine (`newton --bake-objects`) and mapped from flash
+  read-only, the kernel's tasks on FreeRTOS, a 1 MB NewtonScript heap in
+  PSRAM.
+* **The e-paper panel** is the Newton's screen (partial refreshes of only
+  what changed, full ones to clear the ghosts), the **touch panel** its pen
+  and the **keyboard** its keyboard; the screen turns to landscape when
+  the Newton asks.
+* **The internal store** is a 4 MB partition of the board's flash, read in
+  place and written in batched runs, so notes, cards and settings survive a
+  restart.
+* **Wi-Fi** is set up from Internet Setup (scan, password, remembered
+  networks), the clock set by SNTP; the Newton reaches the Internet and
+  **prints** to the network's IPP printers, found by mDNS.
+* **The battery** (`BatteryStatus`) is the board's fuel gauge and charger;
+  the **GPS** receiver gives a fix.
+* **The 4G variant's modem** (A7682E) is driven through the ROM's own
+  Phone transport and Calls log, and text messages go through the In/Out
+  Box and a **Messages** application
+  ([docs/host-tdeck-pro-phone.md](docs/host-tdeck-pro-phone.md)).
+* **The LoRa radio** (SX1262) is a [MeshCore](https://github.com/meshcore-dev/MeshCore)
+  node with a **Mesh** chat application
+  ([docs/host-tdeck-pro-mesh.md](docs/host-tdeck-pro-mesh.md)); the radio,
+  the modem and the GPS can each be switched off in the Host preferences
+  to save the battery.
+
+The board found bugs of the reconstruction that x86 had hidden (a glue
+function dropping its result, a one-byte overrun, an unwinder that cannot
+leave a task's first frame), all fixed in the tree.  Still open: a real
+call and a message exchanged with another MeshCore node on the board,
+the OS's applications at 240x320 (several have been fitted, others not),
+and NewtonScript's speed in PSRAM.
 
 ### Two executables: `newton` and `newton64`
 
@@ -106,6 +166,7 @@ what changes, the boundary, time, the tests - is
 | `docs/` | Reverse-engineering notes per subsystem, starting with the kernel ([docs/os600](docs/os600/README.md)); generated tables are marked as such |
 | `docs/curiosities.md` | The findings worth telling somebody about: clever tricks, shipped bugs, and the compiler idioms that are easy to misread |
 | `docs/next-steps.md` | Where the last piece of work left off and what is obviously next, with the groundwork already read out of the ROM |
+| `tools/host/`, `tools/remarkable/`, `tools/tdeck/` | Tools for the host builds: sampling, profiling and the 32-bit build; the reMarkable's packaging and probes; the T-Deck Pro's source list, serial console, profiler and panel screenshots |
 | `tools/mpdumper/` | Alexey Danilchenko's 2004 symbol dumper (libiberty demangler) and its pre-generated symbol listings for the US ROM; used as the reference oracle for our demangler |
 
 ## Reproducing the Ghidra project

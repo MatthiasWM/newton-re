@@ -1,8 +1,9 @@
 # A LilyGO T-Deck Pro host: what it would take
 
-*An investigation (2026-10-10, branch `tdeck-pro-investigation`). Nothing
-here runs on the device yet; what is measured was measured on the
-development machine, and says so.*
+*Begun as an investigation (2026-10-10, branch `tdeck-pro-investigation`);
+the OS has since been booted and run on the owner's board - the dated
+sections from "The ESP-IDF skeleton" on are that work.  What was measured
+on the development machine says so.*
 
 The question: the MessagePad 2x00 ran this OS in a few megabytes, so could
 the reconstruction run on a small device like the
