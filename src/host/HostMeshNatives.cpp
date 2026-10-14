@@ -80,6 +80,11 @@ FHostMeshStatus(RefArg /*rcvr*/)
 	SetSlot(status, "radioIdleRestarts", info.radioIdleRestarts >= 0 ? RefVar(MAKEINT(info.radioIdleRestarts)) : RefVar(NILREF));
 	SetSlot(status, "radioIdleMs", RefVar(MAKEINT(info.radioIdleMs)));
 	SetSlot(status, "errFlags", RefVar(MAKEINT(info.errFlags)));
+	SetSlot(status, "rawPackets", RefVar(MAKEINT(info.rawPackets)));
+	SetSlot(status, "rawDropped", RefVar(MAKEINT(info.rawDropped)));
+	SetSlot(status, "lastDroppedHeader", info.lastDroppedHeader >= 0 ? RefVar(MAKEINT(info.lastDroppedHeader)) : RefVar(NILREF));
+	SetSlot(status, "poolFree", RefVar(MAKEINT(info.poolFree)));
+	SetSlot(status, "lastFreqError", RefVar(MAKEINT(info.lastFreqError)));
 	SetSlot(status, "noiseFloor", RefVar(MAKEINT(info.noiseFloor)));
 	SetSlot(status, "lastRssi", RefVar(MAKEINT((long) info.lastRssi)));
 	SetSlot(status, "lastSnr", RefVar(MAKEINT((long) info.lastSnr)));

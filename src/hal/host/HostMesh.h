@@ -173,6 +173,9 @@ struct HostMeshPlatform
 	// how often the radio was found out of receive (neither receiving nor
 	// sending) and put back, and for how long all told (NULL: not watched)
 	long			(*radioIdle)(void* ref, long* idleMs);
+	// the radio's estimate of the last packet's frequency error, in Hz
+	// (NULL: not told) - at a narrow bandwidth an offset costs sensitivity
+	long			(*radioFrequencyError)(void* ref);
 };
 
 // The engine's thread
@@ -215,6 +218,15 @@ struct HostMeshStatusInfo
 	long					radioIdleMs;		// ... how long it had been out, all told
 	int						errFlags;			// MeshCore's dispatcher's (ERR_EVENT_*: 1 pool full, 2 channel busy too long, 4 not receiving for 8 s)
 	int						noiseFloor;			// dBm, MeshCore's sampling (0: not yet)
+	// every packet the radio read intact (its CRC good), before MeshCore
+	// parses it - and those its parser drops unseen: a payload version past
+	// 1, a path mode of 3, a path or payload longer than it takes; and the
+	// packets free in its pool (none: a packet read is dropped unseen)
+	long					rawPackets;
+	long					rawDropped;
+	int						lastDroppedHeader;	// (its header and path-length bytes: header << 8 | path_len; -1 none)
+	int						poolFree;
+	long					lastFreqError;		// Hz, the radio's estimate for the last packet (0: not told)
 	float					lastRssi, lastSnr;
 };
 void		HostMeshGetStatus(HostMeshStatusInfo* status);

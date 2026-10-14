@@ -216,7 +216,14 @@ every 100 ms; out of receive for more than a second while MeshCore's
 wrapper thinks it is receiving, it is put back and counted - nil where
 not watched), `errFlags` (MeshCore's dispatcher's: 1 packet pool full, 2
 channel busy too long, 4 not receiving for 8 s), `noiseFloor` (MeshCore's
-sampling, dBm), `lastRssi`, `lastSnr`.  **RadioLib's
+sampling, dBm), `lastRssi`, `lastSnr`; `rawPackets` (every packet the radio
+read with a good CRC, before MeshCore parses it), `rawDropped` and
+`lastDroppedHeader` (those its parser drops unseen: a payload version past
+1, path mode 3, too long), `poolFree` (MeshCore's packet pool: none free and
+a packet read is dropped unseen), `lastFreqError` (Hz, the SX1262's
+estimate for the last packet: at 62.5 kHz an offset costs sensitivity).
+Our MeshCore's packet format, dispatcher and radio wrappers were checked
+against upstream's main on 2026-10-14: identical.  **RadioLib's
 `SX126x::getStatus()` always says 0** (it reads no byte after the
 command); the board reads the status byte itself
 (`TDeckRadioHal::ReadStatus`) - the first try at the watchdog used

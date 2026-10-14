@@ -528,6 +528,14 @@ RadioCheck(void*)
 }
 
 
+// (the SX1262's estimate, its register kept until the next packet)
+static long
+RadioFrequencyError(void*)
+{
+	return (long) gRadio.getFrequencyError();
+}
+
+
 static long
 RadioIdle(void*, long* idleMs)
 {
@@ -580,6 +588,7 @@ HostDeviceLoraStart(void)
 	gPlatform.radioErrors = RadioErrors;
 	gPlatform.radioCheck = RadioCheck;
 	gPlatform.radioIdle = RadioIdle;
+	gPlatform.radioFrequencyError = RadioFrequencyError;
 	HostMeshWillRun();					// (the Newton's side boots while the radio starts)
 
 	// the engine's task: its stack in PSRAM (core 0, beside the WiFi's and the

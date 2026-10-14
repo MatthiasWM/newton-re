@@ -528,11 +528,36 @@ public:
 
 	// what was heard, counted (HostMeshStatus): every packet the dispatcher
 	// parsed, before it is known to be a repeat
-	void logRxRaw(float snr, float rssi, const uint8_t*, int) override
+	void logRxRaw(float snr, float rssi, const uint8_t* raw, int len) override
 	{
+		// (as Dispatcher::tryParsePacket will judge it)
+		bool dropped = len < 2;
+		int path = 0;
+		if (!dropped)
+		{
+			uint8_t header = raw[0];
+			int i = 1 + ((header & PH_ROUTE_MASK) == ROUTE_TYPE_TRANSPORT_FLOOD || (header & PH_ROUTE_MASK) == ROUTE_TYPE_TRANSPORT_DIRECT ? 4 : 0);
+			if (((header >> PH_VER_SHIFT) & PH_VER_MASK) > PAYLOAD_VER_1 || i >= len)
+				dropped = true;
+			else
+			{
+				path = raw[i++];
+				int pathBytes = (path & 63) * ((path >> 6) + 1);
+				dropped = (path >> 6) == 3 || pathBytes > MAX_PATH_SIZE || i + pathBytes > len
+					   || len - i - pathBytes > MAX_PACKET_PAYLOAD;
+			}
+		}
+		long frequencyError = gPlatform->radioFrequencyError != NULL ? gPlatform->radioFrequencyError(gPlatform->ref) : 0;
 		std::lock_guard<std::mutex> hold(gLock);
 		gStatus.lastRssi = rssi;
 		gStatus.lastSnr = snr;
+		gStatus.lastFreqError = frequencyError;
+		gStatus.rawPackets++;
+		if (dropped)
+		{
+			gStatus.rawDropped++;
+			gStatus.lastDroppedHeader = len > 0 ? (raw[0] << 8 | (path & 255)) : 0;
+		}
 	}
 
 	void logRx(mesh::Packet* pkt, int, float) override
@@ -903,6 +928,7 @@ HostMeshRun(const HostMeshPlatform* platform)
 	{
 		std::lock_guard<std::mutex> hold(gLock);
 		gStatus.lastUnknownHash = -1;
+		gStatus.lastDroppedHeader = -1;
 	}
 	gStarted = true;
 	{
@@ -1089,6 +1115,7 @@ HostMeshRun(const HostMeshPlatform* platform)
 			gStatus.radioIdleRestarts = platform->radioIdle != NULL ? platform->radioIdle(platform->ref, &idleMs) : -1;
 			gStatus.radioIdleMs = idleMs;
 			gStatus.errFlags = node->ErrFlags();
+			gStatus.poolFree = manager->getFreeCount();
 			gStatus.noiseFloor = platform->radio->getNoiseFloor();
 		}
 
