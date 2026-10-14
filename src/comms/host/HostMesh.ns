@@ -26,7 +26,14 @@
 // Saved contacts are Names cards (the owner's choice, 2026-10-14): a node's
 // key is kept in one of the Names file's custom fields, the one labelled
 // "Mesh Key" (made, the first free customN, the first time a node is
-// saved), so that a card shows it and it can be edited there.  The cards
+// saved), so that a card shows it and it can be edited there.
+//
+// Channels (the owner's ask, 2026-10-14): Public, and those joined with
+// New's "Join Channel" - a hashtag channel ("#name", its secret made from
+// its name, as every MeshCore application makes it) or a private one (its
+// secret typed: 32 or 64 hex digits, or base64).  A channel's thread is
+// "ch:" & its name (Public's stays "public"); each is listed under Public,
+// in the order joined, and its header offers Show Key and Leave Channel.  The cards
 // with a key are given to the engine as MeshCore favourites (HostMesh-
 // SaveContact: kept first across restarts, never the one to make room)
 // whenever the application starts or opens, and a favourite whose card has
@@ -217,7 +224,7 @@
 				end;
 			end;
 			// (a node chosen with New, nothing said yet, is a conversation too)
-			if currentThread and not byThread.(Intern("t" & currentThread)) then
+			if currentThread and not byThread.(Intern("t" & currentThread)) and not mesh:IsChannel(currentThread) then
 				AddArraySlot(list, {thread: currentThread, name: mesh:NodeName(currentThread), text: nil, time: Time(), unread: 0});
 			local public := byThread.(Intern("t" & mesh.kPublic));
 			if public then
@@ -226,7 +233,21 @@
 				public := {thread: mesh.kPublic, text: nil, time: nil, unread: 0};
 			public.name := "Public channel";
 			threads := [public];
-			ArrayMunger(threads, 1, 0, Sort(list, '|>|, 'time), 0, nil);
+			// the channels joined, in order, under Public
+			local joined := HostMeshChannels();
+			if joined then
+				foreach i, c in joined do
+					if i > 0 then begin
+						local thread := mesh:ChannelThread(c.name);
+						local t := byThread.(Intern("t" & thread));
+						if t then
+							ArrayRemoveCount(list, LSearch(list, t, 0, '|=|, nil), 1)
+						else
+							t := {thread: thread, text: nil, time: nil, unread: 0};
+						t.name := c.name;
+						AddArraySlot(threads, t);
+					end;
+			ArrayMunger(threads, Length(threads), 0, Sort(list, '|>|, 'time), 0, nil);
 		end,
 
 		// the messages of a thread, oldest first
@@ -277,7 +298,10 @@
 		// a conversation's name: its node's Names card's, or as heard, or its id
 		ThreadName: func(t)
 		begin
-			local card := if not StrEqual(t.thread, :Mesh().kPublic) then :Mesh():SavedCard(t.thread);
+			local mesh := :Mesh();
+			if StrEqual(t.thread, mesh.kPublic) then return "Public channel";
+			if mesh:IsChannel(t.thread) then return mesh:ChannelOf(t.thread);
+			local card := mesh:SavedCard(t.thread);
 			if card then card.name
 			else if t.name then t.name
 			else :Mesh():ShortKey(t.thread);
@@ -359,6 +383,8 @@
 			end;
 			AddArraySlot(items, {item: "Add by Key…\u", mark: $ });
 			AddArraySlot(pickNodes, 'addByKey);
+			AddArraySlot(items, {item: "Join Channel…\u", mark: $ });
+			AddArraySlot(pickNodes, 'joinChannel);
 			DoPopup(items, 0, 0, self);
 		end,
 
@@ -369,6 +395,8 @@
 			local chosen := if nodes and index >= 0 and index < Length(nodes) then nodes[index];
 			if chosen = 'addByKey then
 				:OpenAddByKey()
+			else if chosen = 'joinChannel then
+				:OpenJoinChannel()
 			else if IsString(chosen) then
 				:OpenThread(chosen);
 		end,
@@ -457,6 +485,7 @@
 		begin
 			local t := :ThreadFor(thread);
 			if StrEqual(thread, :Mesh().kPublic) then "Delete every message on the Public channel?"
+			else if :Mesh():IsChannel(thread) then "Delete every message on " & :Mesh():ChannelOf(thread) & "?"
 			else "Delete the conversation with " & (if t then :ThreadName(t) else "this node") & "?";
 		end,
 
@@ -571,6 +600,121 @@
 				 viewBounds: {left: -60, top: -28, right: -30, bottom: -10}, viewJustify: 160,
 				 text: "Add",
 				 buttonClickScript: func() theSlip:Add()}
+			]
+		},
+
+		// a channel's secret shown, to be typed into another device
+		ShowChannelKey: func(thread)
+		begin
+			local name := :Mesh():ChannelOf(thread);
+			local secret := nil;
+			local joined := HostMeshChannels();
+			if joined then
+				foreach c in joined do
+					if StrEqual(c.name, name) then secret := c.secret;
+			GetRoot():Notify(3, name, if secret then
+				(if BeginsWith(name, "#") then "A hashtag channel: anyone who joins " & name & " is in it. Its secret: "
+				 else "A private channel: give this secret only to those who should be in it. ") & secret
+				else "This node is no longer in the channel.");
+		end,
+
+		// a channel left, once confirmed (its messages are kept until deleted)
+		LeaveChannel: func(thread)
+		begin
+			local name := :Mesh():ChannelOf(thread);
+			AsyncConfirm("Leave " & name & "? Its messages are kept until you delete them.",
+				[{value: true, text: "Leave"}, {value: nil, text: "Cancel"}],
+				func(confirmed) if confirmed then begin
+					HostMeshLeaveChannel(name);
+					base:Reload();
+					base:Layout();
+				end);
+		end,
+
+		// Join Channel: a hashtag channel by its name, or a private one by its
+		// name and secret; its conversation opened
+		joinSlip: nil,
+		OpenJoinChannel: func()
+		begin
+			if joinSlip and joinSlip.viewCObject then
+				joinSlip:Close();
+			local box := :GlobalBox();
+			local width := Min(box.right - box.left - 12, 260);
+			local height := Min(130, box.bottom - box.top - 8);
+			joinSlip := BuildContext({_proto: joinTemplate, meshApp: self,
+				viewBounds: RelBounds(box.left + (box.right - box.left - width) div 2,
+					box.top + (box.bottom - box.top - height) div 3, width, height)});
+			joinSlip:Open();
+		end,
+
+		joinTemplate: {
+			_proto: @179,						// protoFloatNGo
+			meshApp: nil,
+			theSlip: nil,
+			nameLine: nil, secretLine: nil,
+			viewSetupFormScript: func()
+			begin
+				theSlip := self;
+				inherited:?viewSetupFormScript();
+			end,
+			viewSetupDoneScript: func()
+			begin
+				inherited:?viewSetupDoneScript();
+				foreach v in :ChildViewFrames() do
+					if v.role then
+						self.(v.role) := v;
+			end,
+			viewQuitScript: func()
+			begin
+				if meshApp then meshApp.joinSlip := nil;
+				nameLine := secretLine := nil;
+				inherited:?viewQuitScript();
+			end,
+			Join: func()
+			begin
+				local mesh := GetGlobalVar('|HostMesh:host|);
+				local name := mesh:ChannelName(if nameLine then nameLine.entryLine.text);
+				local secret := if secretLine then TrimString(Clone(secretLine.entryLine.text)) else "";
+				if not StrFilled(secret) then secret := nil;
+				if not name then begin
+					GetRoot():Notify(3, "Mesh", "A channel needs a name: #name for a hashtag channel, or the name of a private one.");
+					return nil;
+				end;
+				local result := HostMeshJoinChannel(name, secret);
+				if result <> true then begin
+					GetRoot():Notify(3, "Mesh",
+						if result = 'badSecret then
+							(if BeginsWith(name, "#") then "The secret is 32 or 64 hexadecimal digits, or base64 - or leave it empty: a hashtag channel's comes from its name."
+							 else "A private channel needs its secret: 32 or 64 hexadecimal digits, or base64. A hashtag channel's name begins with #.")
+						else if result = 'full then "This node is in as many channels as it can be (" & NumberStr(8) & "). Leave one first."
+						else if result = 'already then "This node is already in that channel."
+						else "That name cannot be a channel's (31 letters at most).");
+					return nil;
+				end;
+				local app := meshApp;
+				:Close();
+				if app and app.viewCObject then
+					app:OpenThread(mesh:ChannelThread(name));
+			end,
+			stepChildren: [
+				{_proto: @218,					// protoStaticText
+				 viewBounds: {left: 10, top: 8, right: -10, bottom: 24}, viewJustify: 48,
+				 text: "Join a channel", viewFont: 1058816},
+				{_proto: @189,					// protoLabelInputLine
+				 role: 'nameLine,
+				 viewBounds: {left: 10, top: 30, right: -10, bottom: 50}, viewJustify: 48,
+				 label: "Name", labelFont: 1058816, entryFont: 10240, indent: 50},
+				{_proto: @189,					// protoLabelInputLine
+				 role: 'secretLine,
+				 viewBounds: {left: 10, top: 54, right: -10, bottom: 74}, viewJustify: 48,
+				 label: "Secret", labelFont: 1058816, entryFont: 9216, indent: 50},
+				{_proto: @218,					// protoStaticText
+				 viewBounds: {left: 10, top: 78, right: -10, bottom: 94}, viewJustify: 48,
+				 text: "None for #name: it comes from the name", viewFont: 9216},
+				{_proto: @226,					// protoTextButton
+				 viewBounds: {left: -60, top: -28, right: -30, bottom: -10}, viewJustify: 160,
+				 text: "Join",
+				 buttonClickScript: func() theSlip:Join()}
 			]
 		},
 
@@ -991,7 +1135,9 @@
 					local t := if base.currentThread then base:ThreadFor(base.currentThread);
 					if t and base.mode = 'thread then begin
 						:DrawShape(base:Diamond(12, bt + bh div 2, 4), {penPattern: 0, fillPattern: 5});
-						local id := if StrEqual(t.thread, base:Mesh().kPublic) then "everyone" else base:Mesh():ShortKey(t.thread);
+						local id := if StrEqual(t.thread, base:Mesh().kPublic) then "everyone"
+							else if base:Mesh():IsChannel(t.thread) then "channel"
+							else base:Mesh():ShortKey(t.thread);
 						local iw := StrFontWidth(id, base.kSmall);
 						:DrawShape(MakeText(StyledStrTruncate(base:ThreadName(t), w - iw - 40, base.kBold), 22, bt, w - iw - 12, bt + bh), {font: base.kBold});
 						:DrawShape(MakeText(id, w - iw - 8, st, w, st + sh), {font: base.kSmall});
@@ -1004,11 +1150,18 @@
 					local base := :Parent();
 					local narrow := (base:LocalBox()).right < base.kSideBySideWidth;
 					local mesh := base:Mesh();
-					local node := base.mode = 'thread and base.currentThread and not StrEqual(base.currentThread, mesh.kPublic)
-						and not mesh:SavedCard(base.currentThread);
-					if node then begin
-						headerPicks := ['save];
-						local items := [{item: "Save to Names", mark: $ }];
+					local thread := if base.mode = 'thread then base.currentThread;
+					local node := thread and not mesh:IsChannel(thread) and not mesh:SavedCard(thread);
+					local channel := thread and mesh:IsChannel(thread) and not StrEqual(thread, mesh.kPublic);
+					if node or channel then begin
+						local items;
+						if node then begin
+							headerPicks := ['save];
+							items := [{item: "Save to Names", mark: $ }];
+						end else begin
+							headerPicks := ['showKey, 'leave];
+							items := [{item: "Show Key", mark: $ }, {item: "Leave Channel", mark: $ }];
+						end;
 						if narrow then begin
 							AddArraySlot(items, 'pickseparator);
 							AddArraySlot(headerPicks, nil);
@@ -1033,7 +1186,11 @@
 						if base:Mesh():SaveNode(base.currentThread, if t then t.name) then
 							GetRoot():Notify(3, "Mesh", base:ThreadName(base:ThreadFor(base.currentThread)) & " is saved in Names.");
 						base:Redraw();
-					end else if chosen = 'list then
+					end else if chosen = 'showKey and base.currentThread then
+						base:ShowChannelKey(base.currentThread)
+					else if chosen = 'leave and base.currentThread then
+						base:LeaveChannel(base.currentThread)
+					else if chosen = 'list then
 						base:ShowList();
 				end,
 				pickCancelledScript: func() headerPicks := headerPopup := nil
@@ -1329,6 +1486,28 @@
 	ShortKey: func(key) if StrLen(key) > 8 then SubStr(key, 0, 8) else key,
 
 	/*----------------------------------------------------------------------
+		Channels
+	----------------------------------------------------------------------*/
+
+	// a channel's thread: "public" for Public, "ch:" & its name for another
+	ChannelThread: func(name) if StrEqual(name, "Public") then kPublic else "ch:" & name,
+	IsChannel: func(thread) IsString(thread) and (StrEqual(thread, kPublic) or BeginsWith(thread, "ch:")),
+	ChannelOf: func(thread) if StrEqual(thread, kPublic) then "Public" else SubStr(thread, 3, StrLen(thread) - 3),
+
+	// a channel's name as typed made one: spaces trimmed; a hashtag
+	// channel's in small letters, as MeshCore's applications make them (its
+	// secret is made from its name, so "#Melbourne" would be another
+	// channel) ==> the name, or nil
+	ChannelName: func(text)
+	begin
+		if not IsString(text) then return nil;
+		local name := TrimString(Clone(text));
+		if BeginsWith(name, "#") then
+			name := Downcase(name);
+		if StrLen(name) = 0 or StrEqual(name, "#") or StrLen(name) > 31 then nil else name;
+	end,
+
+	/*----------------------------------------------------------------------
 		Saved contacts: Names cards with a mesh key
 	----------------------------------------------------------------------*/
 
@@ -1524,7 +1703,7 @@
 	// a message the mesh received
 	Received: func(m)
 	begin
-		local thread := if m.channel then kPublic else m.key;
+		local thread := if m.channel then :ChannelThread(m.channel) else m.key;
 		local entry := {class: '|meshMessage:host|, thread: thread,
 			name: if m.channel then nil else m.name, sender: if m.channel then m.name else nil,
 			text: m.text, time: if m.age then Time() - m.age else Time(), dir: 'incoming, state: 'unread};
@@ -1543,8 +1722,11 @@
 	// a message sent: kept as 'sending, handed to the mesh
 	SendText: func(thread, name, text)
 	begin
-		local id := HostMeshSendText(if StrEqual(thread, kPublic) then nil else thread, text);
-		local entry := {class: '|meshMessage:host|, thread: thread, name: if StrEqual(thread, kPublic) then nil else name,
+		local channel := :IsChannel(thread);
+		local id := if StrEqual(thread, kPublic) then HostMeshSendText(nil, text)
+			else if channel then HostMeshSendChannelText(:ChannelOf(thread), text)
+			else HostMeshSendText(thread, text);
+		local entry := {class: '|meshMessage:host|, thread: thread, name: if channel then nil else name,
 			text: text, time: Time(), dir: 'outgoing, state: if id then 'sending else 'failed, sendId: id};
 		:Soup():AddToDefaultStoreXmit(entry, nil);
 		pending := true;

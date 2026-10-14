@@ -188,6 +188,69 @@ FHostMeshSaveContact(RefArg /*rcvr*/, RefArg key, RefArg name, RefArg saved)
 
 
 static Ref
+FHostMeshChannels(RefArg /*rcvr*/)
+{
+	if (!HostMeshStarted())
+		return NILREF;
+	static HostMeshChannel channels[kHostMeshChannelsMax];
+	long count = HostMeshGetChannels(channels, kHostMeshChannelsMax);
+	RefVar list(MakeArray(0));
+	for (long k = 0; k < count; k++)
+	{
+		RefVar channel(AllocateFrame());
+		SetSlot(channel, "name", RefVar(HostStringOfUTF8(channels[k].name)));
+		SetSlot(channel, "secret", RefVar(HostStringOfUTF8(channels[k].secret)));
+		AddArraySlot(list, channel);
+	}
+	return list;
+}
+
+
+static Ref
+FHostMeshJoinChannel(RefArg /*rcvr*/, RefArg name, RefArg secret)
+{
+	if (!IsString(name))
+		return RefVar(Intern((char*) "badName"));
+	char utf8[kHostMeshNameSize + 1];
+	HostUTF8Of(name, utf8, sizeof(utf8));
+	char text[64];
+	text[0] = 0;
+	if (IsString(secret))
+		HostUTF8Of(secret, text, sizeof(text));
+	static const char* const kWhy[] = { NULL, "badName", "badSecret", "full", "already", "noNode" };
+	int result = HostMeshJoinChannel(utf8, text);
+	if (result == kHostMeshJoined)
+		return TRUEREF;
+	return RefVar(Intern((char*) kWhy[result >= 0 && result <= 5 ? result : 5]));
+}
+
+
+static Ref
+FHostMeshLeaveChannel(RefArg /*rcvr*/, RefArg name)
+{
+	if (!IsString(name))
+		return NILREF;
+	char utf8[kHostMeshNameSize];
+	HostUTF8Of(name, utf8, sizeof(utf8));
+	return HostMeshLeaveChannel(utf8) ? TRUEREF : NILREF;
+}
+
+
+static Ref
+FHostMeshSendChannelText(RefArg /*rcvr*/, RefArg channel, RefArg text)
+{
+	if (!IsString(channel) || !IsString(text))
+		return NILREF;
+	char name[kHostMeshNameSize];
+	HostUTF8Of(channel, name, sizeof(name));
+	char utf8[kHostMeshTextSize];
+	HostUTF8Of(text, utf8, sizeof(utf8));
+	long id = HostMeshSendChannelText(name, utf8);
+	return id != 0 ? MAKEINT(id) : NILREF;
+}
+
+
+static Ref
 FHostMeshRegions(RefArg /*rcvr*/)
 {
 	RefVar list(MakeArray(0));
@@ -337,6 +400,10 @@ HostRegisterMeshFunctions(void)
 	SetSlot(functions, "HostMeshAvailable", RefVar(MakeCFunction((void*) FHostMeshAvailable, 0, nil)));
 	SetSlot(functions, "HostMeshStatus", RefVar(MakeCFunction((void*) FHostMeshStatus, 0, nil)));
 	SetSlot(functions, "HostMeshContacts", RefVar(MakeCFunction((void*) FHostMeshContacts, 0, nil)));
+	SetSlot(functions, "HostMeshChannels", RefVar(MakeCFunction((void*) FHostMeshChannels, 0, nil)));
+	SetSlot(functions, "HostMeshJoinChannel", RefVar(MakeCFunction((void*) FHostMeshJoinChannel, 2, nil)));
+	SetSlot(functions, "HostMeshLeaveChannel", RefVar(MakeCFunction((void*) FHostMeshLeaveChannel, 1, nil)));
+	SetSlot(functions, "HostMeshSendChannelText", RefVar(MakeCFunction((void*) FHostMeshSendChannelText, 2, nil)));
 	SetSlot(functions, "HostMeshSaveContact", RefVar(MakeCFunction((void*) FHostMeshSaveContact, 3, nil)));
 	SetSlot(functions, "HostMeshSendText", RefVar(MakeCFunction((void*) FHostMeshSendText, 2, nil)));
 	SetSlot(functions, "HostMeshSendState", RefVar(MakeCFunction((void*) FHostMeshSendState, 1, nil)));

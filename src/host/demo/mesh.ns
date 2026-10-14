@@ -13,7 +13,10 @@
 // saved contacts - Ada saved to Names from her conversation's header (a
 // card with the "Mesh Key" custom field, a MeshCore favourite), Bob added
 // by a meshcore:// link, New listing them first, a card taken out of Names
-// no longer saved; each screen snapshotted
+// no longer saved; channels - #newton-test joined from New's Join
+// Channel (typed in capitals, made small), listed under Public, a message
+// sent on it and Ada's echo filed there, a private channel without its
+// secret refused, the channel left; each screen snapshotted
 // (mesh-<width>x<height>-<n>.pgm).  The ctests host.NewtonMesh.<size>:
 //
 //   python tools/mesh/meshrun.py \
@@ -148,8 +151,8 @@ meSteps := [
 		local index := 0;
 		foreach i, k in meApp.pickNodes do
 			if IsString(k) and StrEqual(k, meAda.key) then index := i;
-		call meCheck with ("New ending with Add by Key", meApp.pickNodes[Length(meApp.pickNodes) - 1] = 'addByKey,
-			"it ends with " & meApp.pickNodes[Length(meApp.pickNodes) - 1]);
+		call meCheck with ("New ending with Add by Key and Join Channel", meApp.pickNodes[Length(meApp.pickNodes) - 2] = 'addByKey
+			and meApp.pickNodes[Length(meApp.pickNodes) - 1] = 'joinChannel, "it ends with " & meApp.pickNodes[Length(meApp.pickNodes) - 1]);
 		meApp:pickActionScript(index);
 		// (as a pick closes it: left open, it would take the next tap)
 		if popup and popup.viewCObject then popup:Close();
@@ -325,6 +328,66 @@ meSteps := [
 			local n := call meContact with (meBobKey);
 			n and not n.saved;
 		end, next, 10);
+	end,
+	// channels: #newton-test joined (Ada is in it, and echoes there)
+	func(next) begin
+		local mesh := GetGlobalVar('|HostMesh:host|);
+		call meCheck with ("Public the only channel at first", Length(HostMeshChannels()) = 1
+			and StrEqual(HostMeshChannels()[0].name, "Public"), "there are " & Length(HostMeshChannels()));
+		local popup := meApp:Compose();
+		local picks := meApp.pickNodes;
+		if popup and popup.viewCObject then popup:Close();
+		meApp.pickNodes := nil;
+		call meCheck with ("New offering Join Channel last", picks[Length(picks) - 1] = 'joinChannel,
+			"it ends with " & picks[Length(picks) - 1]);
+		meApp:OpenJoinChannel();
+		local slip := meApp.joinSlip;
+		call meCheck with ("the Join Channel slip", slip and slip.viewCObject and slip.secretLine, "it did not open");
+		// a private channel without its secret: refused
+		SetValue(slip.nameLine.entryLine, 'text, Clone("Friends"));
+		slip:Join();
+		call meCheck with ("a private channel needing its secret", slip.viewCObject and Length(HostMeshChannels()) = 1,
+			"it was joined");
+		SetValue(slip.nameLine.entryLine, 'text, Clone("#Newton-Test"));
+		call meSnap with ();
+		slip:Join();
+		call meCheck with ("#newton-test joined, its name made small", Length(HostMeshChannels()) = 2
+			and StrEqual(HostMeshChannels()[1].name, "#newton-test"), "the channels are " & Length(HostMeshChannels()));
+		call meCheck with ("its conversation opened", meApp.mode = 'thread and StrEqual(meApp.currentThread, "ch:#newton-test"),
+			"it is " & meApp.currentThread);
+		call meCheck with ("listed under Public", StrEqual(meApp.threads[1].thread, "ch:#newton-test")
+			and StrEqual(meApp:ThreadName(meApp.threads[1]), "#newton-test"), "the second is " & meApp.threads[1].thread);
+		// (the secret: the first 16 bytes of SHA-256 of "#newton-test")
+		call meCheck with ("its secret made from its name", StrLen(HostMeshChannels()[1].secret) = 32, "it is " & HostMeshChannels()[1].secret);
+		SetValue(meApp.replyLine.entryLine, 'text, Clone("Hi channel"));
+		meApp.sendButton:buttonClickScript();
+		call waitFor with ("mesh: Ada's echo on #newton-test", func() begin
+			local e := call meEntryWith with ("echo: Hi channel");
+			e and StrEqual(e.thread, "ch:#newton-test");
+		end, next, 40);
+	end,
+	func(next) begin
+		local echo := call meEntryWith with ("echo: Hi channel");
+		call meCheck with ("Ada's echo filed under the channel, from her", echo and StrEqual(echo.sender, "Ada") and echo.state = 'read,
+			"it is " & (if echo then echo.sender & " " & echo.state));
+		local sent := call meEntryWith with ("Hi channel");
+		call meCheck with ("the message on the air", sent and sent.state = 'sent and StrEqual(sent.thread, "ch:#newton-test"),
+			"it is " & (if sent then sent.state));
+		call meSnap with ();
+		// the header: Show Key and Leave Channel
+		meApp.headerView:viewClickScript(nil);
+		local picks := meApp.headerView.headerPicks;
+		local popup := meApp.headerView.headerPopup;
+		call meCheck with ("the channel's header offering Show Key and Leave Channel", picks and picks[0] = 'showKey and picks[1] = 'leave,
+			"it offers " & picks);
+		if popup and popup.viewCObject then popup:Close();
+		meApp.headerView.headerPicks := nil;
+		HostMeshLeaveChannel("#newton-test");
+		meApp:Reload();
+		call meCheck with ("left: Public the only channel again", Length(HostMeshChannels()) = 1, "there are " & Length(HostMeshChannels()));
+		call meCheck with ("its messages kept", Length(meApp:ThreadMessages("ch:#newton-test")) = 2,
+			Length(meApp:ThreadMessages("ch:#newton-test")) & " kept");
+		call next with ();
 	end,
 	func(next) begin
 		local hello := call meEntryWith with ("Hello mesh");

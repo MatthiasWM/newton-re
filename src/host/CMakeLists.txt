@@ -553,7 +553,7 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../fixtures/packages/fonts/monac
     foreach(size 240x320 320x480 480x320 810x1080)
         add_test(NAME host.NewtonMesh.${size}
                  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/mesh/meshrun.py --seconds 280
-                         --peer "$<TARGET_FILE:meshpeer> --air lan:{port} --name Ada --echo --channel 'Hello mesh' --seconds 300"
+                         --peer "$<TARGET_FILE:meshpeer> --air lan:{port} --name Ada --echo --channel 'Hello mesh' --join '#newton-test' --seconds 300"
                          -- $<TARGET_FILE:newton> --mesh-air lan:{port} --serial-port none --display ${size} --erase
                          --store ${CMAKE_CURRENT_BINARY_DIR}/mesh-${size}.store --headless 200
                          --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/mesh.ns

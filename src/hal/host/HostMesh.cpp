@@ -79,7 +79,7 @@ const long			kBandwidthCount = (long) (sizeof(kBandwidths) / sizeof(kBandwidths[
 
 // Every MeshCore node has the same key for the public channel: it is the
 // open conversation on the frequency, not a secret
-#define PUBLIC_CHANNEL_KEY	"izOH6cXN6mrJ5e26oRXNcg=="
+#define PUBLIC_CHANNEL_KEY	"8B3387E9C5CDEA6AC9E5EDBAA115CD72"	// (izOH6cXN6mrJ5e26oRXNcg== in base64)
 #define PUBLIC_CHANNEL_NAME	"Public"
 
 const unsigned long	kAdvertPeriodMs = 10 * 60 * 1000;	// this node announced unprompted this often
@@ -186,6 +186,7 @@ struct Send
 	long		id;
 	int			state;			// HostMeshSendState
 	bool		channel;
+	char		channelName[kHostMeshNameSize];	// (a channel's: "Public" or one joined)
 	uint8_t		key[kHostMeshKeySize];
 	char		text[kHostMeshTextSize];
 	int			attempt;		// 0: not yet sent
@@ -202,6 +203,20 @@ static bool					gNameAsked = false;
 static char					gNameWanted[kHostMeshNameSize];
 static bool					gRadioAsked = false;
 static HostMeshRadioSettings	gRadioWanted;
+// the channels: Public (MeshCore's slot 0) and those joined, kept in the
+// blob "channels"; changed by any thread, given to MeshCore by the engine's
+struct KeptChannel
+{
+	char		name[32];
+	uint8_t		secret[32];
+	uint8_t		size;			// 16 or 32
+	uint8_t		unused[3];
+};
+const long						kChannelsMagic = 0x4D434831;	// "MCH1"
+static HOST_LARGE_STATIC KeptChannel	gChannels[kHostMeshChannelsMax];
+static long						gChannelCount = 0;		// (Public included)
+static bool						gChannelsChanged = false;
+
 // contacts saved (MeshCore's favourites) or forgotten, by key
 struct ContactAsk
 {
@@ -324,6 +339,10 @@ static unsigned long			gContactsChangedAt = 0;
 static uint32_t					gContactsSignature = 0;		// the list as last kept
 
 static void		RecordMessage(const char* key, const char* name, const char* channel, const char* text, uint32_t sent);
+static int		SecretOf(const char* text, uint8_t* secret);
+static void		LoadChannels(void);
+static void		SaveChannels(void);
+static long		SendText(const char* key, const char* channel, const char* text);
 
 class HostMeshNode : public BaseChatMesh
 {
@@ -463,6 +482,49 @@ public:
 	}
 
 	int ErrFlags() const { return _err_flags; }
+
+	// a channel's slot in MeshCore's table, by name, or -1
+	int ChannelIndex(const char* name)
+	{
+		for (int k = 0; k < MAX_GROUP_CHANNELS; k++)
+		{
+			ChannelDetails d;
+			if (getChannel(k, d) && d.name[0] != 0 && strcmp(d.name, name) == 0)
+				return k;
+		}
+		return -1;
+	}
+
+	// the channels given to MeshCore's table, in order; the slots after
+	// them emptied
+	void ApplyChannels()
+	{
+		KeptChannel list[kHostMeshChannelsMax];
+		long count;
+		{
+			std::lock_guard<std::mutex> hold(gLock);
+			count = gChannelCount;
+			memcpy(list, gChannels, sizeof(list));
+		}
+		for (int k = 0; k < MAX_GROUP_CHANNELS; k++)
+		{
+			ChannelDetails d;
+			memset(&d, 0, sizeof(d));
+			if (k < count)
+			{
+				memcpy(d.name, list[k].name, sizeof(d.name));
+				d.name[sizeof(d.name) - 1] = 0;
+				memcpy(d.channel.secret, list[k].secret, list[k].size);
+			}
+			setChannel(k, d);
+			if (k >= count)
+			{
+				// (an empty slot's hash made one no packet has: its secret is
+				// nothing, and it is never searched in vain for long)
+				memset(&d, 0, sizeof(d));
+			}
+		}
+	}
 
 	// what was heard, counted (HostMeshStatus): every packet the dispatcher
 	// parsed, before it is known to be a repeat
@@ -652,9 +714,10 @@ public:
 			uint32_t ack = 0, timeout = 0;
 			if (s.channel)
 			{
-				ChannelDetails publicChannel;
-				state = getChannel(0, publicChannel)
-					 && sendGroupMessage(s.timestamp, publicChannel.channel, gSettings.name, s.text, (int) strlen(s.text))
+				ChannelDetails channel;
+				int index = ChannelIndex(s.channelName);
+				state = index >= 0 && getChannel(index, channel)
+					 && sendGroupMessage(s.timestamp, channel.channel, gSettings.name, s.text, (int) strlen(s.text))
 						? kHostMeshSendSent : kHostMeshSendFailed;
 				if (state == kHostMeshSendSent)
 				{
@@ -903,7 +966,8 @@ HostMeshRun(const HostMeshPlatform* platform)
 	HostMeshRadioSettings radio = RadioSettings();
 	bool radioUp = gPowered && platform->radioStart(platform->ref, &radio);
 	node->begin();
-	node->addChannel(PUBLIC_CHANNEL_NAME, PUBLIC_CHANNEL_KEY);
+	LoadChannels();
+	node->ApplyChannels();
 	node->LoadContacts();
 	node->Mirror();
 	gContactsSignature = node->Signature();
@@ -990,6 +1054,17 @@ HostMeshRun(const HostMeshPlatform* platform)
 		}
 
 		long recoveries = platform->radioCheck != NULL ? platform->radioCheck(platform->ref) : -1;
+		bool channelsChanged;
+		{
+			std::lock_guard<std::mutex> hold(gLock);
+			channelsChanged = gChannelsChanged;
+			gChannelsChanged = false;
+		}
+		if (channelsChanged)
+		{
+			node->ApplyChannels();
+			SaveChannels();
+		}
 		{
 			ContactAsk asks[kContactAsksMax];
 			int n;
@@ -1092,12 +1167,22 @@ HostMeshNextMessage(HostMeshMessage* message)
 long
 HostMeshSendText(const char* key, const char* text)
 {
+	return SendText(key, PUBLIC_CHANNEL_NAME, text);
+}
+
+
+// a message to a node (key) or else a channel (by name)
+static long
+SendText(const char* key, const char* channel, const char* text)
+{
 	if (!HostMeshStarted() || text == NULL || text[0] == 0)
 		return 0;
 	Send s;
 	memset(&s, 0, sizeof(s));
 	s.channel = key == NULL || key[0] == 0;
-	if (!s.channel && !KeyOf(key, s.key))
+	if (s.channel)
+		CopyUTF8(s.channelName, channel, sizeof(s.channelName));
+	else if (!KeyOf(key, s.key))
 		return 0;
 	// (MeshCore takes MAX_TEXT_LEN, 160 bytes; a channel's has the
 	// sender's name in front, which it cuts to fit)
@@ -1129,6 +1214,189 @@ HostMeshGetSendState(long id)
 		if (gSends[k].id == id)
 			return gSends[k].state;
 	return kHostMeshSendNone;
+}
+
+
+// ----------------------------------------------------------------------
+// The channels
+
+// the channels kept (the blob "channels": magic, count, KeptChannel[]), after
+// Public, which is always first and not kept
+static void
+LoadChannels(void)
+{
+	KeptChannel publicChannel;
+	memset(&publicChannel, 0, sizeof(publicChannel));
+	CopyUTF8(publicChannel.name, PUBLIC_CHANNEL_NAME, sizeof(publicChannel.name));
+	publicChannel.size = (uint8_t) SecretOf(PUBLIC_CHANNEL_KEY, publicChannel.secret);
+	uint8_t blob[8 + kHostMeshChannelsMax * sizeof(KeptChannel)];
+	long size = sizeof(blob);
+	std::lock_guard<std::mutex> hold(gLock);
+	gChannels[0] = publicChannel;
+	gChannelCount = 1;
+	if (!gPlatform->load(gPlatform->ref, "channels", blob, &size) || size < 8)
+		return;
+	uint32_t magic, n;
+	memcpy(&magic, blob, 4);
+	memcpy(&n, blob + 4, 4);
+	if (magic != (uint32_t) kChannelsMagic || n > (uint32_t) kHostMeshChannelsMax - 1 || 8 + n * (long) sizeof(KeptChannel) > size)
+		return;
+	for (uint32_t k = 0; k < n; k++)
+	{
+		KeptChannel c;
+		memcpy(&c, blob + 8 + k * sizeof(KeptChannel), sizeof(c));
+		c.name[sizeof(c.name) - 1] = 0;
+		if (c.name[0] != 0 && (c.size == 16 || c.size == 32))
+			gChannels[gChannelCount++] = c;
+	}
+}
+
+
+static void
+SaveChannels(void)
+{
+	uint8_t blob[8 + kHostMeshChannelsMax * sizeof(KeptChannel)];
+	uint32_t magic = (uint32_t) kChannelsMagic, n;
+	{
+		std::lock_guard<std::mutex> hold(gLock);
+		n = (uint32_t) (gChannelCount - 1);
+		memcpy(blob + 8, &gChannels[1], n * sizeof(KeptChannel));
+	}
+	memcpy(blob, &magic, 4);
+	memcpy(blob + 4, &n, 4);
+	gPlatform->save(gPlatform->ref, "channels", blob, 8 + n * (long) sizeof(KeptChannel));
+}
+
+
+// a secret as hex (32 or 64 digits) or base64 (16 or 32 bytes) ==> its size, 0
+static int
+SecretOf(const char* text, uint8_t* secret)
+{
+	size_t length = strlen(text);
+	if (length == 32 || length == 64)
+	{
+		bool hex = true;
+		for (size_t k = 0; k < length && hex; k++)
+			hex = isxdigit((unsigned char) text[k]) != 0;
+		if (hex)
+		{
+			for (size_t k = 0; k < length / 2; k++)
+			{
+				char pair[3] = { text[2 * k], text[2 * k + 1], 0 };
+				secret[k] = (uint8_t) strtoul(pair, NULL, 16);
+			}
+			return (int) length / 2;
+		}
+	}
+	if (length == 24 || length == 44)
+	{
+		// base64 (MeshCore's base64.hpp defines its functions in the header:
+		// a second file including it meets the first's at link time)
+		uint8_t bytes[33];
+		int size = 0;
+		uint32_t bits = 0;
+		int held = 0;
+		for (size_t k = 0; k < length && text[k] != '='; k++)
+		{
+			char c = text[k];
+			int v = c >= 'A' && c <= 'Z' ? c - 'A' : c >= 'a' && c <= 'z' ? c - 'a' + 26 : c >= '0' && c <= '9' ? c - '0' + 52
+				  : c == '+' || c == '-' ? 62 : c == '/' || c == '_' ? 63 : -1;
+			if (v < 0)
+				return 0;
+			bits = (bits << 6) | (uint32_t) v;
+			held += 6;
+			if (held >= 8)
+			{
+				held -= 8;
+				if (size == (int) sizeof(bytes))
+					return 0;
+				bytes[size++] = (uint8_t) (bits >> held);
+			}
+		}
+		if (size == 16 || size == 32)
+		{
+			memcpy(secret, bytes, size);
+			return size;
+		}
+	}
+	return 0;
+}
+
+
+long
+HostMeshGetChannels(HostMeshChannel* channels, long max)
+{
+	std::lock_guard<std::mutex> hold(gLock);
+	long count = gChannelCount < max ? gChannelCount : max;
+	for (long k = 0; k < count; k++)
+	{
+		CopyUTF8(channels[k].name, gChannels[k].name, sizeof(channels[k].name));
+		HexOf(gChannels[k].secret, gChannels[k].size, channels[k].secret);
+	}
+	return count;
+}
+
+
+int
+HostMeshJoinChannel(const char* name, const char* secret)
+{
+	if (!HostMeshStarted())
+		return kHostMeshJoinNoNode;
+	if (name == NULL || name[0] == 0 || strlen(name) >= sizeof(((KeptChannel*) 0)->name) || (name[0] == '#' && name[1] == 0))
+		return kHostMeshJoinBadName;
+	KeptChannel c;
+	memset(&c, 0, sizeof(c));
+	CopyUTF8(c.name, name, sizeof(c.name));
+	if (secret == NULL || secret[0] == 0)
+	{
+		if (name[0] != '#')
+			return kHostMeshJoinBadSecret;		// (a private channel needs its secret)
+		uint8_t digest[32];
+		mesh::Utils::sha256(digest, sizeof(digest), (const uint8_t*) name, (int) strlen(name));
+		memcpy(c.secret, digest, 16);
+		c.size = 16;
+	}
+	else if ((c.size = (uint8_t) SecretOf(secret, c.secret)) == 0)
+		return kHostMeshJoinBadSecret;
+	std::lock_guard<std::mutex> hold(gLock);
+	for (long k = 0; k < gChannelCount; k++)
+		if (strcmp(gChannels[k].name, c.name) == 0
+		 || (gChannels[k].size == c.size && memcmp(gChannels[k].secret, c.secret, c.size) == 0))
+			return kHostMeshJoinAlready;
+	if (gChannelCount >= kHostMeshChannelsMax)
+		return kHostMeshJoinFull;
+	gChannels[gChannelCount++] = c;
+	gChannelsChanged = true;
+	gWake.notify_one();
+	return kHostMeshJoined;
+}
+
+
+bool
+HostMeshLeaveChannel(const char* name)
+{
+	if (!HostMeshStarted() || name == NULL)
+		return false;
+	std::lock_guard<std::mutex> hold(gLock);
+	for (long k = 1; k < gChannelCount; k++)		// (Public, the first, stays)
+		if (strcmp(gChannels[k].name, name) == 0)
+		{
+			memmove(&gChannels[k], &gChannels[k + 1], (gChannelCount - k - 1) * sizeof(KeptChannel));
+			gChannelCount--;
+			gChannelsChanged = true;
+			gWake.notify_one();
+			return true;
+		}
+	return false;
+}
+
+
+long
+HostMeshSendChannelText(const char* channel, const char* text)
+{
+	if (channel == NULL || channel[0] == 0)
+		return 0;
+	return SendText(NULL, channel, text);
 }
 
 

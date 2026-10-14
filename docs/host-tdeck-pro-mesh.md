@@ -140,6 +140,29 @@ forgets them); the board's in NVS, namespace `mesh`.
 - a message that cannot be filed is told on the console and the poll goes
   on (a throw out of `Poll` used to end the polling until a restart).
 
+**Channels** (the owner's ask, 2026-10-14, when the board missed a
+message the owner's other device showed: it was on a channel the board was
+not in - `channelUnknown`, hash 154): New's last item, **Join Channel…**,
+takes a name and, for a private channel, its secret.
+
+- A **hashtag channel** (`#name`) needs no secret: it is the first 16
+  bytes of SHA-256 of the name, `#` included, as every MeshCore
+  application makes it (meshcore_py's `set_channel`) - anyone who knows the
+  name is in it.  The name is made small (`#Melbourne` would be another
+  channel).
+- A **private channel's** secret is typed as 32 or 64 hex digits, or base64
+  (24 or 44 characters).
+- Up to 8 channels, Public always first (`MAX_GROUP_CHANNELS` 8 now, was 4:
+  it sizes `BaseChatMesh`, so the desktop's and the board's builds both
+  have it); those joined are kept across restarts (the blob `channels`).
+- Each is a conversation listed under Public, in the order joined (thread
+  `"ch:" & name`; Public's stays `"public"`); its header offers **Show
+  Key** (the secret, to type into another device) and **Leave Channel**
+  (once confirmed; its messages are kept until deleted).
+- Natives `HostMeshChannels`, `HostMeshJoinChannel`, `HostMeshLeaveChannel`,
+  `HostMeshSendChannelText`; meshpeer's `--join` (and `--echo` answers on
+  that channel too).
+
 **Saved contacts are Names cards** (the owner's choice, 2026-10-14): a
 node's key is kept in one of the Names file's ten custom fields
 (`custom1`..`custom10`, values of class `'|string.custom|`), the one
@@ -295,7 +318,7 @@ after the advert that follows a first packet was heard.
 - The WiFi companion (MeshCore's companion protocol on TCP port 5000, the
   frames lilyphone1's `mesh_companion.cpp` speaks), so the MeshCore phone
   apps can drive the node.
-- Channels other than Public; scroll arrows (as Messages).
+- Scroll arrows (as Messages); a channel shared as a link or a QR code.
 - Picking a saved contact through Names' own people picker (a
   `|nameRef.meshKey:host|` data def over the custom field), and adding a
   heard node's key to an existing card rather than a new one.

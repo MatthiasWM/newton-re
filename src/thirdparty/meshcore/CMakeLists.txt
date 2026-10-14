@@ -57,6 +57,6 @@ target_include_directories(meshcore SYSTEM PUBLIC
     ${ED}
     ${CMAKE_CURRENT_SOURCE_DIR}/base64/src
 )
-target_compile_definitions(meshcore PUBLIC MAX_CONTACTS=64 MAX_GROUP_CHANNELS=4 ED25519_NO_SEED=1)
+target_compile_definitions(meshcore PUBLIC MAX_CONTACTS=64 MAX_GROUP_CHANNELS=8 ED25519_NO_SEED=1)
 # third-party code: its own warnings are not the reconstruction's
 target_compile_options(meshcore PRIVATE -w)

@@ -85,6 +85,18 @@
 											GMT), age how many minutes ago by
 											ours - or nil
 					HostMeshAdvertise()		this node announced now
+					HostMeshChannels()		the channels this node is in, Public
+											first - [{name, secret}], secret in
+											hex
+					HostMeshJoinChannel(name, secret)
+											secret nil for a hashtag channel
+											("#name"), else 32 or 64 hex digits
+											or base64 ==> true, or why not:
+											'badName, 'badSecret, 'full,
+											'already
+					HostMeshLeaveChannel(name)
+					HostMeshSendChannelText(channel, text)
+											==> an id for HostMeshSendState
 					HostMeshSetName(name)	this node's name, announced
 					HostMeshRegions()		the radio presets' names
 					HostMeshRegion()		the one in use (an index), or nil
@@ -220,6 +232,31 @@ struct HostMeshContact
 };
 // ==> how many contacts there are; as many as fit given, newest first
 long		HostMeshGetContacts(HostMeshContact* contacts, long max);
+
+// The channels this node is in: Public always first, then those joined
+// (kept across restarts).  A hashtag channel ("#name") has the first 16
+// bytes of SHA-256 of its name, "#" included, as its secret - as every
+// MeshCore application makes it (meshcore_py's set_channel), so that anyone
+// who knows the name is in it; any other is private, its secret (16 or 32
+// bytes) shared by those in it.
+const long	kHostMeshChannelsMax = 8;		// MAX_GROUP_CHANNELS (thirdparty/meshcore/CMakeLists.txt)
+const long	kHostMeshSecretHexSize = 65;	// a secret of 32 bytes in hex, its terminator included
+
+struct HostMeshChannel
+{
+	char		name[kHostMeshNameSize];
+	char		secret[kHostMeshSecretHexSize];	// in hex (32 or 64 digits)
+};
+long		HostMeshGetChannels(HostMeshChannel* channels, long max);
+
+enum HostMeshJoin { kHostMeshJoined, kHostMeshJoinBadName, kHostMeshJoinBadSecret, kHostMeshJoinFull, kHostMeshJoinAlready, kHostMeshJoinNoNode };
+// a channel joined: secret NULL or "" for a hashtag channel, else 32 or 64
+// hex digits, or the same in base64 (24 or 44 characters, as MeshCore's
+// applications show it)
+int			HostMeshJoinChannel(const char* name, const char* secret);
+bool		HostMeshLeaveChannel(const char* name);		// (not Public)
+// ==> an id for HostMeshGetSendState, or 0
+long		HostMeshSendChannelText(const char* channel, const char* text);
 
 struct HostMeshMessage
 {

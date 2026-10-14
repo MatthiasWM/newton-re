@@ -8,15 +8,19 @@
 
 					meshpeer [--air lan[:port]] [--name NAME] [--state PREFIX]
 							 [--echo] [--channel TEXT] [--send-to NAME --text TEXT]
-							 [--until TEXT] [--seconds N]
+							 [--join CHANNEL [--join-text TEXT]] [--until TEXT] [--seconds N]
 
 				--air		the air (as newton --mesh-air; lan:3685 by default)
 				--name		this node's name (meshpeer)
 				--state		where its identity and contacts are kept (none: a
 							new node each run)
-				--echo		each message to it answered "echo: <text>"
+				--echo		each message to it answered "echo: <text>", and each
+							on the --join channel answered there
 				--channel	TEXT said on the Public channel once a node has been
 							heard
+				--join		the channel joined at the start (a hashtag channel:
+							"#name"), and --join-text said on it once a node has
+							been heard
 				--send-to	TEXT (--text) sent to the node of that name once it
 							has been heard, and how it went printed
 				--until		stops (exit 0) once a message holding TEXT comes, to
@@ -59,6 +63,8 @@ main(int argc, char** argv)
 	const char* name = "meshpeer";
 	const char* state = NULL;
 	const char* channelText = NULL;
+	const char* join = NULL;
+	const char* joinText = NULL;
 	const char* sendTo = NULL;
 	const char* sendText = NULL;
 	const char* until = NULL;
@@ -83,6 +89,10 @@ main(int argc, char** argv)
 			state = v, i++;
 		else if (strcmp(a, "--channel") == 0)
 			channelText = v, i++;
+		else if (strcmp(a, "--join") == 0)
+			join = v, i++;
+		else if (strcmp(a, "--join-text") == 0)
+			joinText = v, i++;
 		else if (strcmp(a, "--send-to") == 0)
 			sendTo = v, i++;
 		else if (strcmp(a, "--text") == 0)
@@ -113,11 +123,16 @@ main(int argc, char** argv)
 		HostMeshGetStatus(&status);
 	} while (status.state == kHostMeshStarting);
 	printf("meshpeer: up %.8s as %s\n", status.key, status.name);
+	if (join != NULL && HostMeshJoinChannel(join, NULL) != kHostMeshJoined)
+	{
+		fprintf(stderr, "meshpeer: %s cannot be joined\n", join);
+		return 2;
+	}
 
 	static HostMeshContact contacts[kHostMeshContactsMax];
 	static char heard[kHostMeshContactsMax][kHostMeshKeyHexSize];
 	long heardCount = 0;
-	bool channelSaid = false, untilSeen = false;
+	bool channelSaid = false, joinSaid = false, untilSeen = false;
 	long sendId = 0;
 	int sendState = kHostMeshSendNone;
 	for (;;)
@@ -148,6 +163,11 @@ main(int argc, char** argv)
 			channelSaid = true;
 			HostMeshSendText(NULL, channelText);
 		}
+		if (join != NULL && joinText != NULL && !joinSaid && heardCount > 0)
+		{
+			joinSaid = true;
+			HostMeshSendChannelText(join, joinText);
+		}
 		if (sendId != 0)
 		{
 			int now = HostMeshGetSendState(sendId);
@@ -161,7 +181,16 @@ main(int argc, char** argv)
 		while (HostMeshNextMessage(&m))
 		{
 			if (m.channel[0] != 0)
+			{
 				printf("meshpeer: channel %s %s: %s\n", m.channel, m.name, m.text);
+				// (--echo answers on the --join channel too, there)
+				if (echo && join != NULL && strcmp(m.channel, join) == 0 && strncmp(m.text, "echo: ", 6) != 0)
+				{
+					char reply[kHostMeshTextSize];
+					snprintf(reply, sizeof(reply), "echo: %s", m.text);
+					HostMeshSendChannelText(join, reply);
+				}
+			}
 			else
 			{
 				printf("meshpeer: from %s: %s\n", m.name, m.text);
