@@ -71,18 +71,28 @@ binary but strings and reals is kept as its bytes):
                      addresses (tools/newton-rom/analysis/romdicts.py).  One an
                      edit has made bigger than its room is moved, with
                      --relayout (MOVED_DATA_BASE, the object file's moved table)
-    romdata/<name>.bin, romdata.tsv   the ROM's other data that code outside
+    romdata/<name>.txt, romdata.tsv   the ROM's other data that code outside
                      the object area reads at its ROM address: the parameter
                      block gParamBlock (0x1000, a page: gROMVersion, gROMStage,
                      gHardwareType, ...), whose version words a package's
-                     native code reads (armcpu/PackageNativeCPU.cpp); the .tsv
-                     their ROM addresses (ROMDATA below)
+                     native code reads (armcpu/PackageNativeCPU.cpp), as its
+                     words named by the ROM's symbols (tools/rex/rextext.py's
+                     `words`; a .bin, its bytes, is read too); the .tsv their
+                     ROM addresses (ROMDATA below)
     rex/, rex.tsv    the ROM extension (the "high" file: its header, config
                      entries and the ten built-in packages), cut into pieces
-                     in address order - each package a .pkg file as the ROM
+                     in address order - a package with a frames part its
+                     directory (<Package>.head.txt) and the part as a tree of
+                     its own (<Package>/), any other a .pkg file as the ROM
                      holds it (its frames parts' refs ROM addresses: see
-                     tools/newton-rom/analysis/packages.py), each config
-                     entry a .bin - which the builder puts back together;
+                     tools/newton-rom/analysis/packages.py), the header,
+                     config entries, page, export and patch tables and the
+                     padding text (tools/rex/rextext.py: what records where
+                     the pieces lie - the header's entries and length, a
+                     directory's sizes, a padding's length - worked out as
+                     they are put together; a .bin piece, its bytes, is read
+                     too, as the tree tagged romsrc-rom has them) - which the
+                     builder puts back together;
                      a piece at address `-` was added (an ordinary package
                      file, `rom-form`, put into the ROM's form where it
                      falls, with <name>.patches.tsv applied first when there
@@ -210,6 +220,9 @@ import newtonlex					# noqa: E402
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tables"))
 import newtontables					# noqa: E402
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "rex"))
+import rextext						# noqa: E402
 
 # where a lexicon an edit has grown past its room goes (romsrc.py build
 # --relayout): an address no ROM data uses, the object file's moved table
@@ -676,8 +689,8 @@ class Extractor:
 
 	def write_romdata(self):
 		"""The ROM's other data that code outside the object area reads at its
-		ROM address (ROMDATA), each as a file of its bytes."""
-		write_romdata(self.rom, self.out)
+		ROM address (ROMDATA), each as a text file of its words."""
+		write_romdata(self.rom, self.out, self.build_dir)
 
 	def write_rex(self):
 		"""The ROM extension as pieces: every config entry and every package
@@ -713,34 +726,122 @@ class Extractor:
 				objs, pad, odd = found
 				aligns[first] = align
 				cuts |= {first, last}
-				names[p["base"]] = name + ".head.bin"
+				names[p["base"]] = name + ".head"		# (.txt, or .bin: rex_texts)
 				names[last] = name + ".tail.bin"
 				names[first] = name + "/"
 				parts[first] = (last, objs, pad, odd)
 		cuts = sorted(c for c in cuts if start <= c <= end)
 		os.makedirs(os.path.join(self.out, "rex"), exist_ok=True)
 		rom = self.rom.rom
+		tags = {e["address"]: e["tag"].encode("latin-1") for e in rex["entries"]}
+		# each piece's file: a frames part a tree of its own, a piece that has
+		# a text form (tools/rex/rextext.py) text, any other its bytes
+		pieces = []					# (address, end, rel, its text or None)
+		for a, b in zip(cuts, cuts[1:]):
+			name = names.get(a, "bytes_%x" % a)
+			if name.endswith("/"):
+				# a package's frames part: its objects as a tree of their own
+				last, objs, pad, odd = parts[a]
+				rel = "rex/" + name
+				sub = Extractor(self.rom, os.path.join(self.out, rel), self.build_dir, objs, (a, last - a), pad,
+								self.newtonscript, aligns[a])
+				sub.odd_gaps = odd
+				sub.run()
+				print("  %s: %d objects, %d functions as source, %d as bytecode"
+					  % (rel, len(objs), len(sub.sources), len(sub.undecompiled)))
+			else:
+				rel = "rex/" + (name if "." in name else name + ".bin")
+			pieces.append((a, b, rel, None))
+		pieces = self.rex_texts(pieces, start, end, tags)
 		with open(os.path.join(self.out, "rex.tsv"), "w", encoding="utf-8", newline="\n") as f:
 			f.write("# the ROM extension: its pieces in address order (address, file)\n")
 			f.write("rex\t%x\t%x\n" % (start, end - start))
-			for a, b in zip(cuts, cuts[1:]):
-				name = names.get(a, "bytes_%x" % a)
-				if name.endswith("/"):
-					# a package's frames part: its objects as a tree of their own
-					last, objs, pad, odd = parts[a]
-					rel = "rex/" + name
-					sub = Extractor(self.rom, os.path.join(self.out, rel), self.build_dir, objs, (a, last - a), pad,
-									self.newtonscript, aligns[a])
-					sub.odd_gaps = odd
-					sub.run()
-					print("  %s: %d objects, %d functions as source, %d as bytecode"
-						  % (rel, len(objs), len(sub.sources), len(sub.undecompiled)))
-					f.write("%x\t%s\n" % (a, rel))
-					continue
-				rel = "rex/" + (name if "." in name else name + ".bin")
-				with open(os.path.join(self.out, rel), "wb") as out:
-					out.write(rom[a:b])
+			for a, b, rel, text in pieces:
+				if text is not None:
+					with open(os.path.join(self.out, rel), "w", encoding="utf-8", newline="\n") as out:
+						out.write(text)
+				elif not rel.endswith("/"):
+					with open(os.path.join(self.out, rel), "wb") as out:
+						out.write(rom[a:b])
 				f.write("%x\t%s\n" % (a, rel))
+
+	def rex_texts(self, pieces, start, end, tags):
+		"""The pieces of the extension that have a text form
+		(tools/rex/rextext.py) given it: the header, the config entries
+		that are tables of words, the page tables, the export and patch
+		tables, the padding and the package directories.  A piece whose
+		text would not give its bytes back keeps them (a .bin).
+		==> the pieces as (address, end, rel, text or None)."""
+		rom = self.rom.rom
+		out = list(pieces)
+
+		def as_text(i, text):
+			a, b, rel, _ = out[i]
+			stem = rel[:-len(".bin")] if rel.endswith(".bin") else rel
+			out[i] = (a, b, stem + ".txt", text) if text is not None else (a, b, stem + ".bin", None)
+
+		def layout():
+			return rextext.Layout(start, end - start, [(rel, a - start, b - a) for a, b, rel, _ in out])
+
+		def where(address):
+			"""What lies at an address of the extension: its piece and the offset."""
+			for a, b, rel, _ in out:
+				if a <= address < b:
+					return "%s +0x%x" % (rel[len("rex/"):], address - a)
+			return None
+
+		def part_object(ref):
+			"""The object an exported ref names: its package and its path."""
+			for a, b, rel, _ in out:
+				if rel.endswith("/") and a <= ref < b:
+					found = self.rex_layout_paths(rel).get(ref - 1)
+					return "%s %s" % (rel[len("rex/"):-1], found) if found else None
+			return None
+		rex_id = struct.unpack_from(">I", rom, start + 0x1c)[0]
+		for i, (a, b, rel, _) in enumerate(out):
+			t = tags.get(a)
+			if rel.endswith("/") or a == start or rel.endswith(".head"):
+				continue
+			data = rom[a:b]
+			if t in rextext.CONFIG_COLUMNS:
+				as_text(i, rextext.config_table_text(t, data))
+			elif t in (b"ptpt", b"glpt"):
+				as_text(i, rextext.page_table_text(t, data))
+			elif t == b"fexp":
+				as_text(i, rextext.refs_text(data, part_object, [
+					"# the ROM extension's frame export table 'fexp (written by romsrc.py extract, built",
+					"# by tools/rex/rextext.py): the refs of the objects its packages export, which",
+					"# magic-pointer table 2 indexes (packages/FramePartHandler.cpp) - each with its index",
+					"# and the package and path of its object; build --relayout moves each with its",
+					"# object and appends the entries of the packages it adds"]))
+			elif t == b"jump":
+				as_text(i, rextext.patch_table_text(data, 0x01a00000 + 0x400000 + (rex_id << 20), where))
+			elif t == b"pad ":
+				# (the alignment the piece after it starts on, to a page at most -
+				# what rex_relaid_out keeps)
+				as_text(i, rextext.pad_text(data, a, min(b & -b, 0x1000)))
+		# the package directories (their parts are the pieces after them), then
+		# the header, which names the pieces
+		for i, (a, b, rel, _) in enumerate(out):
+			if rel.endswith(".head"):
+				as_text(i, rextext.package_directory_text(rom[a:b], layout(), rel, os.path.basename(rel)[:-len(".head")]))
+		if out and out[0][0] == start:
+			out[0] = out[0][:2] + ("rex/header", None)
+			as_text(0, rextext.header_text(rom[start:out[0][1]], layout(), "rex/header"))
+		return out
+
+	def rex_layout_paths(self, rel):
+		"""A package part's tree's layout.tsv: each object's address -> its path."""
+		cache = self.__dict__.setdefault("_rex_paths", {})
+		if rel not in cache:
+			paths = {}
+			with open(os.path.join(self.out, rel, "layout.tsv"), encoding="utf-8") as f:
+				for line in f:
+					fields = line.rstrip("\n").split("\t")
+					if len(fields) > 1 and re.match(r"[0-9a-f]+\Z", fields[0]):
+						paths.setdefault(int(fields[0], 16), fields[1])
+			cache[rel] = paths
+		return cache[rel]
 
 	def r_names(self):
 		"""The ROM's object constants: R<name>, whose word holds the ref (with
@@ -1080,17 +1181,56 @@ class Extractor:
 ROMDATA = [("gParamBlock", 0x1000)]
 
 
-def write_romdata(rom, out):
-	"""romdata/<name>.bin and romdata.tsv: each ROMDATA block's bytes and its
-	ROM address.  Run by extract; the tree's copy was written by it once."""
+def romdata_text(rom, build_dir, name, address, length):
+	"""A ROMDATA block as text (tools/rex/rextext.py's `words`): each word
+	named by the ROM's symbol at its address (not an `abs` one, nor the
+	block's own), the stretches that the MMU map the machine starts from
+	uses as coarse page tables said so (tools/newton-rom/analysis/mmumap.py).
+	None when the text would not give the bytes back."""
+	import mmumap
+	with open(os.path.join(build_dir, "symbols.json"), encoding="utf-8") as f:
+		symbols = json.load(f)["symbols"]
+	names = {}
+	for s in symbols:
+		if address <= s["address"] < address + length and s["class"] != "abs" and s["name"] != name \
+				and "jt_index" not in s:
+			names.setdefault(s["address"], s["name"])
+	notes = {}
+	for table in mmumap.TABLES:
+		if table not in rom.by_name:
+			continue
+		for virtual, physical, size, flags in mmumap.read_table(rom.rom, rom.by_name[table]):
+			if flags & 3 == 1 and address <= physical < address + length:
+				notes.setdefault(physical, []).append(
+					"the coarse page table %s (ROM %#x) maps 0x%08x with: 256 small-page descriptors"
+					% (table, rom.by_name[table], virtual))
+	for lines in notes.values():
+		lines.append("(docs/memory/mmu-map.md); the words not named are its entries")
+	title = ["# %s, the ROM's data at 0x%x that code reads at its ROM address (written by" % (name, address),
+			 "# romsrc.py extract, built by tools/rex/rextext.py): each word at its address,",
+			 "# named by the ROM's symbol for it (`word` when it has none); `zeros N` is N bytes of",
+			 "# nought.  A line's address must be where the line before it ends"]
+	return rextext.words_text(rom.rom[address:address + length], address, names, notes, title)
+
+
+def write_romdata(rom, out, build_dir):
+	"""romdata/<name>.txt (or .bin, when the text would not give the bytes
+	back) and romdata.tsv: each ROMDATA block's words and its ROM address.
+	Run by extract; the tree's copy was written by it once."""
 	os.makedirs(os.path.join(out, "romdata"), exist_ok=True)
 	with open(os.path.join(out, "romdata.tsv"), "w", encoding="utf-8", newline="\n") as f:
 		f.write("# the ROM's other data read at its ROM address: ROM address, name, file\n")
 		for name, length in ROMDATA:
 			address = rom.by_name[name]
-			rel = "romdata/%s.bin" % name
-			with open(os.path.join(out, rel), "wb") as blob:
-				blob.write(rom.rom[address:address + length])
+			text = romdata_text(rom, build_dir, name, address, length)
+			if text is not None:
+				rel = "romdata/%s.txt" % name
+				with open(os.path.join(out, rel), "w", encoding="utf-8", newline="\n") as blob:
+					blob.write(text)
+			else:
+				rel = "romdata/%s.bin" % name
+				with open(os.path.join(out, rel), "wb") as blob:
+					blob.write(rom.rom[address:address + length])
 			f.write("%x\t%s\t%s\n" % (address, name, rel))
 
 
@@ -1780,7 +1920,11 @@ class Builder:
 		the objects the parts export, each moved as its object was).  The
 		header's checksum is left as it was: nothing in the ROM reads it
 		(TestForREx 0x003137dc takes a block on its signatures and id alone;
-		docs/rom-free/README.md).
+		docs/rom-free/README.md).  A header or directory that is text
+		(tools/rex/rextext.py) is made when every piece is placed, its
+		lengths and offsets taken from where the pieces now lie; one kept
+		as bytes (.bin, as the tree tagged romsrc-rom has them) is patched
+		by how far things moved.
 
 		A piece whose address is `-` was not in the ROM: an ordinary
 		package file (`rom-form` in the third column), added to the package
@@ -1791,7 +1935,7 @@ class Builder:
 		to them), the entries appended to 'fexp.  A padding piece (`pad_*`)
 		is as long as it must be for the piece after it to keep the
 		alignment it had (to 0x1000 at most: the page tables and the patch
-		table start on pages).  The patch table's page tables ('ptpt,
+		table start on pages; a text one says its alignment).  The patch table's page tables ('ptpt,
 		'glpt: MMU small-page entries naming the physical page the patch
 		table 'jump is in, which they map at its virtual address - its
 		branches are relative to that, so they stay as they are) are
@@ -1812,7 +1956,8 @@ class Builder:
 		fexp_next = 0
 		for old, rel, how in pieces:
 			if os.path.basename(rel).startswith("fexp"):
-				fexp_next = os.path.getsize(os.path.join(self.src, rel)) // 4
+				path = os.path.join(self.src, rel)
+				fexp_next = (len(rextext.pack(path)) if rel.endswith(".txt") else os.path.getsize(path)) // 4
 		units = {}					# the units the added packages export (rom_form_package)
 		new_fexp = []				# their 'fexp entries
 		data = bytearray()
@@ -1820,11 +1965,31 @@ class Builder:
 		relocations = {}			# an exported object's old ref -> its new one
 		head = None					# the offset in data of the last package directory
 		fexp_at = None
+		placed = []					# (rel, offset, size) of every piece
+		texts = []					# (rel, offset, its rextext piece): the text pieces worked out last
 		for n, (old, rel, how) in enumerate(pieces):
 			new = base + len(data)
 			if old is not None:
 				moved[old] = new
-			if os.path.basename(rel).startswith("pad_") and n + 1 < len(pieces) and pieces[n + 1][0] is not None:
+			if placed and placed[-1][2] is None:
+				placed[-1] = placed[-1][:2] + (new - base - placed[-1][1],)
+			placed.append((rel, new - base, None))
+			text = None
+			if rel.endswith(".txt"):
+				# a piece as text (tools/rex/rextext.py): one that says where
+				# other pieces are (the header, a package's directory, padding)
+				# made when every piece is placed - a package's directory then
+				# takes its size and its parts' from them, so it is not
+				# patched as a .bin one is below
+				text = rextext.load(os.path.join(self.src, rel))
+				if text.needs_layout or isinstance(text, rextext.Pad):
+					size = text.size(new)
+					texts.append((rel, len(data), text))
+					data += bytes(size)
+					if isinstance(text, rextext.PackageDirectory):
+						head = None
+					continue
+			if text is None and os.path.basename(rel).startswith("pad_") and n + 1 < len(pieces) and pieces[n + 1][0] is not None:
 				after = pieces[n + 1][0]
 				align = min(after & -after, 0x1000)
 				data += b"\0" * ((after - new) % align)
@@ -1837,7 +2002,7 @@ class Builder:
 				head = len(data)
 				data += blob
 				continue
-			if old is None:
+			if old is None and text is None:
 				raise ValueError("rex.tsv: %s is not from the ROM and not a package to put into its form" % rel)
 			if rel.endswith("/"):
 				sub = Builder(os.path.join(self.src, rel), self.newtonscript, relayout=True, base=new)
@@ -1857,24 +2022,38 @@ class Builder:
 								struct.pack_into(">I", data, entry + k, struct.unpack_from(">I", data, entry + k)[0] + delta)
 				data += part
 				continue
-			with open(os.path.join(self.src, rel), "rb") as piece:
-				blob = piece.read()
+			if text is not None:
+				blob = text.data()
+			else:
+				with open(os.path.join(self.src, rel), "rb") as piece:
+					blob = piece.read()
 			if blob[:7] == b"package":
 				head = len(data)
 			if os.path.basename(rel).startswith("fexp"):
 				blob += b"".join(struct.pack(">I", r) for r in new_fexp)
 			data += blob
 		moved[base + length] = base + len(data)
-		# the header: its length, and each config entry's offset and size
-		struct.pack_into(">I", data, 0x18, len(data))
+		if placed and placed[-1][2] is None:
+			placed[-1] = placed[-1][:2] + (len(data) - placed[-1][1],)
+		layout = rextext.Layout(base, len(data), placed)
+		for rel, offset, text in texts:
+			blob = text.render(layout, rel)
+			if len(blob) != layout.at(rel, rel)[1]:
+				raise ValueError("rex.tsv: %s made %d bytes, not the %d it had room for" % (rel, len(blob), layout.at(rel, rel)[1]))
+			data[offset:offset + len(blob)] = blob
+		if not pieces[0][1].endswith(".txt"):
+			# a header kept as bytes: its length, and each config entry's offset and size
+			struct.pack_into(">I", data, 0x18, len(data))
+			for i in range(struct.unpack_from(">I", data, 0x24)[0]):
+				entry = 0x28 + 12 * i
+				tag, offset, size = struct.unpack_from(">4sII", data, entry)
+				start, end = base + offset, base + offset + size
+				new_start, new_end = moved.get(start, start), moved.get(end, end)
+				struct.pack_into(">II", data, entry + 4, new_start - base, new_end - new_start)
 		for i in range(struct.unpack_from(">I", data, 0x24)[0]):
-			entry = 0x28 + 12 * i
-			tag, offset, size = struct.unpack_from(">4sII", data, entry)
-			start, end = base + offset, base + offset + size
-			new_start, new_end = moved.get(start, start), moved.get(end, end)
-			struct.pack_into(">II", data, entry + 4, new_start - base, new_end - new_start)
+			tag, offset, size = struct.unpack_from(">4sII", data, 0x28 + 12 * i)
 			if tag == b"fexp":
-				fexp_at, fexp_size = new_start - base, new_end - new_start
+				fexp_at, fexp_size = offset, size
 		if fexp_at is not None:
 			for k in range(fexp_at, fexp_at + fexp_size - 3, 4):
 				ref = struct.unpack_from(">I", data, k)[0]
@@ -2109,6 +2288,10 @@ class Builder:
 					if line.startswith("#"):
 						continue
 					address, _, rel = line.rstrip("\n").split("\t")
+					if rel.endswith(".txt"):
+						# its words as text (tools/rex/rextext.py's `words`)
+						self.blocks.append((int(address, 16), rextext.pack(os.path.join(self.src, rel))))
+						continue
 					with open(os.path.join(self.src, rel), "rb") as blob:
 						self.blocks.append((int(address, 16), blob.read()))
 
@@ -2120,6 +2303,8 @@ class Builder:
 			with open(rex, encoding="utf-8") as f:
 				data = bytearray()
 				base = None
+				placed = []				# (rel, offset, size) of every piece
+				texts = []				# (rel, offset, its rextext piece) of the text pieces worked out last
 				for line in f:
 					if line.startswith("#"):
 						continue
@@ -2138,12 +2323,30 @@ class Builder:
 						part_base, part = Builder(os.path.join(self.src, fields[1]), self.newtonscript).build()
 						if part_base != base + len(data):
 							raise ValueError("rex.tsv: %s's objects are laid out at %#x" % (fields[1], part_base))
+						placed.append((fields[1], len(data), len(part)))
 						data += part
 						continue
+					if fields[1].endswith(".txt"):
+						# a piece as text (tools/rex/rextext.py): its room now, its
+						# bytes when every piece is placed
+						piece = rextext.load(os.path.join(self.src, fields[1]))
+						size = piece.size(base + len(data))
+						texts.append((fields[1], len(data), piece))
+						placed.append((fields[1], len(data), size))
+						data += bytes(size)
+						continue
 					with open(os.path.join(self.src, fields[1]), "rb") as piece:
-						data += piece.read()
+						blob = piece.read()
+					placed.append((fields[1], len(data), len(blob)))
+					data += blob
 				if len(data) != length:
 					raise ValueError("rex.tsv: the pieces make %#x bytes, not %#x" % (len(data), length))
+				layout = rextext.Layout(base, len(data), placed)
+				for rel, offset, piece in texts:
+					blob = piece.render(layout, rel)
+					if len(blob) != layout.at(rel, rel)[1]:
+						raise ValueError("rex.tsv: %s made %d bytes, not the %d it had room for" % (rel, len(blob), layout.at(rel, rel)[1]))
+					data[offset:offset + len(blob)] = blob
 				self.blocks.append((base, bytes(data)))
 
 		self.place_grown_lexicons()
@@ -2179,7 +2382,7 @@ class Builder:
 # the modules the builder builds with, besides this one: what the stamp is a
 # hash of (all imported above, so a run of any command has them)
 STAMP_MODULES = ("nsfunctions", "nsdecompile", "romdicts", "packages", "romid",
-				 "png", "newtonsfnt", "newtonlex", "newtontables")
+				 "png", "newtonsfnt", "newtonlex", "newtontables", "rextext")
 
 
 def builder_stamp():
@@ -2303,7 +2506,7 @@ def main(argv=None):
 			f.write(text)
 		return 0
 	if a.command == "romdata":
-		write_romdata(nf.ROM(a.build_dir), a.tree)
+		write_romdata(nf.ROM(a.build_dir), a.tree, a.build_dir)
 		print("romdata.tsv and romdata/ written into %s" % a.tree)
 		return 0
 	if a.command == "edit-test":

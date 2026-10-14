@@ -57,6 +57,7 @@ if(romsrc_can_build AND Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/l
          ${CMAKE_SOURCE_DIR}/../tools/fonts/*.py
          ${CMAKE_SOURCE_DIR}/../tools/lexicons/*.py
          ${CMAKE_SOURCE_DIR}/../tools/tables/*.py
+         ${CMAKE_SOURCE_DIR}/../tools/rex/*.py
          ${CMAKE_SOURCE_DIR}/../tools/imaging/*.py)
     add_custom_command(OUTPUT ${NEWTON_OBJECTS_FILE}
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/newton-rom/analysis/romsrc.py
@@ -2488,6 +2489,20 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/layout.tsv)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/tables/test_newtontables.py
                      --rom ${NEWTON_ROM_BUILD_DIR}
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    # the text form of the ROM extension's header, config entries, package
+    # directories, page, export and patch tables and padding, and of the
+    # parameter block (tools/rex/rextext.py): each committed piece built
+    # where rex.tsv puts it and written back as the same text - the ROM's
+    # own bytes with the image - and edits read back
+    add_test(NAME tools.RExText
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/rex/test_rextext.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    if(EXISTS ${NEWTON_ROM_BUILD_DIR}/rom.bin)
+        add_test(NAME tools.RExTextROM
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/rex/test_rextext.py
+                         --rom ${NEWTON_ROM_BUILD_DIR}
+                 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    endif()
     # a collation edit: a and z given each other's weights in the ROM's
     # sorting table, the tree built, and StrCompare on the booted machine
     # puts "zebra" before "apple" (demo/tableedit.ns)
