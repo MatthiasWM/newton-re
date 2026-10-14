@@ -13,7 +13,12 @@
 				The browse is the host's: DnsServiceBrowse and
 				DnsServiceResolve on Windows (dnsapi, Windows 10 and later);
 				avahi-browse (the Avahi daemon's own client) on Linux and the
-				BSDs; nothing elsewhere.  Never a resolver of our own.  It
+				BSDs.  Where that finds nothing or is missing (the
+				reMarkable found none) and on hosts with no browse
+				at all (ESP-IDF on the T-Deck Pro), a one-shot mDNS
+				question of our own put on the link through the host's
+				sockets (HostDNSSDQueryMDNS) - a question, not a resolver
+				or a responder.  It
 				runs on a host thread of its own, so a lookup is started and
 				then asked how many it has found, as the ROM's NBP lookups
 				are.
@@ -65,6 +70,15 @@ int		HostDNSSDFind(const char* name, HostDNSSDPrinter* printer);
 // yet: a browse started and waited on for up to `milliseconds` (the
 // caller's thread blocked meanwhile).  ==> 0: not on the network.
 int		HostDNSSDResolve(const char* name, HostDNSSDPrinter* printer, int milliseconds);
+
+// The mDNS question asked on the link (a legacy unicast query from a port
+// of our own, RFC 6762 6.7), the printers it finds added to those found;
+// blocks for about `milliseconds`.  ==> how many it found.
+int		HostDNSSDQueryMDNS(int milliseconds);
+
+// Answers taken as the question's would be (the tests' canned packets;
+// `from` the address each came from, network order).  ==> printers found.
+int		HostDNSSDTakeMDNSAnswers(const unsigned char* const* packets, const int* sizes, const unsigned long* from, int count);
 
 #ifdef __cplusplus
 }

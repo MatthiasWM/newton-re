@@ -764,6 +764,22 @@ the first read after the gauge has been idle failed with
 cycles, 13 ms (`tdeck_input.cpp`, where the bus is installed), and a
 gauge read is tried twice.
 
+## Printing (2026-10-14)
+
+The board prints to the network's IPP printers as the desktops do
+(`docs/print/README.md`): `DevicePreMain` installs them
+(`HostInstallIPPPrinters`; the Network Printers panel's source,
+`print/host/HostPrinters.ns`, is embedded by `main/CMakeLists.txt`), so
+the Print slip offers the printers found on the network and the Prefs
+have the Network Printers panel. Before, the print code was compiled in
+but never installed: `HostLookForPrinters` was an undefined function and
+the slip offered no network printer. The PNG host printer is left out (the
+board has nowhere to put the pages). ESP-IDF has no DNS-SD browse of its
+own to ask, so the printers are found by the mDNS question of
+`print/host/dnssd/HostDNSSD.cpp` over lwIP's sockets; its buffers are
+static because the browse's thread has ESP-IDF's default 3 KB stack.
+There is no TLS on the board, so an `ipps://` printer cannot be used.
+
 ## Order of work
 
 The owner already has a T-Deck Pro (bought for another project), so the

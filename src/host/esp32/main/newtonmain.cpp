@@ -48,6 +48,7 @@
 #include "comms/host/HostCellProvider.h"
 #include "comms/host/HostMeshApp.h"
 #include "host/HostSettings.h"
+#include "print/host/HostIPP.h"
 #include "host/HostFontProvider.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -290,6 +291,7 @@ DevicePreMain(void)
 	HostLinkStart();
 	HostCellProviderStart();			// (the 4G module, for the Phone transport: comms/host/HostCellProvider.h)
 	HostMeshAppStart();					// (the LoRa radio's mesh node, for the Mesh application: comms/host/HostMeshApp.h)
+	HostInstallIPPPrinters();			// (print/host/HostIPP.h: the network's IPP printers, in the Print slip and the Network Printers panel; no PNG host printer on the board)
 	HostInstallSettings();				// (the Host preferences panel: the panel's quick updates and clean-ups)
 }
 

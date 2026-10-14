@@ -9,6 +9,34 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-14: Network printers on the reMarkable and the T-Deck Pro
+
+The owner could not print from either device: the reMarkable no longer
+found their printer, and the T-Deck's Print slip offered no network
+printer. Two causes. The host's DNS-SD layer
+(`print/host/dnssd/HostDNSSD.cpp`) browses with `DnsServiceBrowse` on
+Windows and `avahi-browse` on Linux, and with nothing at all elsewhere: the
+tablet found no printer, and ESP-IDF had no browse. And the T-Deck never
+installed the network printers - `HostInstallIPPPrinters` was not called
+from `DevicePreMain` and the Network Printers panel's source was not
+embedded, so `HostLookForPrinters` was an undefined function on the board.
+
+Where the host's browse is missing or finds nothing, an mDNS question of
+our own is now put on the link through the host's sockets
+(`HostDNSSDQueryMDNS`): a legacy unicast query for `_ipp._tcp.local` from
+an ephemeral port, sent on every IPv4 interface, with a second round for
+the SRV, TXT and A records the answers leave out. Sending on the default
+route alone found nothing on the development machine - Windows routes
+multicast to a virtual adapter - though the printer answered as soon as
+the query went out of the Wi-Fi interface. On the development machine the
+question finds the owner's HP Color LaserJet with the same URI as Windows'
+own browse. Its buffers are static: the browse runs on a `std::thread`,
+which ESP-IDF gives 3 KB of stack. The T-Deck now installs the IPP
+printers (no PNG host printer: the board has nowhere to put pages); it has
+no TLS, so no `ipps://`. ctest `print.HostDNSSD` takes canned answers
+(compressed names, a dot in an instance name, an answer without an
+address, a cut-off packet); `NEWTON_TEST_MDNS=1` asks the real link too.
+
 ## 2026-10-14: The host's battery on every host
 
 The host's battery driver (`power/host/HostBatteryDriver.cpp`) read only

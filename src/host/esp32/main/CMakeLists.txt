@@ -195,6 +195,15 @@ set(NAME gHostMeshSource)
 include(${NEWTON_SRC}/cmake/EmbedText.cmake)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
 target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostMeshSource.cpp)
+# print/host/HostPrinters.ns, the Network Printers preferences panel (print/
+# host/HostNetworkPrinters.cpp: the IPP printers the board's mDNS question
+# finds, and the ROM's network printer chooser answered from it)
+set(INPUT ${NEWTON_SRC}/print/host/HostPrinters.ns)
+set(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostPrintersSource.cpp)
+set(NAME gHostPrintersSource)
+include(${NEWTON_SRC}/cmake/EmbedText.cmake)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
+target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostPrintersSource.cpp)
 # host/HostSettings.ns, the Host preferences panel (host/HostSettings.cpp,
 # beside it: the panel's settings - tdeck_panel.cpp answers them)
 set(INPUT ${NEWTON_SRC}/host/HostSettings.ns)
