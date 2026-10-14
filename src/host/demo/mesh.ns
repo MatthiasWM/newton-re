@@ -19,7 +19,9 @@
 // secret refused, the channel left; location (a GPS fixed at -37.81,
 // 144.96: newton --gps) - Send Location in Ada's conversation, her echo of
 // it back, Location in adverts putting the position in the node's adverts
-// and taking it out again; each screen snapshotted
+// and taking it out again; the alert while Mesh is closed - two messages,
+// one slip saying two are unread, Show opening Ada's conversation; each
+// screen snapshotted
 // (mesh-<width>x<height>-<n>.pgm).  The ctests host.NewtonMesh.<size>:
 //
 //   python tools/mesh/meshrun.py \
@@ -429,6 +431,30 @@ meSteps := [
 			"it is " & where);
 		mesh:SetShareLocation(nil);
 		call meCheck with ("off: none", not HostMeshStatus().location, "it is " & HostMeshStatus().location);
+		call next with ();
+	end,
+	// the alert while the application is closed: one slip, kept up to date
+	func(next) begin
+		local mesh := GetGlobalVar('|HostMesh:host|);
+		meApp:Close();
+		mesh:Received({key: meAda.key, name: "Ada", channel: nil, text: "First while you were away"});
+		local slip := mesh.alertSlip;
+		call meCheck with ("an alert slip with the message", slip and slip.viewCObject
+			and StrPos(slip.titleView.text, "Ada", 0) and StrEqual(slip.bodyView.text, "First while you were away"),
+			"it is " & (if slip and slip.viewCObject then slip.titleView.text));
+		mesh:Received({key: meAda.key, name: "Ada", channel: nil, text: "And a second"});
+		call meCheck with ("the same slip, two unread, the latest", mesh.alertSlip = slip and slip.viewCObject
+			and StrPos(slip.titleView.text, "2 unread", 0) and StrPos(slip.bodyView.text, "And a second", 0),
+			"it is " & (if slip and slip.viewCObject then slip.titleView.text & " / " & slip.bodyView.text));
+		local slips := 0;
+		foreach v in GetRoot():ChildViewFrames() do
+			if v.meshAlert then slips := slips + 1;
+		call meCheck with ("only one slip on the screen", slips = 1, slips & " of them");
+		call meSnap with ();
+		mesh:ShowAlerted();
+		call meCheck with ("Show: Mesh open at Ada's conversation, the slip gone", meApp.viewCObject and meApp.mode = 'thread
+			and StrEqual(meApp.currentThread, meAda.key) and not mesh.alertSlip and mesh.alertCount = 0,
+			"the mode is " & meApp.mode);
 		call next with ();
 	end,
 	func(next) begin

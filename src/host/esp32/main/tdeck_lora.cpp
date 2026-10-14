@@ -536,6 +536,30 @@ RadioFrequencyError(void*)
 }
 
 
+// the packet just read read out of the radio's buffer again (its length
+// and place from the buffer status, which holds until the next packet ends)
+static int
+RadioReread(void*, const uint8_t* raw, int len, int* first)
+{
+	uint8_t offset = 0;
+	size_t length = gRadio.getPacketLength(true, &offset);
+	if ((int) length != len || len > 255)
+		return -1;							// (another packet since: not the same one)
+	uint8_t again[256];
+	if (gRadio.readBuffer(again, (uint8_t) len, offset) != RADIOLIB_ERR_NONE)
+		return -1;
+	int differs = 0;
+	*first = -1;
+	for (int k = 0; k < len; k++)
+		if (again[k] != raw[k])
+		{
+			if (differs++ == 0)
+				*first = k;
+		}
+	return differs;
+}
+
+
 static long
 RadioIdle(void*, long* idleMs)
 {
@@ -589,6 +613,7 @@ HostDeviceLoraStart(void)
 	gPlatform.radioCheck = RadioCheck;
 	gPlatform.radioIdle = RadioIdle;
 	gPlatform.radioFrequencyError = RadioFrequencyError;
+	gPlatform.radioReread = RadioReread;
 	HostMeshWillRun();					// (the Newton's side boots while the radio starts)
 
 	// the engine's task: its stack in PSRAM (core 0, beside the WiFi's and the

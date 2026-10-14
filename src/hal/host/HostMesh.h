@@ -180,6 +180,10 @@ struct HostMeshPlatform
 	// the radio's estimate of the last packet's frequency error, in Hz
 	// (NULL: not told) - at a narrow bandwidth an offset costs sensitivity
 	long			(*radioFrequencyError)(void* ref);
+	// the packet just read (raw, len) read out of the radio again ==> how
+	// many bytes differ, and where the first does; -1: it could not be read
+	// again (NULL: not done)
+	int				(*radioReread)(void* ref, const uint8_t* raw, int len, int* first);
 };
 
 // The engine's thread
@@ -215,6 +219,7 @@ struct HostMeshStatusInfo
 	long					heardByType[16];
 	long					channelKnown;		// GRP_TXT/GRP_DATA a channel of ours decrypted
 	long					channelUnknown;		// ... no channel of ours could
+	long					channelMismatched;	// ... of those, ones whose hash is a channel of ours (its MAC wrong)
 	int						lastUnknownHash;	// the last of those's channel hash (-1: none)
 	long					radioErrors;
 	long					radioRecoveries;	// the radio's interrupt found missed (-1: not watched)
@@ -231,6 +236,12 @@ struct HostMeshStatusInfo
 	int						lastDroppedHeader;	// (its header and path-length bytes: header << 8 | path_len; -1 none)
 	int						poolFree;
 	long					lastFreqError;		// Hz, the radio's estimate for the last packet (0: not told)
+	// each packet read out of the radio a second time and compared
+	// (radioReread): how many were, and how many came back different -
+	// the read itself unreliable (a packet damaged after its CRC was checked)
+	long					rereads;
+	long					rereadDiffers;
+	int						lastRereadOffset;	// (the first byte that differed; -1 none)
 	bool					hasLocation;		// the position in this node's adverts (HostMeshSetLocation)
 	double					latitude, longitude;
 	float					lastRssi, lastSnr;
@@ -275,6 +286,10 @@ void		HostMeshTraceRx(bool on);
 // the last channel packet heard that no channel of this node's could
 // decrypt, as the radio gave it (its bytes in hex, "" none) - to see why
 long		HostMeshLastUnreadable(char* hex, long size);
+// ... and the last whose channel hash is one of this node's channels', yet
+// none of them could decrypt it (its MAC wrong: a damaged packet, or a
+// channel of the same hash) - the puzzling kind
+long		HostMeshLastMismatched(char* hex, long size);
 
 enum HostMeshJoin { kHostMeshJoined, kHostMeshJoinBadName, kHostMeshJoinBadSecret, kHostMeshJoinFull, kHostMeshJoinAlready, kHostMeshJoinNoNode };
 // a channel joined: secret NULL or "" for a hashtag channel, else 32 or 64

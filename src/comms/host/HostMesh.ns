@@ -122,6 +122,8 @@
 				folderTab.showBarText.pickActionScript := ConversationPicked;
 				folderTab.showBarText.pickThreads := nil;
 			end;
+			// (the alert, if there is one, is done with: what it told is here)
+			:Mesh():CloseAlert();
 			// (Names may have changed while the application was closed)
 			try
 				:Mesh():SyncSaved()
@@ -1818,9 +1820,130 @@
 		if base then
 			PlaySound(@102)
 		else
-			GetRoot():Notify(3, if m.channel then "Mesh: " & m.channel else "Mesh: " & m.name,
-				(if m.channel and StrFilled(m.name) then m.name & ": " else "") & m.text);
+			:Tell(m, thread);
 	end,
+
+	/*----------------------------------------------------------------------
+		The alert while the application is closed: one slip, kept up to
+		date - the first message's sender and text, then how many are
+		unread and the latest (the owner's ask, 2026-10-14: an alert each
+		piled up, one over another); Show opens the application at the
+		conversation (or the list, when they came from more than one)
+	----------------------------------------------------------------------*/
+
+	alertSlip: nil,
+	alertCount: 0,
+	alertThread: nil,						// (the conversation they all came from, or nil)
+
+	Tell: func(m, thread)
+	begin
+		local from := if m.channel then m.channel else if StrFilled(m.name) then m.name else :ShortKey(thread);
+		local card := if not m.channel then :SavedCard(thread);
+		if card then from := card.name;
+		local said := (if m.channel and StrFilled(m.name) then m.name & ": " else "") & m.text;
+		alertThread := if alertCount = 0 or (alertThread and StrEqual(alertThread, thread)) then thread;
+		alertCount := alertCount + 1;
+		local title := if alertCount = 1 then "Mesh: " & from
+			else "Mesh: " & NumberStr(alertCount) & " unread messages";
+		local body := if alertCount = 1 then said else "The latest, " & from & ": " & said;
+		if StrLen(body) > 140 then
+			body := SubStr(body, 0, 139) & "…\u";
+		if alertSlip and alertSlip.viewCObject then
+			alertSlip:Show(title, body)
+		else begin
+			// (protoFloatNGo centres itself across the screen: its left is an
+			// offset from there)
+			local box := GetRoot():LocalBox();
+			local width := Min(box.right - box.left - 16, 260);
+			alertSlip := BuildContext({_proto: alertTemplate, title: title, body: body,
+				viewBounds: RelBounds(0, box.top + 24, width, 104)});
+			alertSlip:Open();
+		end;
+		PlaySound(@102);
+	end,
+
+	// the slip gone (closed, or the application opened): the count begun again
+	AlertClosed: func()
+	begin
+		alertSlip := nil;
+		alertCount := 0;
+		alertThread := nil;
+	end,
+
+	CloseAlert: func()
+	begin
+		if alertSlip and alertSlip.viewCObject then
+			alertSlip:Close();
+		:AlertClosed();
+	end,
+
+	// Show: the application open at the conversation, or its list
+	ShowAlerted: func()
+	begin
+		local thread := alertThread;
+		:CloseAlert();
+		local base := GetRoot().(appSymbol);
+		if not base then return nil;
+		if not base.viewCObject then
+			base:Open();
+		if thread then
+			base:OpenThread(thread)
+		else
+			base:ShowList();
+	end,
+
+	alertTemplate: {
+		_proto: @179,						// protoFloatNGo
+		meshAlert: true,
+		title: "", body: "",
+		titleView: nil, bodyView: nil,
+		viewSetupDoneScript: func()
+		begin
+			inherited:?viewSetupDoneScript();
+			foreach v in :ChildViewFrames() do
+				if v.role then
+					self.(v.role) := v;
+		end,
+		viewQuitScript: func()
+		begin
+			titleView := bodyView := nil;
+			GetGlobalVar('|HostMesh:host|):AlertClosed();
+			inherited:?viewQuitScript();
+		end,
+		// (a later message: the same slip, its words changed)
+		Show: func(newTitle, newBody)
+		begin
+			title := newTitle;
+			body := newBody;
+			if titleView then SetValue(titleView, 'text, newTitle);
+			if bodyView then SetValue(bodyView, 'text, newBody);
+		end,
+		stepChildren: [
+			{_proto: @218,					// protoStaticText
+			 role: 'titleView,
+			 viewBounds: {left: 10, top: 8, right: -30, bottom: 24}, viewJustify: 48,
+			 viewFont: 1058816,
+			 viewSetupFormScript: func()
+			 begin
+				text := :Parent().title;
+				inherited:?viewSetupFormScript();
+			 end},
+			{_proto: @218,					// protoStaticText
+			 role: 'bodyView,
+			 viewBounds: {left: 10, top: 28, right: -10, bottom: 72}, viewJustify: 48,
+			 viewFont: 10240,
+			 viewSetupFormScript: func()
+			 begin
+				text := :Parent().body;
+				inherited:?viewSetupFormScript();
+			 end},
+			{_proto: @226,					// protoTextButton
+			 viewBounds: {left: -76, top: -28, right: -32, bottom: -10}, viewJustify: 160,
+			 text: "Show",
+			 buttonClickScript: func() GetGlobalVar('|HostMesh:host|):ShowAlerted()},
+			{_proto: @166}					// protoClosebox (closing: AlertClosed)
+		]
+	},
 
 	// a message sent: kept as 'sending, handed to the mesh
 	SendText: func(thread, name, text)

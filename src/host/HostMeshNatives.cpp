@@ -74,6 +74,7 @@ FHostMeshStatus(RefArg /*rcvr*/)
 	SetSlot(status, "heard", heard);
 	SetSlot(status, "channelKnown", RefVar(MAKEINT(info.channelKnown)));
 	SetSlot(status, "channelUnknown", RefVar(MAKEINT(info.channelUnknown)));
+	SetSlot(status, "channelMismatched", RefVar(MAKEINT(info.channelMismatched)));
 	SetSlot(status, "lastUnknownHash", info.lastUnknownHash >= 0 ? RefVar(MAKEINT(info.lastUnknownHash)) : RefVar(NILREF));
 	SetSlot(status, "radioErrors", info.radioErrors >= 0 ? RefVar(MAKEINT(info.radioErrors)) : RefVar(NILREF));
 	SetSlot(status, "radioRecoveries", info.radioRecoveries >= 0 ? RefVar(MAKEINT(info.radioRecoveries)) : RefVar(NILREF));
@@ -85,6 +86,9 @@ FHostMeshStatus(RefArg /*rcvr*/)
 	SetSlot(status, "lastDroppedHeader", info.lastDroppedHeader >= 0 ? RefVar(MAKEINT(info.lastDroppedHeader)) : RefVar(NILREF));
 	SetSlot(status, "poolFree", RefVar(MAKEINT(info.poolFree)));
 	SetSlot(status, "lastFreqError", RefVar(MAKEINT(info.lastFreqError)));
+	SetSlot(status, "rereads", RefVar(MAKEINT(info.rereads)));
+	SetSlot(status, "rereadDiffers", RefVar(MAKEINT(info.rereadDiffers)));
+	SetSlot(status, "lastRereadOffset", info.lastRereadOffset >= 0 ? RefVar(MAKEINT(info.lastRereadOffset)) : RefVar(NILREF));
 	if (info.hasLocation)
 	{
 		RefVar location(MakeArray(2));
@@ -231,6 +235,15 @@ FHostMeshSetLocation(RefArg /*rcvr*/, RefArg latitude, RefArg longitude)
 	bool has = NumberOf(latitude, &lat) && NumberOf(longitude, &lon);
 	HostMeshSetLocation(has, has ? lat : 0, has ? lon : 0);
 	return MAKEBOOLEAN(has);
+}
+
+
+static Ref
+FHostMeshLastMismatched(RefArg /*rcvr*/)
+{
+	static char hex[2 * 256 + 1];
+	HostMeshLastMismatched(hex, sizeof(hex));
+	return HostStringOfUTF8(hex);
 }
 
 
@@ -457,6 +470,7 @@ HostRegisterMeshFunctions(void)
 	SetSlot(functions, "HostMeshContacts", RefVar(MakeCFunction((void*) FHostMeshContacts, 0, nil)));
 	SetSlot(functions, "HostMeshLastUnreadable", RefVar(MakeCFunction((void*) FHostMeshLastUnreadable, 0, nil)));
 	SetSlot(functions, "HostMeshSetLocation", RefVar(MakeCFunction((void*) FHostMeshSetLocation, 2, nil)));
+	SetSlot(functions, "HostMeshLastMismatched", RefVar(MakeCFunction((void*) FHostMeshLastMismatched, 0, nil)));
 	SetSlot(functions, "HostMeshTraceRx", RefVar(MakeCFunction((void*) FHostMeshTraceRx, 1, nil)));
 	SetSlot(functions, "HostMeshChannels", RefVar(MakeCFunction((void*) FHostMeshChannels, 0, nil)));
 	SetSlot(functions, "HostMeshJoinChannel", RefVar(MakeCFunction((void*) FHostMeshJoinChannel, 2, nil)));

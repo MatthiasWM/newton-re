@@ -131,12 +131,18 @@ forgets them); the board's in NVS, namespace `mesh`.
   the application is open or not, and keeps the messages in the soup
   `Mesh:host` (`{class: '|meshMessage:host|, thread, name, sender, text,
   time, dir, state, sendId}`; a thread is a node's key or `"public"`);
-  closed, a message is told with an alert; open, with a beep;
+  open, a message is told with a beep;
 - the node is named after the owner (Setup's name) the first time.
 - **deleting**: a message tapped in the conversation is selected (drawn
   inverted); the status bar's **Delete** removes it, or - nothing selected
   - asks (`AsyncConfirm`) and removes the whole conversation (the Public
   channel stays listed, empty);
+- **closed, a message is told in one alert slip of the application's
+  own** (the owner's ask, 2026-10-14: `Notify` piled an alert on an alert):
+  the first message's sender and text, then "N unread messages" and the
+  latest; **Show** opens the application at the conversation (or its list,
+  when they came from more than one); closing the slip, or opening the
+  application, begins the count again;
 - a message that cannot be filed is told on the console and the poll goes
   on (a throw out of `Poll` used to end the polling until a restart).
 
@@ -261,7 +267,11 @@ sampling, dBm), `lastRssi`, `lastSnr`; `rawPackets` (every packet the radio
 read with a good CRC, before MeshCore parses it), `rawDropped` and
 `lastDroppedHeader` (those its parser drops unseen: a payload version past
 1, path mode 3, too long), `poolFree` (MeshCore's packet pool: none free and
-a packet read is dropped unseen), `lastFreqError` (Hz, the SX1262's
+a packet read is dropped unseen), `channelMismatched` and `HostMeshLastMismatched()` (channel packets
+whose hash is a channel of this node's but whose MAC is wrong - the
+puzzling kind), `rereads`, `rereadDiffers` and `lastRereadOffset` (the
+board reads each packet out of the radio a second time and compares),
+`lastFreqError` (Hz, the SX1262's
 estimate for the last packet: at 62.5 kHz an offset costs sensitivity).
 Our MeshCore's packet format, dispatcher and radio wrappers were checked
 against upstream's main on 2026-10-14: identical.  **RadioLib's

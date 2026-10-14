@@ -226,6 +226,8 @@ static uint8_t					gLastRaw[MAX_TRANS_UNIT + 1];
 static int						gLastRawLength = 0;
 static uint8_t					gUnreadable[MAX_TRANS_UNIT + 1];
 static int						gUnreadableLength = 0;
+static uint8_t					gMismatched[MAX_TRANS_UNIT + 1];
+static int						gMismatchedLength = 0;
 
 // contacts saved (MeshCore's favourites) or forgotten, by key
 struct ContactAsk
@@ -563,6 +565,18 @@ public:
 			memcpy(gLastRaw, raw, len);
 			gLastRawLength = len;
 		}
+		int first = -1;
+		int differs = gPlatform->radioReread != NULL && len > 0 ? gPlatform->radioReread(gPlatform->ref, raw, len, &first) : -1;
+		if (differs >= 0)
+		{
+			std::lock_guard<std::mutex> hold(gLock);
+			gStatus.rereads++;
+			if (differs > 0)
+			{
+				gStatus.rereadDiffers++;
+				gStatus.lastRereadOffset = first;
+			}
+		}
 		std::lock_guard<std::mutex> hold(gLock);
 		gStatus.lastRssi = rssi;
 		gStatus.lastSnr = snr;
@@ -578,12 +592,12 @@ public:
 	void logRx(mesh::Packet* pkt, int, float) override
 	{
 		uint8_t type = pkt->getPayloadType();
-		int known = -1;
+		int known = -1, n = 0;
 		if ((type == PAYLOAD_TYPE_GRP_TXT || type == PAYLOAD_TYPE_GRP_DATA) && pkt->payload_len > 3)
 		{
 			known = 0;
 			mesh::GroupChannel channels[4];
-			int n = searchChannelsByHash(&pkt->payload[0], channels, 4);
+			n = searchChannelsByHash(&pkt->payload[0], channels, 4);
 			uint8_t data[MAX_PACKET_PAYLOAD];
 			for (int j = 0; j < n && !known; j++)
 				known = mesh::Utils::MACThenDecrypt(channels[j].secret, data, &pkt->payload[1], pkt->payload_len - 1) > 0;
@@ -615,6 +629,12 @@ public:
 			gStatus.lastUnknownHash = pkt->payload[0];
 			memcpy(gUnreadable, gLastRaw, gLastRawLength);
 			gUnreadableLength = gLastRawLength;
+			if (n > 0)
+			{
+				gStatus.channelMismatched++;
+				memcpy(gMismatched, gLastRaw, gLastRawLength);
+				gMismatchedLength = gLastRawLength;
+			}
 		}
 	}
 
@@ -971,6 +991,7 @@ HostMeshRun(const HostMeshPlatform* platform)
 		std::lock_guard<std::mutex> hold(gLock);
 		gStatus.lastUnknownHash = -1;
 		gStatus.lastDroppedHeader = -1;
+		gStatus.lastRereadOffset = -1;
 	}
 	gStarted = true;
 	{
@@ -1389,6 +1410,18 @@ SecretOf(const char* text, uint8_t* secret)
 		}
 	}
 	return 0;
+}
+
+
+long
+HostMeshLastMismatched(char* hex, long size)
+{
+	std::lock_guard<std::mutex> hold(gLock);
+	long n = gMismatchedLength;
+	if (2 * n + 1 > size)
+		n = (size - 1) / 2;
+	HexOf(gMismatched, n, hex);
+	return n;
 }
 
 
