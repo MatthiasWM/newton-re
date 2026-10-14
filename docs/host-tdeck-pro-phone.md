@@ -302,8 +302,12 @@ host gives it**.
 - **Received**: the transport gives each message the application's
   `appSymbol` (and its number, text and card's name); the In Box's
   `AutoFunction` sends `AutoPutAway`, which files it in the soup
-  "Messages:host" (`RegUnionSoup`) and says so - an alert (`Notify`), or a
-  beep when Messages is open.  The transport no longer keeps texts in the
+  "Messages:host" (`RegUnionSoup`) and says so - a beep when Messages is
+  open; closed, **one alert slip of its own** (2026-10-14, the owner's ask,
+  as Mesh's: `Notify` piled an alert on an alert): the first text's sender
+  and words, then "N unread" and the latest; **Show** opens the
+  conversation (or the list, from more than one); closing the slip or
+  opening Messages begins the count again.  The transport no longer keeps texts in the
   In Box (`dontAutoPutAway` cleared on a store that saved `'never`).
 - **Sent**: `Send` straight to the transport, the item hidden from the Out
   Box with a completion script (`ItemCompletionScript`): the message
@@ -367,8 +371,8 @@ chosen from it opened and its name the tab's title.
 
 NOT YET: the Action picker on a message (Reply, Forward, Copy to Notes,
 Delete); scrolling by the status bar's arrows (the application has
-`viewScrollUpScript`/`DownScript`; no arrows drawn); an alert with Reply
-and Show (`Notify` has neither); a message longer than one SMS; removing
+`viewScrollUpScript`/`DownScript`; no arrows drawn); Reply on the alert
+slip (it has Show); a message longer than one SMS; removing
 the Extras icon on a host with no module (a store moved to one).
 
 ## Open questions

@@ -214,6 +214,30 @@ msSteps := [
 		call msCheck with ("back to the list, one conversation left", msApp.mode = 'list and not msApp.currentThread
 			and Length(msApp.threads) = 1, "the mode is " & msApp.mode & ", " & Length(msApp.threads) & " conversations");
 		call msSnap with ();
+		call next with ();
+	end,
+	// the alert while Messages is closed: one slip, kept up to date
+	func(next) begin
+		local messages := GetGlobalVar('|HostMessages:host|);
+		msApp:Close();
+		messages:Received({smsNumber: "0400111222", smsName: "Bob", smsText: "Running late, sorry"});
+		local slip := messages.alertSlip;
+		call msCheck with ("an alert slip with the text", slip and slip.viewCObject
+			and StrPos(slip.titleView.text, "Bob", 0) and StrEqual(slip.bodyView.text, "Running late, sorry"),
+			"it is " & (if slip and slip.viewCObject then slip.titleView.text));
+		messages:Received({smsNumber: "0400111222", smsName: "Bob", smsText: "Ten minutes away"});
+		call msCheck with ("the same slip, two unread, the latest", messages.alertSlip = slip and slip.viewCObject
+			and StrPos(slip.titleView.text, "2 unread", 0) and StrPos(slip.bodyView.text, "Ten minutes away", 0),
+			"it is " & (if slip and slip.viewCObject then slip.titleView.text & " / " & slip.bodyView.text));
+		local slips := 0;
+		foreach v in GetRoot():ChildViewFrames() do
+			if v.messagesAlert then slips := slips + 1;
+		call msCheck with ("only one slip on the screen", slips = 1, slips & " of them");
+		call msSnap with ();
+		messages:ShowAlerted();
+		call msCheck with ("Show: Messages open at Bob's conversation, the slip gone", msApp.viewCObject and msApp.mode = 'thread
+			and StrEqual(msApp.currentThread, messages:ThreadKey("0400111222")) and not messages.alertSlip and messages.alertCount = 0,
+			"the mode is " & msApp.mode);
 		Print("messages: done, " & msFailures & " failed");
 		HostQuit();
 	end];
