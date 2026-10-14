@@ -115,6 +115,16 @@ struct HostGPSDevice
 };
 void	HostGPSSetDevice(const HostGPSDevice* device);
 
+// A receiver whose supply the host can switch (a board's, to save its
+// battery): the host gives its switch (==> whether it took) and whether the
+// receiver is on now.  HostGPSSetPower (the Host preferences panel's "The
+// GPS on") off switches it off and forgets its fix - HostGPSStatus has none
+// until it is on again and has a new one
+void	HostGPSSetPowerSwitch(bool (*powerSwitch)(bool on), bool on);
+bool	HostGPSPowerSwitchable(void);
+bool	HostGPSPowered(void);
+bool	HostGPSSetPower(bool on);
+
 // The receiver started on its source (spec as above) ==> whether it was;
 // why says why not.  Once only.
 bool	HostGPSStart(const char* spec, char* why, long size);

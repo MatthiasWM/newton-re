@@ -19,6 +19,14 @@
 				- 38400 baud, as lilyphone1 sets the M10 (its default is
 				  9600, which is tried when nothing readable comes at 38400).
 
+				The receiver can be switched off to save the battery (the
+				Host preferences panel's "The GPS on": HostGPSSetPower):
+				GPIO 39 low, the fix forgotten; on again, GPIO 39 high.  The
+				choice is kept in NVS ("gpsOff"), so a receiver switched
+				off stays off from the next boot on.  The switching is done
+				by a task of the board's own: the Newton's tasks, whose
+				stacks are in PSRAM, must not write the flash NVS is on.
+
 				The receiver's thread is HostGPS's own (std::thread: a
 				pthread with a 3 KB internal stack, its buffers static).
 				ESP-IDF's headers only (esp32host.h says why).
@@ -28,6 +36,8 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
+#include "nvs.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
@@ -40,6 +50,50 @@
 #define PIN_GPS_RX		44				// ours, from the module's TXD
 
 static const uart_port_t	kPort = UART_NUM_2;
+static QueueHandle_t		gPowerRequests;		// the switch's: on or off (a bool)
+
+
+static bool
+KeptOff(void)
+{
+	nvs_handle_t nvs;
+	uint8_t off = 0;
+	if (nvs_open("newton", NVS_READONLY, &nvs) == ESP_OK)
+	{
+		nvs_get_u8(nvs, "gpsOff", &off);
+		nvs_close(nvs);
+	}
+	return off != 0;
+}
+
+
+// The switch (HostGPSSetPowerSwitch): handed to the power task
+static bool
+PowerSwitch(bool on)
+{
+	return xQueueSend(gPowerRequests, &on, 0) == pdTRUE;
+}
+
+
+static void
+PowerTask(void*)
+{
+	for (;;)
+	{
+		bool on;
+		if (xQueueReceive(gPowerRequests, &on, portMAX_DELAY) != pdTRUE)
+			continue;
+		gpio_set_level((gpio_num_t) PIN_GPS_POWER, on ? 1 : 0);
+		nvs_handle_t nvs;
+		if (nvs_open("newton", NVS_READWRITE, &nvs) == ESP_OK)
+		{
+			nvs_set_u8(nvs, "gpsOff", on ? 0 : 1);
+			nvs_commit(nvs);
+			nvs_close(nvs);
+		}
+		printf("[gps] the receiver switched %s\n", on ? "on" : "off");
+	}
+}
 
 
 static long
@@ -90,7 +144,8 @@ HostDeviceGpsStart(void)
 	pins.pin_bit_mask = 1ULL << PIN_GPS_POWER;
 	pins.mode = GPIO_MODE_INPUT_OUTPUT;
 	gpio_config(&pins);
-	gpio_set_level((gpio_num_t) PIN_GPS_POWER, 1);
+	bool on = !KeptOff();
+	gpio_set_level((gpio_num_t) PIN_GPS_POWER, on ? 1 : 0);
 
 	uart_config_t config = {};
 	config.baud_rate = 38400;
@@ -110,12 +165,17 @@ HostDeviceGpsStart(void)
 	// receiver just powered says nothing for a moment)
 	vTaskDelay(pdMS_TO_TICKS(300));
 	long baud = 38400;
-	if (!Hears(1500))
+	if (!on)
+		printf("[gps] the receiver is switched off (the Host panel)\n");
+	else if (!Hears(1500))
 	{
 		uart_set_baudrate(kPort, 9600);
 		baud = Hears(1500) ? 9600 : 38400;
 		uart_set_baudrate(kPort, baud);
 	}
+	gPowerRequests = xQueueCreate(4, sizeof(bool));
+	if (gPowerRequests != NULL && xTaskCreatePinnedToCore(PowerTask, "gpspower", 3072, NULL, 4, NULL, 0) == pdPASS)
+		HostGPSSetPowerSwitch(PowerSwitch, on);
 	HostGPSSetDevice(&gDevice);
 	char why[96];
 	if (!HostGPSStart("device", why, sizeof(why)))

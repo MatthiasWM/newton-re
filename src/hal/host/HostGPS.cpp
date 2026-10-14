@@ -56,6 +56,8 @@ const double	kKnot = 1852.0 / 3600.0;	// metres a second
 enum SourceKind { kSourceNone, kSourceSim, kSourceFixed, kSourceFile, kSourceTCP, kSourceGPSD, kSourceSerial, kSourceDevice };
 
 static const HostGPSDevice*	gDevice = NULL;		// (the source "device": the board's receiver)
+static bool					(*gPowerSwitch)(bool on) = NULL;
+static std::atomic<bool>	gPoweredOff(false);
 
 static long long
 Millis(void)
@@ -973,6 +975,37 @@ bool		HostGPSStarted(void)		{ return gStarted; }
 
 void		HostGPSSetDevice(const HostGPSDevice* device)	{ gDevice = device; }
 
+
+void
+HostGPSSetPowerSwitch(bool (*powerSwitch)(bool on), bool on)
+{
+	gPowerSwitch = powerSwitch;
+	gPoweredOff = !on;
+}
+
+
+bool		HostGPSPowerSwitchable(void)	{ return gPowerSwitch != NULL; }
+bool		HostGPSPowered(void)			{ return !gPoweredOff; }
+
+
+bool
+HostGPSSetPower(bool on)
+{
+	if (gPowerSwitch == NULL)
+		return false;
+	if (on == !gPoweredOff)
+		return true;
+	if (!gPowerSwitch(on))
+		return false;
+	gPoweredOff = !on;
+	if (!on)
+	{
+		std::lock_guard<std::mutex> hold(gLock);
+		gFix.valid = false;					// (a fix from before is no longer where we are)
+	}
+	return true;
+}
+
 void
 HostGPSSource(char* spec, long size)
 {
@@ -1053,4 +1086,6 @@ HostGPSStatus(HostGPSFix* fix)
 {
 	std::lock_guard<std::mutex> hold(gLock);
 	*fix = gFix;
+	if (gPoweredOff)
+		fix->valid = false;					// (switched off: what it last said is old news)
 }

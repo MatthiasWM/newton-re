@@ -252,6 +252,8 @@ FHostSettingsList(RefArg /*rcvr*/)
 		Choices(kind, kGPSKindChoices, 2);
 		AddArraySlot(list, kind);
 	}
+	if (HostGPSPowerSwitchable())
+		AddArraySlot(list, RefVar(Item("gpsPower", "The GPS on", kCheck, HostGPSPowered())));
 	if (HostCellularPowerSwitchable())
 		AddArraySlot(list, RefVar(Item("cellPower", "The 4G module on", kCheck, HostCellularPowered())));
 	// (the LoRa mesh node's settings - its radio's power and preset, its
@@ -382,6 +384,14 @@ FHostSetSetting(RefArg /*rcvr*/, RefArg setting, RefArg value)
 		HostGPSSetKind(RINT(value) == 1 ? kHostGPSTripmate : kHostGPSNMEA);
 		fprintf(stderr, "[host] GPS receiver: %s\n", kGPSKindChoices[RINT(value)]);
 		return TRUEREF;
+	}
+	if (strcmp(name, "gpsPower") == 0)
+	{
+		if (!HostGPSPowerSwitchable())
+			return NILREF;
+		bool taken = HostGPSSetPower(on);
+		fprintf(stderr, "[host] the GPS %s%s\n", on ? "on" : "off", taken ? "" : " - it could not be switched");
+		return MAKEBOOLEAN(taken);
 	}
 	if (strcmp(name, "cellPower") == 0)
 	{
