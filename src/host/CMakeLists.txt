@@ -2488,6 +2488,15 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/layout.tsv)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/tables/test_newtontables.py
                      --rom ${NEWTON_ROM_BUILD_DIR}
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    # the ink codec's code books, the letter trigrams and the Letter Shapes
+    # pictures as text (tools/tables/inktables.py): round trip, edits
+    add_test(NAME tools.InkTables
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/tables/test_inktables.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    add_test(NAME tools.InkTablesROM
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/tables/test_inktables.py
+                     --rom ${NEWTON_ROM_BUILD_DIR}
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     # a collation edit: a and z given each other's weights in the ROM's
     # sorting table, the tree built, and StrCompare on the booted machine
     # puts "zebra" before "apple" (demo/tableedit.ns)

@@ -2196,7 +2196,19 @@ not its reading:
   and `DrawStringShapes` over the ROM's `letterimages` (LetterShapes.h has
   the format): a group of variants to a 35-pixel cell, a letter pair to a
   page, the tapped group hilited and its weight changed, never leaving a
-  letter with no group in use.
+  letter with no group in use.  In `romsrc/` the pictures are text
+  (`tools/tables/inktables.py`'s `letter-images`: a letter, its variants'
+  groups and each stroke's points; the ROM lays the letters, then the
+  variants, then the strokes out in order, so no offset is kept).
+- Not the cursive recogniser's trigrams: the ROM has a second trigram
+  table, the 'Trigrams binary `Rtrig` (0x005ba4b1, 8192 bytes) - two bits
+  for each of 32 x 32 x 32 sequences of a-z, `'` and a word's edge
+  (`inktables.py`'s `trigrams` has how that was worked out) - and
+  **nothing in the ROM reads it**: its reference occurs only in the
+  constant `Rtrig`, whose only reference is the package export `RStrig`,
+  itself unreferenced (`analysis/xrefs.py ... Rtrig RStrig` and a byte
+  search of `rom.bin`).  `DTETrigrams` (40 symbols, `Xrlv.cpp`) is the
+  one the recogniser uses.
 - The boot's choice: `SetUpRosetta` also sets `FragmentLigatures` from
   the `doFragmentation` preference - 'default meaning "if the processor
   runs faster than 90 MHz", which is why the kernel now answers the

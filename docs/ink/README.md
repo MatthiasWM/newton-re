@@ -152,6 +152,17 @@ number is worth - 0x800 for the writing book and 0x2000 for the ink one
 - and the codec counts in thousand-and-twenty-fourths of a tablet unit,
 so a step is two units in one book and eight in the other.
 
+The books are the two 'Comp binaries of `charsetInfoResources`
+(`codebook1`, `Rparagraphcodebook1`, 23840 bytes; `codebook2`,
+`Rparagraphcodebook2` = magic pointer @145, 6656 bytes), which
+`InitializeParagraphCompression` (0x001543a4, the only code that reads
+either constant - `analysis/xrefs.py`) puts in the two globals.  In
+`romsrc/` they are text, `tools/tables/inktables.py`'s `code-book`
+format.  Every table of both is a *complete* code: the sum of 2^-length
+over its entries is exactly 1 (worked out over both books' bytes), so
+every string of bits begins with some code and a code word can only be
+added by splitting an existing one.
+
 **A stroke.**  `ReadNewStroke` (0x00280f1c) reads the next stroke's kind
 and moves the pen to where it starts.  The first stroke of a run carries
 the format: a kind of 2 there is not the end of the group but the marker

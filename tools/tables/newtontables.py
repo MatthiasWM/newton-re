@@ -35,6 +35,11 @@ Usage:
     newtontables.py pack TABLE.txt OUT.bin
     newtontables.py check FORMAT TABLE.bin...     (unpacked and packed back: the same?)
 
+Other modules here add formats of their own (EXTENSIONS: each has
+FORMATS, unpack(data, format, path) and pack_lines(format, lines, base)),
+and these functions hand those formats to them: inktables.py (the ink
+code books, the letter trigrams, the letter pictures).
+
 As a module: `unpack(data, format, path)`, `pack(path)` -> bytes.
 `romsrc.py` writes them as `texttable(class, "resources/....txt")`.
 """
@@ -418,7 +423,29 @@ _BYTES = {"to-unicode": _to_unicode_bytes, "from-unicode": _from_unicode_bytes, 
 		  "break-table": _break_bytes}
 
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import inktables					# noqa: E402
+
+EXTENSIONS = (inktables,)
+
+
+def _extension(format: str):
+	for m in EXTENSIONS:
+		if format in m.FORMATS:
+			return m
+	return None
+
+
+def formats():
+	"""Every format this module (with its extensions) packs."""
+	return tuple(_TEXT) + tuple(f for m in EXTENSIONS for f in m.FORMATS)
+
+
 def unpack(data: bytes, format: str, path: str) -> None:
+	m = _extension(format)
+	if m is not None:
+		m.unpack(data, format, path)
+		return
 	lines = _TEXT[format](data)
 	with open(path, "w", encoding="utf-8", newline="\n") as f:
 		f.write("\n".join(lines) + "\n")
@@ -426,6 +453,10 @@ def unpack(data: bytes, format: str, path: str) -> None:
 
 def pack(path: str) -> bytes:
 	format, rows = _lines(path)
+	m = _extension(format)
+	if m is not None:
+		with open(path, encoding="utf-8") as f:
+			return m.pack_lines(format, f.read().split("\n"), os.path.dirname(os.path.abspath(path)))
 	return _BYTES[format](rows)
 
 

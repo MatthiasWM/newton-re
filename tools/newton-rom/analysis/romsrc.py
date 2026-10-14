@@ -140,8 +140,10 @@ constructors of its own):
                     key tables; a 'table of 256 entries)
     texttable('UniC, "resources/UniC/addr.txt")   a table of the Unicode
                     frame (an encoding's maps, the character classes and
-                    their case tables), a sorting table ('Sort) or a
-                    locale's break table ('Intl) as text whose `format`
+                    their case tables), a sorting table ('Sort), a
+                    locale's break table ('Intl), an ink code book
+                    ('Comp), the letter trigrams ('Trigrams) or the Letter
+                    Shapes pictures ('letterimages) as text whose `format`
                     line says which: tools/tables/newtontables.py packs it
                     (tools/tables/README.md)
     lexicon('AirusA, "resources/AirusA/addr.lex")   an Airus dictionary
@@ -1217,8 +1219,9 @@ HEX_TABLES = {"kchr": kchr_text, "table": table_text}
 
 def text_table_format(cname, path, data):
 	"""The text form (tools/tables/newtontables.py) a binary of the Unicode
-	frame, a sorting table or a locale's break table takes, by its class and
-	the slot it is in; None for any other binary."""
+	frame, a sorting table, a locale's break table, an ink code book, the
+	trigrams or the letter pictures takes, by its class and the slot it is
+	in; None for any other binary."""
 	slot = path.rsplit(".", 1)[-1].lower() if path else ""
 	if cname == "UniC":
 		if slot == "maptounicode":
@@ -1236,6 +1239,12 @@ def text_table_format(cname, path, data):
 		return "sort-table"
 	if cname == "Intl" and slot in ("wordbreaktable", "linebreaktable"):
 		return "break-table"
+	if cname == "Comp":
+		return "code-book"				# (the ink codec's code books: tools/tables/inktables.py)
+	if cname == "Trigrams":
+		return "trigrams"
+	if cname == "letterimages":
+		return "letter-images"
 	return None
 
 SCORE_HEADER = ("version", "algorithm", "reserved", "repeats")
@@ -2200,7 +2209,7 @@ class Builder:
 # the modules the builder builds with, besides this one: what the stamp is a
 # hash of (all imported above, so a run of any command has them)
 STAMP_MODULES = ("nsfunctions", "nsdecompile", "romdicts", "packages", "romid",
-				 "png", "newtonsfnt", "newtonlex", "newtontables")
+				 "png", "newtonsfnt", "newtonlex", "newtontables", "inktables")
 
 
 def builder_stamp():

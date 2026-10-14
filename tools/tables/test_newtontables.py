@@ -48,7 +48,7 @@ def edited(src, tmp, change):
 class RoundTrip(unittest.TestCase):
 	def test_committed(self):
 		files = committed()
-		self.assertEqual(len(files), 16)
+		self.assertEqual(len(files), 20)		# (16, and inktables.py's 4)
 		rom = None
 		if ROM_BUILD:
 			with open(os.path.join(ROM_BUILD, "rom.bin"), "rb") as f:
