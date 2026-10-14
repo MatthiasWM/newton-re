@@ -9,8 +9,11 @@
 // growing with a long message and emptied by Send (typed text too), a
 // message to everyone ('sent); the "i" button's Prefs (only Prefs
 // offered), its slip retuning the radio (a preset, then a frequency typed) and renaming the node; deleting:
-// a message tapped and deleted, Ada's conversation deleted once confirmed; each screen
-// snapshotted
+// a message tapped and deleted, Ada's conversation deleted once confirmed;
+// saved contacts - Ada saved to Names from her conversation's header (a
+// card with the "Mesh Key" custom field, a MeshCore favourite), Bob added
+// by a meshcore:// link, New listing them first, a card taken out of Names
+// no longer saved; each screen snapshotted
 // (mesh-<width>x<height>-<n>.pgm).  The ctests host.NewtonMesh.<size>:
 //
 //   python tools/mesh/meshrun.py \
@@ -25,6 +28,23 @@ meShot := 0;
 meAda := nil;
 meDeleteCount := 0;
 meDeleteId := nil;
+meBobKey := "B0B0000000000000000000000000000000000000000000000000000000000001";
+
+// a node's entry in HostMeshContacts, by key
+meContact := func(key) begin
+	local nodes := HostMeshContacts();
+	if nodes then
+		foreach n in nodes do
+			if StrEqual(n.key, key) then return n;
+	nil;
+end;
+
+// the Names card with this mesh key
+meCard := func(key) begin
+	local mesh := GetGlobalVar('|HostMesh:host|);
+	local card := mesh:SavedCards(true).(Intern("k" & key));
+	if card then card.entry;
+end;
 
 meCheck := func(what, ok, why) begin
 	if ok then
@@ -126,8 +146,10 @@ meSteps := [
 		// New: the nodes heard; Ada chosen
 		local popup := meApp:Compose();
 		local index := 0;
-		foreach i, n in meApp.pickNodes do
-			if StrEqual(n.name, "Ada") then index := i;
+		foreach i, k in meApp.pickNodes do
+			if IsString(k) and StrEqual(k, meAda.key) then index := i;
+		call meCheck with ("New ending with Add by Key", meApp.pickNodes[Length(meApp.pickNodes) - 1] = 'addByKey,
+			"it ends with " & meApp.pickNodes[Length(meApp.pickNodes) - 1]);
 		meApp:pickActionScript(index);
 		// (as a pick closes it: left open, it would take the next tap)
 		if popup and popup.viewCObject then popup:Close();
@@ -226,6 +248,83 @@ meSteps := [
 			and Length(meApp:ThreadMessages("public")) = fresh - 1, "it is still there");
 		mesh:SetKeep(1);
 		call next with ();
+	end,
+	// saved contacts: keys read, links parsed
+	func(next) begin
+		local mesh := GetGlobalVar('|HostMesh:host|);
+		local spaced := Downcase(SubStr(meBobKey, 0, 4) & " " & SubStr(meBobKey, 4, 4) & " " & SubStr(meBobKey, 8, 56));
+		local read := mesh:NormalKey(spaced);
+		call meCheck with ("a key read in capitals, spaces let be", read and StrEqual(read, meBobKey),
+			"it is " & read);
+		call meCheck with ("a short key refused", not mesh:NormalKey("B0B0"), "it was taken");
+		call meCheck with ("a key with a letter past F refused", not mesh:NormalKey("G" & SubStr(meBobKey, 1, 63)), "it was taken");
+		local link := mesh:ParseLink("meshcore://contact/add?name=Bob%20B+Jones&public_key=" & meBobKey & "&type=1");
+		call meCheck with ("a contact link parsed", link and StrEqual(link.key, meBobKey) and StrEqual(link.name, "Bob B Jones"),
+			"it is " & (if link then link.name & " " & link.key));
+		// Ada saved from her conversation's header
+		meApp:OpenThread(meAda.key);
+		meApp.headerView:viewClickScript(nil);
+		call meCheck with ("the header offering Save to Names", meApp.headerView.headerPicks
+			and meApp.headerView.headerPicks[0] = 'save, "it offers " & meApp.headerView.headerPicks);
+		local popup := meApp.headerView.headerPopup;
+		meApp.headerView:pickActionScript(0);
+		// (as a pick closes it: left open, it would take the next tap)
+		if popup and popup.viewCObject then popup:Close();
+		local card := call meCard with (meAda.key);
+		local path := mesh:MeshKeyPath(nil);
+		call meCheck with ("a Names card for Ada with her key", card and path and StrEqual(card.(path), meAda.key)
+			and ClassOf(card.(path)) = '|string.custom| and StrEqual(mesh:CardName(card), "Ada"),
+			"the card is " & (if card then mesh:CardName(card)) & ", the field " & path);
+		local labels := GetRoot().cardfile:GetCustomInfo();
+		call meCheck with ("the custom field labelled Mesh Key", labels and labels.(path)
+			and StrEqual(labels.(path).label, "Mesh Key"), "it is not");
+		call meSnap with ();
+		call waitFor with ("mesh: Ada a favourite", func() begin
+			local n := call meContact with (meAda.key);
+			n and n.saved;
+		end, next, 10);
+	end,
+	func(next) begin
+		local mesh := GetGlobalVar('|HostMesh:host|);
+		// Bob, never heard, added by a link pasted in the key's line
+		meApp:OpenAddByKey();
+		local slip := meApp.addSlip;
+		call meCheck with ("the Add by Key slip", slip and slip.viewCObject and slip.keyLine, "it did not open");
+		SetValue(slip.keyLine.entryLine, 'text, "meshcore://contact/add?name=Bob%20B&public_key=" & meBobKey & "&type=1");
+		call meSnap with ();
+		SetValue(slip.keyLine.entryLine, 'text, Clone("not a key"));
+		slip:Add();
+		call meCheck with ("a bad key told, the slip left open", slip.viewCObject and not call meCard with (meBobKey), "it was taken");
+		SetValue(slip.keyLine.entryLine, 'text, "meshcore://contact/add?name=Bob%20B&public_key=" & meBobKey & "&type=1");
+		slip:Add();
+		local card := call meCard with (meBobKey);
+		call meCheck with ("Bob's card, named from the link", card and StrEqual(mesh:CardName(card), "Bob B"),
+			"it is " & (if card then mesh:CardName(card)));
+		call meCheck with ("his conversation opened", meApp.mode = 'thread and StrEqual(meApp.currentThread, meBobKey)
+			and StrEqual(meApp:ThreadName(meApp:ThreadFor(meBobKey)), "Bob B"), "it is " & meApp.currentThread);
+		call meSnap with ();
+		call waitFor with ("mesh: Bob a favourite", func() begin
+			local n := call meContact with (meBobKey);
+			n and n.saved;
+		end, next, 10);
+	end,
+	func(next) begin
+		local mesh := GetGlobalVar('|HostMesh:host|);
+		// New: the saved first, in name order
+		local popup := meApp:Compose();
+		local picks := meApp.pickNodes;
+		if popup and popup.viewCObject then popup:Close();
+		meApp.pickNodes := nil;
+		call meCheck with ("New listing Ada, then Bob B, first", picks and Length(picks) >= 3
+			and StrEqual(picks[0], meAda.key) and StrEqual(picks[1], meBobKey),
+			"it lists " & (if picks then Length(picks)) & " items");
+		// Bob's card taken out of Names: no longer saved
+		EntryRemoveFromSoupXmit(call meCard with (meBobKey), nil);
+		mesh:SyncSaved();
+		call waitFor with ("mesh: Bob no longer saved", func() begin
+			local n := call meContact with (meBobKey);
+			n and not n.saved;
+		end, next, 10);
 	end,
 	func(next) begin
 		local hello := call meEntryWith with ("Hello mesh");

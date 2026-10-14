@@ -202,6 +202,16 @@ static bool					gNameAsked = false;
 static char					gNameWanted[kHostMeshNameSize];
 static bool					gRadioAsked = false;
 static HostMeshRadioSettings	gRadioWanted;
+// contacts saved (MeshCore's favourites) or forgotten, by key
+struct ContactAsk
+{
+	uint8_t		key[kHostMeshKeySize];
+	char		name[kHostMeshNameSize];	// "" to keep the name it has
+	bool		saved;
+};
+const int						kContactAsksMax = 64;
+static HOST_LARGE_STATIC ContactAsk	gContactAsks[kContactAsksMax];
+static int						gContactAskCount = 0;
 
 // the power
 static bool					(*gPowerSwitch)(bool on) = NULL;
@@ -281,7 +291,8 @@ const long		kSettingsVersion1Size = 4 + kHostMeshNameSize + 4 + 4;
 
 // a contact as kept: MeshCore's ContactInfo without its cached secret or
 // its route (learnt again: the first message to it floods), the newest
-// kKeptContacts of them (a board's NVS is small: 32 are 2.8 KB), written
+// kKeptContacts of them, the saved ones (favourites) always first (a
+// board's NVS is small: 64 are 5.6 KB), written
 // only when the list itself changes - who is in it, by what name - not each
 // time one of them announces itself again
 struct KeptContact
@@ -294,7 +305,7 @@ struct KeptContact
 	uint32_t	syncSince;
 };
 const long		kContactsMagic = 0x4D43432;		// "MCC" 2
-const long		kKeptContacts = 32;
+const long		kKeptContacts = 64;
 // (file statics, not a function's: a function's static in an inline member
 // function and a file's in the PSRAM section conflict on the board)
 static HOST_LARGE_STATIC KeptContact	gKept[kHostMeshContactsMax];
@@ -323,7 +334,46 @@ public:
 	// a node in a pocket is a poor repeater and forwarding costs battery
 	bool	allowPacketForward(const mesh::Packet*) override { return false; }
 
-	void onDiscoveredContact(ContactInfo&, bool, uint8_t, const uint8_t*) override
+	// a full table makes room for a node newly heard: the oldest not saved
+	// goes (MeshCore's default is to add no more - a node heard once the
+	// table was full could never be written to, nor its messages read)
+	bool	shouldOverwriteWhenFull() const override { return true; }
+
+	// a contact saved (a favourite: never the one to make room) or not,
+	// added when it is not known - by its key alone, a node never heard
+	void SetSaved(const uint8_t* key, const char* name, bool saved)
+	{
+		ContactInfo* c = lookupContactByPubKey(key, PUB_KEY_SIZE);
+		if (c == NULL)
+		{
+			if (!saved)
+				return;
+			ContactInfo n;
+			memset(&n, 0, sizeof(n));
+			n.id = mesh::Identity(key);
+			n.type = ADV_TYPE_CHAT;
+			n.out_path_len = OUT_PATH_UNKNOWN;
+			n.lastmod = getRTCClock()->getCurrentTime();
+			if (!addContact(n))
+				return;
+			c = lookupContactByPubKey(key, PUB_KEY_SIZE);
+			if (c == NULL)
+				return;
+		}
+		if (name != NULL && name[0] != 0 && (c->name[0] == 0 || c->last_advert_timestamp == 0))
+			StrHelper::strncpy(c->name, name, sizeof(c->name));	// (a node heard names itself)
+		if (c->name[0] == 0)
+		{
+			char hex[kHostMeshKeyHexSize];
+			HexOf(key, PUB_KEY_SIZE, hex);
+			hex[8] = 0;
+			StrHelper::strncpy(c->name, hex, sizeof(c->name));
+		}
+		c->flags = saved ? (c->flags | 1) : (c->flags & ~1);
+		ContactsChanged();
+	}
+
+	void ContactsChanged()
 	{
 		Mirror();
 		uint32_t signature = Signature();
@@ -333,6 +383,11 @@ public:
 			gContactsChanged = true;
 			gContactsChangedAt = NowMs();
 		}
+	}
+
+	void onDiscoveredContact(ContactInfo&, bool, uint8_t, const uint8_t*) override
+	{
+		ContactsChanged();
 	}
 
 	void onContactPathUpdated(const ContactInfo&) override
@@ -356,6 +411,7 @@ public:
 				for (size_t k = 0; k < sizes[p]; k++)
 					h = (h ^ parts[p][k]) * 16777619u;
 			h = (h ^ c.type) * 16777619u;
+			h = (h ^ (c.flags & 1)) * 16777619u;
 		}
 		return h;
 	}
@@ -472,6 +528,7 @@ public:
 			m.kind = c.type;
 			m.hops = c.out_path_len == OUT_PATH_UNKNOWN ? -1 : c.out_path_len;
 			m.heard = c.lastmod;
+			m.saved = (c.flags & 1) != 0;
 		}
 		// newest first (insertion: there are few)
 		for (long i = 1; i < count; i++)
@@ -507,9 +564,10 @@ public:
 			k.longitude = c.gps_lon;
 			k.syncSince = c.sync_since;
 		}
-		// the newest kept
+		// the saved first, then the newest
 		for (long i = 1; i < count; i++)
-			for (long j = i; j > 0 && kept[j].lastmod > kept[j - 1].lastmod; j--)
+			for (long j = i; j > 0 && ((kept[j].flags & 1) > (kept[j - 1].flags & 1)
+										|| ((kept[j].flags & 1) == (kept[j - 1].flags & 1) && kept[j].lastmod > kept[j - 1].lastmod)); j--)
 			{
 				KeptContact t = kept[j];
 				kept[j] = kept[j - 1];
@@ -609,6 +667,26 @@ public:
 			else
 			{
 				ContactInfo* contact = lookupContactByPubKey(s.key, PUB_KEY_SIZE);
+				if (contact == NULL)
+				{
+					// (a key never heard, or made room for since: added - a
+					// message needs only the key; the first floods)
+					ContactInfo n;
+					memset(&n, 0, sizeof(n));
+					n.id = mesh::Identity(s.key);
+					n.type = ADV_TYPE_CHAT;
+					n.out_path_len = OUT_PATH_UNKNOWN;
+					n.lastmod = getRTCClock()->getCurrentTime();
+					char hex[kHostMeshKeyHexSize];
+					HexOf(s.key, PUB_KEY_SIZE, hex);
+					hex[8] = 0;
+					StrHelper::strncpy(n.name, hex, sizeof(n.name));
+					if (addContact(n))
+					{
+						ContactsChanged();
+						contact = lookupContactByPubKey(s.key, PUB_KEY_SIZE);
+					}
+				}
 				if (contact == NULL)
 					state = kHostMeshSendFailed;
 				else
@@ -912,6 +990,18 @@ HostMeshRun(const HostMeshPlatform* platform)
 		}
 
 		long recoveries = platform->radioCheck != NULL ? platform->radioCheck(platform->ref) : -1;
+		{
+			ContactAsk asks[kContactAsksMax];
+			int n;
+			{
+				std::lock_guard<std::mutex> hold(gLock);
+				n = gContactAskCount;
+				memcpy(asks, gContactAsks, n * sizeof(ContactAsk));
+				gContactAskCount = 0;
+			}
+			for (int k = 0; k < n; k++)
+				node->SetSaved(asks[k].key, asks[k].name, asks[k].saved);
+		}
 		node->CheckSends();
 		node->loop();
 		{
@@ -1039,6 +1129,31 @@ HostMeshGetSendState(long id)
 		if (gSends[k].id == id)
 			return gSends[k].state;
 	return kHostMeshSendNone;
+}
+
+
+bool
+HostMeshSetSaved(const char* key, const char* name, bool saved)
+{
+	ContactAsk a;
+	memset(&a, 0, sizeof(a));
+	if (!HostMeshStarted() || key == NULL || strlen(key) != 2 * kHostMeshKeySize || !KeyOf(key, a.key))
+		return false;
+	CopyUTF8(a.name, name != NULL ? name : "", sizeof(a.name));
+	a.saved = saved;
+	std::lock_guard<std::mutex> hold(gLock);
+	for (int k = 0; k < gContactAskCount; k++)
+		if (memcmp(gContactAsks[k].key, a.key, sizeof(a.key)) == 0)
+		{
+			gContactAsks[k] = a;					// (the later wins)
+			gWake.notify_one();
+			return true;
+		}
+	if (gContactAskCount == kContactAsksMax)
+		return false;
+	gContactAsks[gContactAskCount++] = a;
+	gWake.notify_one();
+	return true;
 }
 
 

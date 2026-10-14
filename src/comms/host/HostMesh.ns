@@ -20,9 +20,19 @@
 //
 // Any screen, as Messages: GetAppParams' area, Layout, the list and a
 // conversation drawn by the application, side by side from
-// kSideBySideWidth.  A new conversation is begun with a node heard on the
-// mesh (HostMeshContacts), not a Names card; Announce sends this node's
-// advert so that others hear it.  docs/host-tdeck-pro-mesh.md.
+// kSideBySideWidth.  Announce sends this node's advert so that others hear
+// it.  docs/host-tdeck-pro-mesh.md.
+//
+// Saved contacts are Names cards (the owner's choice, 2026-10-14): a node's
+// key is kept in one of the Names file's custom fields, the one labelled
+// "Mesh Key" (made, the first free customN, the first time a node is
+// saved), so that a card shows it and it can be edited there.  The cards
+// with a key are given to the engine as MeshCore favourites (HostMesh-
+// SaveContact: kept first across restarts, never the one to make room)
+// whenever the application starts or opens, and a favourite whose card has
+// gone is no longer one.  New lists them, then the nodes heard, then "Add by
+// Key", which takes a name and a key (or a meshcore:// contact link) for a
+// node never heard; a conversation's header offers to save its node.
 
 {
 	appSymbol: '|Mesh:host|,
@@ -42,6 +52,10 @@
 	kMessagesMax: 1000,
 	kPruneEvery: 60,						// minutes
 	lastPrune: nil,
+
+	kMeshKeyLabel: "Mesh Key",
+	saved: nil,								// (the saved cards, by "k" & key: {key, name, entry})
+	savedAt: nil,							// (when they were read, in seconds)
 
 	app: {
 		viewClass: 74,							// clView
@@ -91,6 +105,11 @@
 				folderTab.showBarText.pickActionScript := ConversationPicked;
 				folderTab.showBarText.pickThreads := nil;
 			end;
+			// (Names may have changed while the application was closed)
+			try
+				:Mesh():SyncSaved()
+			onexception |evt.ex| do
+				nil;
 			:Reload();
 			:Layout();
 		end,
@@ -255,7 +274,14 @@
 		GetTargetInfo: func(reason)
 			{target: nil, targetView: self, targetStore: GetDefaultStore()},
 
-		ThreadName: func(t) if t.name then t.name else :Mesh():ShortKey(t.thread),
+		// a conversation's name: its node's Names card's, or as heard, or its id
+		ThreadName: func(t)
+		begin
+			local card := if not StrEqual(t.thread, :Mesh().kPublic) then :Mesh():SavedCard(t.thread);
+			if card then card.name
+			else if t.name then t.name
+			else :Mesh():ShortKey(t.thread);
+		end,
 
 		ShownThread: func()
 			if mode = 'thread and currentThread then :ThreadFor(currentThread),
@@ -294,18 +320,45 @@
 			:Layout();
 		end,
 
-		// New: the nodes heard, to begin a conversation with one
+		// New: the saved contacts (Names cards with a mesh key), then the
+		// people's nodes heard and not saved (chat nodes and room servers:
+		// repeaters and sensors take no messages), then Add by Key
 		Compose: func()
 		begin
-			local nodes := HostMeshContacts();
-			if not nodes or Length(nodes) = 0 then begin
-				GetRoot():Notify(3, "Mesh", "No one has been heard on the mesh yet. Tap Announce so that others hear you.");
-				return nil;
-			end;
-			pickNodes := nodes;
+			local mesh := :Mesh();
+			local cards := mesh:SavedCards(true);
+			local savedList := [];
+			foreach c in cards do
+				AddArraySlot(savedList, {key: c.key, name: c.name});
+			Sort(savedList, '|str<|, 'name);
 			local items := [];
-			foreach n in nodes do
-				AddArraySlot(items, {item: n.name & (if n.kind <> 'chat then " (" & SymbolName(n.kind) & ")" else ""), mark: $ });
+			pickNodes := [];
+			foreach c in savedList do begin
+				AddArraySlot(items, {item: c.name, mark: $ });
+				AddArraySlot(pickNodes, c.key);
+			end;
+			local heard := [];
+			local nodes := HostMeshContacts();
+			if nodes then
+				foreach n in nodes do
+					if (n.kind = 'chat or n.kind = 'room) and not cards.(Intern("k" & n.key)) then
+						AddArraySlot(heard, n);
+			if Length(heard) > 0 then begin
+				if Length(items) > 0 then begin
+					AddArraySlot(items, 'pickseparator);
+					AddArraySlot(pickNodes, nil);
+				end;
+				foreach n in heard do begin
+					AddArraySlot(items, {item: n.name & (if n.kind = 'room then " (room)" else ""), mark: $ });
+					AddArraySlot(pickNodes, n.key);
+				end;
+			end;
+			if Length(items) > 0 then begin
+				AddArraySlot(items, 'pickseparator);
+				AddArraySlot(pickNodes, nil);
+			end;
+			AddArraySlot(items, {item: "Add by Key…\u", mark: $ });
+			AddArraySlot(pickNodes, 'addByKey);
 			DoPopup(items, 0, 0, self);
 		end,
 
@@ -313,8 +366,11 @@
 		begin
 			local nodes := pickNodes;
 			pickNodes := nil;
-			if nodes and index >= 0 and index < Length(nodes) then
-				:OpenThread(nodes[index].key);
+			local chosen := if nodes and index >= 0 and index < Length(nodes) then nodes[index];
+			if chosen = 'addByKey then
+				:OpenAddByKey()
+			else if IsString(chosen) then
+				:OpenThread(chosen);
 		end,
 
 		pickCancelledScript: func() pickNodes := nil,
@@ -437,6 +493,86 @@
 		// too small to see)
 		DoInfoPrefs: func()
 			base:TogglePrefs(),
+
+		// Add by Key: a node never heard, by its name and its key (64 hex
+		// digits, or a meshcore:// contact link pasted in the key's line);
+		// saved as a Names card, and its conversation opened
+		addSlip: nil,
+		OpenAddByKey: func()
+		begin
+			if addSlip and addSlip.viewCObject then
+				addSlip:Close();
+			local box := :GlobalBox();
+			local width := Min(box.right - box.left - 12, 260);
+			local height := Min(110, box.bottom - box.top - 8);
+			addSlip := BuildContext({_proto: addTemplate, meshApp: self,
+				viewBounds: RelBounds(box.left + (box.right - box.left - width) div 2,
+					box.top + (box.bottom - box.top - height) div 3, width, height)});
+			addSlip:Open();
+		end,
+
+		addTemplate: {
+			_proto: @179,						// protoFloatNGo
+			meshApp: nil,
+			theSlip: nil,
+			nameLine: nil, keyLine: nil,
+			viewSetupFormScript: func()
+			begin
+				theSlip := self;
+				inherited:?viewSetupFormScript();
+			end,
+			viewSetupDoneScript: func()
+			begin
+				inherited:?viewSetupDoneScript();
+				foreach v in :ChildViewFrames() do
+					if v.role then
+						self.(v.role) := v;
+			end,
+			viewQuitScript: func()
+			begin
+				if meshApp then meshApp.addSlip := nil;
+				nameLine := keyLine := nil;
+				inherited:?viewQuitScript();
+			end,
+			// the node saved and its conversation opened, or what is wrong told
+			Add: func()
+			begin
+				local mesh := GetGlobalVar('|HostMesh:host|);
+				local name := if nameLine then TrimString(Clone(nameLine.entryLine.text)) else "";
+				local typed := if keyLine then keyLine.entryLine.text else "";
+				local link := mesh:ParseLink(typed);
+				local key := if link then link.key else mesh:NormalKey(typed);
+				if not key then begin
+					GetRoot():Notify(3, "Mesh", "A key is 64 hexadecimal digits (0-9, A-F), or a meshcore:// contact link.");
+					return nil;
+				end;
+				if not StrFilled(name) and link and IsString(link.name) then
+					name := link.name;
+				if not mesh:SaveNode(key, name) then
+					return nil;
+				local app := meshApp;
+				:Close();
+				if app and app.viewCObject then
+					app:OpenThread(key);
+			end,
+			stepChildren: [
+				{_proto: @218,					// protoStaticText
+				 viewBounds: {left: 10, top: 8, right: -10, bottom: 24}, viewJustify: 48,
+				 text: "Add a node by its key", viewFont: 1058816},
+				{_proto: @189,					// protoLabelInputLine
+				 role: 'nameLine,
+				 viewBounds: {left: 10, top: 30, right: -10, bottom: 50}, viewJustify: 48,
+				 label: "Name", labelFont: 1058816, entryFont: 10240, indent: 46},
+				{_proto: @189,					// protoLabelInputLine
+				 role: 'keyLine,
+				 viewBounds: {left: 10, top: 54, right: -10, bottom: 74}, viewJustify: 48,
+				 label: "Key", labelFont: 1058816, entryFont: 9216, indent: 46},
+				{_proto: @226,					// protoTextButton
+				 viewBounds: {left: -60, top: -28, right: -30, bottom: -10}, viewJustify: 160,
+				 text: "Add",
+				 buttonClickScript: func() theSlip:Add()}
+			]
+		},
 
 		TogglePrefs: func()
 		begin
@@ -861,13 +997,46 @@
 						:DrawShape(MakeText(id, w - iw - 8, st, w, st + sh), {font: base.kSmall});
 					end;
 				end,
+				// tapped: a node not saved offers to be (Save to Names), and a
+				// narrow screen goes back to the list
 				viewClickScript: func(unit)
 				begin
 					local base := :Parent();
-					if base.mode <> 'list and (base:LocalBox()).right < base.kSideBySideWidth then
+					local narrow := (base:LocalBox()).right < base.kSideBySideWidth;
+					local mesh := base:Mesh();
+					local node := base.mode = 'thread and base.currentThread and not StrEqual(base.currentThread, mesh.kPublic)
+						and not mesh:SavedCard(base.currentThread);
+					if node then begin
+						headerPicks := ['save];
+						local items := [{item: "Save to Names", mark: $ }];
+						if narrow then begin
+							AddArraySlot(items, 'pickseparator);
+							AddArraySlot(headerPicks, nil);
+							AddArraySlot(items, {item: base.appAll, mark: $ });
+							AddArraySlot(headerPicks, 'list);
+						end;
+						headerPopup := DoPopup(items, 0, 0, self);
+					end else if base.mode <> 'list and narrow then
 						base:ShowList();
 					true;
-				end
+				end,
+				headerPicks: nil,
+				headerPopup: nil,					// (the popup, while it is open)
+				pickActionScript: func(index)
+				begin
+					local base := :Parent();
+					local picks := headerPicks;
+					headerPicks := headerPopup := nil;
+					local chosen := if picks and index >= 0 and index < Length(picks) then picks[index];
+					if chosen = 'save and base.currentThread then begin
+						local t := base:ThreadFor(base.currentThread);
+						if base:Mesh():SaveNode(base.currentThread, if t then t.name) then
+							GetRoot():Notify(3, "Mesh", base:ThreadName(base:ThreadFor(base.currentThread)) & " is saved in Names.");
+						base:Redraw();
+					end else if chosen = 'list then
+						base:ShowList();
+				end,
+				pickCancelledScript: func() headerPicks := headerPopup := nil
 			},
 
 			// the conversations, and this node at the foot
@@ -1159,9 +1328,176 @@
 	// a key's first eight digits, as the node's id
 	ShortKey: func(key) if StrLen(key) > 8 then SubStr(key, 0, 8) else key,
 
-	// a node's name, as last heard
+	/*----------------------------------------------------------------------
+		Saved contacts: Names cards with a mesh key
+	----------------------------------------------------------------------*/
+
+	// the custom field of the Names file labelled "Mesh Key": its slot
+	// ('custom1 .. 'custom10), made - the first one with no label - when make
+	MeshKeyPath: func(make)
+	begin
+		local cardfile := GetRoot().cardfile;
+		if not cardfile then return nil;
+		local info := cardfile:GetCustomInfo();
+		if info then
+			for i := 1 to 10 do begin
+				local p := Intern("custom" & NumberStr(i));
+				local f := info.(p);
+				if f and IsString(f.label) and StrEqual(TrimString(Clone(f.label)), kMeshKeyLabel) then
+					return p;
+			end;
+		if not make then return nil;
+		local changed := if info then Clone(info) else {};
+		for i := 1 to 10 do begin
+			local p := Intern("custom" & NumberStr(i));
+			local f := changed.(p);
+			if not f or not IsString(f.label) or not StrFilled(TrimString(Clone(f.label))) then begin
+				changed.(p) := {label: kMeshKeyLabel};
+				cardfile:SetCustomInfo(changed);
+				return p;
+			end;
+		end;
+		nil;
+	end,
+
+	// text read as a key: 64 hex digits, spaces and colons between them let
+	// be, in capitals as the engine has them - or nil
+	NormalKey: func(text)
+	begin
+		if not IsString(text) then return nil;
+		local digits := [];
+		for i := 0 to StrLen(text) - 1 do begin
+			local c := text[i];
+			if (c >= $0 and c <= $9) or (c >= $A and c <= $F) or (c >= $a and c <= $f) then
+				AddArraySlot(digits, c)
+			else if c <> $  and c <> $: and c <> $\n and c <> $\t then
+				return nil;
+		end;
+		if Length(digits) <> 64 then return nil;
+		Upcase(Stringer(digits));
+	end,
+
+	// a meshcore:// contact link (MeshCore's apps share a contact as
+	// meshcore://contact/add?name=...&public_key=...&type=1) ==> {name, key},
+	// or nil when the text is not one
+	ParseLink: func(text)
+	begin
+		if not IsString(text) or not StrPos(text, "public_key=", 0) then return nil;
+		local key := :NormalKey(:LinkParam(text, "public_key="));
+		if not key then return nil;
+		{name: :LinkParam(text, "name="), key: key};
+	end,
+
+	// a link's parameter, its %XX and + decoded (nil: not there)
+	LinkParam: func(text, param)
+	begin
+		local at := StrPos(text, param, 0);
+		if not at then return nil;
+		at := at + StrLen(param);
+		local stop := StrPos(text, "&", at);
+		local raw := SubStr(text, at, (if stop then stop else StrLen(text)) - at);
+		local out := [];
+		local i := 0;
+		while i < StrLen(raw) do begin
+			local c := raw[i];
+			if c = $+ then
+				AddArraySlot(out, $ )
+			else if c = $% and i + 2 < StrLen(raw) then begin
+				local n := :HexDigit(raw[i + 1]) * 16 + :HexDigit(raw[i + 2]);
+				// (a byte above 127 is part of a UTF-8 letter: not decoded)
+				AddArraySlot(out, if n >= 32 and n < 127 then Chr(n) else $?);
+				i := i + 2;
+			end else
+				AddArraySlot(out, c);
+			i := i + 1;
+		end;
+		Stringer(out);
+	end,
+
+	// a hex digit's value (-1000: not one, so that a sum of two is negative)
+	HexDigit: func(c)
+		if c >= $0 and c <= $9 then Ord(c) - Ord($0)
+		else if c >= $A and c <= $F then Ord(c) - Ord($A) + 10
+		else if c >= $a and c <= $f then Ord(c) - Ord($a) + 10
+		else -1000,
+
+	// a card's name as Names shows it
+	CardName: func(e)
+	begin
+		local name := if e.name then GetRoot():bcFullName(e.name);
+		if IsString(name) and StrFilled(name) then name
+		else if IsString(e.company) and StrFilled(e.company) then e.company
+		else "?";
+	end,
+
+	// the saved cards, read again when force or older than half a minute
+	SavedCards: func(force)
+	begin
+		local now := Ticks() div 60;
+		if saved and not force and savedAt and now - savedAt < 30 then
+			return saved;
+		local cards := {};
+		local path := :MeshKeyPath(nil);
+		local soup := GetUnionSoup("Names");
+		if path and soup then begin
+			local cursor := Query(soup, {type: 'index, validTest: func(e) IsString(e.(path)) and StrFilled(e.(path))});
+			local e;
+			while e := cursor:Entry() do begin
+				local key := :NormalKey(e.(path));
+				if key then
+					cards.(Intern("k" & key)) := {key: key, name: :CardName(e), entry: e};
+				cursor:Next();
+			end;
+		end;
+		saved := cards;
+		savedAt := now;
+		cards;
+	end,
+
+	// a node's card, or nil
+	SavedCard: func(key) if IsString(key) then (:SavedCards(nil)).(Intern("k" & key)),
+
+	// the engine told which nodes are saved: every card's, and no other
+	SyncSaved: func()
+	begin
+		local cards := :SavedCards(true);
+		foreach c in cards do
+			HostMeshSaveContact(c.key, c.name, true);
+		local nodes := HostMeshContacts();
+		if nodes then
+			foreach n in nodes do
+				if n.saved and not cards.(Intern("k" & n.key)) then
+					HostMeshSaveContact(n.key, nil, nil);
+	end,
+
+	// a node saved as a new Names card (name: as heard, or given) ==> the card
+	SaveNode: func(key, name)
+	begin
+		local card := :SavedCard(key);
+		if card then return card.entry;
+		local path := :MeshKeyPath(true);
+		local cardfile := GetRoot().cardfile;
+		if not path or not cardfile then begin
+			GetRoot():Notify(3, "Mesh", "The Names file has no custom field free for the node's key.");
+			return nil;
+		end;
+		if not IsString(name) or not StrFilled(TrimString(Clone(name))) then
+			name := :NodeName(key);
+		if not IsString(name) or not StrFilled(name) then
+			name := :ShortKey(key);
+		local frame := {name: {first: TrimString(Clone(name))}};
+		frame.(path) := SetClass(Clone(key), '|string.custom|);
+		local entry := cardfile:AddCard('person, frame);
+		:SyncSaved();
+		:Refresh();
+		entry;
+	end,
+
+	// a node's name: its card's, or as last heard
 	NodeName: func(key)
 	begin
+		local card := :SavedCard(key);
+		if card then return card.name;
 		local nodes := HostMeshContacts();
 		if nodes then
 			foreach n in nodes do
@@ -1309,6 +1645,10 @@
 					icon: :MakeIcon(), labels: nil, sequence: 31, _tagList: ['_icon, '_noBackup]}, nil);
 		end;
 		:Prune(true);
+		try
+			:SyncSaved()
+		onexception |evt.ex| do
+			nil;
 		:Poll();
 	end
 }

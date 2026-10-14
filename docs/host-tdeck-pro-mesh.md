@@ -110,9 +110,9 @@ forgets them); the board's in NVS, namespace `mesh`.
 - conversations: one per node, and the **Public channel**, always first;
   the folder tab's picker lists them; the list's foot says who this node
   is (name, id, preset) or that the radio is off;
-- **New** picks from the nodes heard (`HostMeshContacts`), not the Names
-  file - a mesh node has a key, not a number; **Announce** sends this
-  node's advert; **Say** and **Send** below a conversation: the Say line
+- **New** lists the saved contacts (below), then the people's nodes heard
+  and not saved (chat nodes and room servers: repeaters take no messages),
+  then **Add by Key…**; **Announce** sends this node's advert; **Say** and **Send** below a conversation: the Say line
   wraps and grows with what is written (up to half the conversation's
   height; the ROM's `protoLabelInputLine` is one line only, so its entry
   loses `vjOneLineOnly`, and its `textChanged` lays the application out
@@ -139,6 +139,36 @@ forgets them); the board's in NVS, namespace `mesh`.
   channel stays listed, empty);
 - a message that cannot be filed is told on the console and the poll goes
   on (a throw out of `Poll` used to end the polling until a restart).
+
+**Saved contacts are Names cards** (the owner's choice, 2026-10-14): a
+node's key is kept in one of the Names file's ten custom fields
+(`custom1`..`custom10`, values of class `'|string.custom|`), the one
+labelled **"Mesh Key"** - the labels are the Names soup's info
+`customFields` (`cardfile:GetCustomInfo`/`SetCustomInfo`), and the first
+free one is labelled so the first time a node is saved.  A card shows
+"Mesh Key: ..." in Names and the key can be edited there.
+
+- **Save to Names**: tapping a conversation's header (a node not saved)
+  offers it; a card is made (`cardfile:AddCard('person, ...)`) named as the
+  node calls itself.
+- **Add by Key…** (New's last item): a slip taking a name and a key - 64
+  hex digits, spaces and colons let be, or a `meshcore://contact/add?name=
+  ...&public_key=...&type=1` link as MeshCore's apps share a contact (its
+  name used when none is typed) - for a node never heard; the card is
+  made and its conversation opened.
+- The cards' keys are given to the engine as **MeshCore favourites**
+  (`HostMeshSaveContact`) when the application starts or opens; a
+  favourite whose card has gone is no longer one.  A favourite is kept
+  first across restarts (up to 64 contacts are kept now, favourites first)
+  and is never the one to make room, and a node added by key alone is
+  known by its key until it announces itself.
+- A conversation is named by its node's card.
+- **A full contact table makes room** (`shouldOverwriteWhenFull`, found
+  2026-10-14): MeshCore's default is to add nobody once its 64 contacts
+  are taken - a busy mesh's repeaters fill it - and a direct message from
+  a node not in the table cannot be decrypted, so it was lost unseen.  The
+  oldest node not saved now goes.  A message sent to a key the table does
+  not hold adds it (the first then floods).
 
 **A message heard by another node but not by this one** is most likely a
 collision: the radio is half-duplex, and a channel message is neither
@@ -265,5 +295,7 @@ after the advert that follows a first packet was heard.
 - The WiFi companion (MeshCore's companion protocol on TCP port 5000, the
   frames lilyphone1's `mesh_companion.cpp` speaks), so the MeshCore phone
   apps can drive the node.
-- Channels other than Public; renaming the node from the application;
-  removing a contact; scroll arrows (as Messages).
+- Channels other than Public; scroll arrows (as Messages).
+- Picking a saved contact through Names' own people picker (a
+  `|nameRef.meshKey:host|` data def over the custom field), and adding a
+  heard node's key to an existing card rather than a new one.

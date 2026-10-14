@@ -107,6 +107,7 @@ FHostMeshContacts(RefArg /*rcvr*/)
 		SetSlot(contact, "kind", RefVar(Intern((char*) kKinds[c.kind >= 0 && c.kind <= 4 ? c.kind : 0])));
 		SetSlot(contact, "hops", c.hops >= 0 ? RefVar(MAKEINT(c.hops)) : RefVar(NILREF));
 		SetSlot(contact, "heard", RefVar(MinutesOf(c.heard)));
+		SetSlot(contact, "saved", c.saved ? RefVar(TRUEREF) : RefVar(NILREF));
 		AddArraySlot(list, contact);
 	}
 	return list;
@@ -168,6 +169,21 @@ FHostMeshSetName(RefArg /*rcvr*/, RefArg name)
 	char utf8[kHostMeshNameSize];
 	HostUTF8Of(name, utf8, sizeof(utf8));
 	return HostMeshSetName(utf8) ? TRUEREF : NILREF;
+}
+
+
+static Ref
+FHostMeshSaveContact(RefArg /*rcvr*/, RefArg key, RefArg name, RefArg saved)
+{
+	if (!IsString(key))
+		return NILREF;
+	char hex[kHostMeshKeyHexSize + 1];
+	HostUTF8Of(key, hex, sizeof(hex));
+	char utf8[kHostMeshNameSize];
+	utf8[0] = 0;
+	if (IsString(name))
+		HostUTF8Of(name, utf8, sizeof(utf8));
+	return HostMeshSetSaved(hex, utf8, NOTNIL(saved)) ? TRUEREF : NILREF;
 }
 
 
@@ -321,6 +337,7 @@ HostRegisterMeshFunctions(void)
 	SetSlot(functions, "HostMeshAvailable", RefVar(MakeCFunction((void*) FHostMeshAvailable, 0, nil)));
 	SetSlot(functions, "HostMeshStatus", RefVar(MakeCFunction((void*) FHostMeshStatus, 0, nil)));
 	SetSlot(functions, "HostMeshContacts", RefVar(MakeCFunction((void*) FHostMeshContacts, 0, nil)));
+	SetSlot(functions, "HostMeshSaveContact", RefVar(MakeCFunction((void*) FHostMeshSaveContact, 3, nil)));
 	SetSlot(functions, "HostMeshSendText", RefVar(MakeCFunction((void*) FHostMeshSendText, 2, nil)));
 	SetSlot(functions, "HostMeshSendState", RefVar(MakeCFunction((void*) FHostMeshSendState, 1, nil)));
 	SetSlot(functions, "HostMeshNextMessage", RefVar(MakeCFunction((void*) FHostMeshNextMessage, 0, nil)));

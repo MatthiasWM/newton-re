@@ -55,7 +55,16 @@
 											[{key, name, kind, hops, heard}]:
 											kind 'chat, 'repeater, 'room,
 											'sensor; hops nil when no route is
-											known; heard in minutes since 1904
+											known; heard in minutes since 1904;
+											saved (a favourite) true or nil
+					HostMeshSaveContact(key, name, saved)
+											saved non-nil: the node kept for
+											good (MeshCore's favourite: kept
+											first across restarts, never the
+											one to make room), added by its
+											key alone when it was not known
+											(name nil: as heard, or its id);
+											nil: no longer saved
 					HostMeshSendText(key, text)
 											key nil: the Public channel
 											==> an id for HostMeshSendState,
@@ -207,6 +216,7 @@ struct HostMeshContact
 	int			kind;		// HostMeshKind
 	int			hops;		// -1: no route known (a message goes by flood)
 	uint32_t	heard;		// when, by the mesh clock (Unix seconds)
+	bool		saved;		// a favourite: kept first, never the one to make room
 };
 // ==> how many contacts there are; as many as fit given, newest first
 long		HostMeshGetContacts(HostMeshContact* contacts, long max);
@@ -230,6 +240,9 @@ int			HostMeshGetSendState(long id);
 
 bool		HostMeshAdvertise(void);
 bool		HostMeshSetName(const char* name);
+// a contact saved (added by its key alone when not known; name "" or NULL:
+// the one it has, or its id) or no longer saved
+bool		HostMeshSetSaved(const char* key, const char* name, bool saved);
 
 long		HostMeshRegionCount(void);
 const char*	HostMeshRegionName(long index);
