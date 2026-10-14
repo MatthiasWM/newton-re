@@ -1,0 +1,5 @@
+@@ 0x1042ad9
+func() begin
+	self:FindAliasedSetup()
+end
+@@end

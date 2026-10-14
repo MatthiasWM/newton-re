@@ -1,0 +1,5 @@
+@@ 0x104d791
+func() begin
+	EnsureInternal({version: "2.0    ", userConfigSymbol: '|InetServices:NIE|})
+end
+@@end

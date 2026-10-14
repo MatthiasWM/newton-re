@@ -1,0 +1,10 @@
+map_100c989 := map(0, nil, '_ImportTable, 'installScript, 'devInstallScript, 'devRemoveScript);
+map_100ca6d := map(2, nil, 'name, 'major, 'minor);
+map_100cb19 := map(0, nil, 'class, 'instructions, 'literals, 'argFrame, 'numArgs);
+map_100d115 := map(4, nil, 'height, 'overview, 'viewBounds, 'stepChildren, 'icon, 'pref, 'viewSetupFormScript, 'curDevice, 'curPLink, 'SetPref, 'curLinkSym, '_proto, 'closeBox, 'stepAllocateContext, 'DevicePicker);
+map_100d345 := map(0, nil, 'left, 'top, 'right, 'bottom);
+map_100d3ed := map(4, nil, '_proto, 'preAllocatedContext);
+map_100d455 := map(4, nil, 'text, 'viewBounds, 'viewJustify, 'viewSetupFormScript, 'FindService, 'textSetup, 'labelActionScript, '_proto);
+map_100d559 := map(2, nil, 'left, 'top, 'right, 'bottom);
+map_100d9d5 := map(4, nil, 'text, 'viewBounds, 'viewJustify, 'viewSetupFormScript, 'FindService, 'textSetup, 'labelActionScript, 'SetupDevicePicker, 'MakeLabelCommands, 'SetDisplay, 'viewSetupDoneScript, 'viewShowScript, '_proto, 'preAllocatedContext);
+map_100e089 := map(0, nil, 'bits, 'bounds);

@@ -1,0 +1,5 @@
+@@ 0x1007425
+func(a1) begin
+	self:Config(a1, true)
+end
+@@end

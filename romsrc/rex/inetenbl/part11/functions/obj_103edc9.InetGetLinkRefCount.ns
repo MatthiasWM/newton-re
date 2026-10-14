@@ -1,0 +1,5 @@
+@@ 0x104d75d
+func() begin
+	InetStartUp().fLinKRefCount
+end
+@@end

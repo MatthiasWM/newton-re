@@ -1,0 +1,5 @@
+@@ 0x104d2f5
+func(a1, a2) begin
+	InetIsSameIPAddress(InetIPStringToAddress(a1), InetIPStringToAddress(a2))
+end
+@@end

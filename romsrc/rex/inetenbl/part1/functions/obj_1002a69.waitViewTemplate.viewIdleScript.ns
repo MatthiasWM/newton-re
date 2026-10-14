@@ -1,0 +1,8 @@
+@@ 0x101390d
+func() begin
+	statusView := BuildContext(statusViewTemplate);
+	statusView:SetOwnerContext(self, statusViewOptions);
+	statusView:ModalDialog();
+	nil
+end
+@@end

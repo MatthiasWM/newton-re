@@ -1,0 +1,5 @@
+@@ 0x104abb9
+func() begin
+	self:DoEvent('DisengageLinkProtocol, nil)
+end
+@@end

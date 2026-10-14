@@ -1,0 +1,6 @@
+@@ 0x104aab5
+func() begin
+	fAbort := true;
+	(if fPhysicalLayerServiceFSM then fPhysicalLayerServiceFSM:DoEvent('Cancel, nil))
+end
+@@end

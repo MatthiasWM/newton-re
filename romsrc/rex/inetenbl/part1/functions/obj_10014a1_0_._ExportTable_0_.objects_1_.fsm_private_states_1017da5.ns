@@ -1,0 +1,8 @@
+@@ 0x1017da5
+func() begin
+	if self:GetAbort() then begin
+			return self:DoEvent('Abort, nil)
+		end;
+	self:DoEvent('Accept, nil)
+end
+@@end

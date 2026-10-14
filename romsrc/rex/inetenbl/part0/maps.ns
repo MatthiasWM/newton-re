@@ -1,0 +1,4 @@
+map_1000831 := map(0, map_1000849, 'text, 'TapAction);
+map_1000849 := map(2, nil, 'DoNotInstall, 'installScript);
+map_10008f5 := map(0, nil, 'class, 'instructions, 'literals, 'argFrame, 'numArgs);
+map_1001379 := map(2, nil, 'removeScript);

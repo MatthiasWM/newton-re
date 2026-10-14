@@ -1,0 +1,5 @@
+@@ 0x10184d9
+func() begin
+	self:DoEvent('Dispose, nil)
+end
+@@end

@@ -1,0 +1,6 @@
+@@ 0x1011921
+func() begin
+	labelCommands := self:BuildLabelCommands();
+	inherited:?viewSetupFormScript()
+end
+@@end

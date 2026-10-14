@@ -1,0 +1,9 @@
+@@ 0x100e3a1
+func(a1) begin
+	UnDefGlobalVar('AppleTalkLinkRegistry);
+	UnDefGlobalFn('RegAppleTalklink);
+	UnDefGlobalFn('UnRegAppleTalklink);
+	RemoveSlot(UserConfiguration, 'appletalkLink);
+	UnRegPrefs('AppleTalk)
+end
+@@end

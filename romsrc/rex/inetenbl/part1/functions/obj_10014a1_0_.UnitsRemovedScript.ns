@@ -1,0 +1,5 @@
+@@ 0x1002941
+func(a1) begin
+	UnRegDataView('worksite, 'INETSetup)
+end
+@@end

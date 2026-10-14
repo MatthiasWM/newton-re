@@ -9,12 +9,18 @@ inserted into a protocol part, the package renamed - give a package whose
 parts, relocation chunk and frames parts' refs all moved along.
 
     python tools/armpart/test_newtonpkg.py [-v] [--packages DIR] [--no-fixtures] [--rom BUILD]
+        [--newtonscript EXE]
+
+A package whose frames parts are source trees (romsrc/rex/inetenbl/, ...)
+is built by romsrc.py's builder, which compiles their functions with the
+host's newtonscript (--newtonscript); without it those are skipped.
 """
 
 from __future__ import annotations
 
 import glob
 import os
+import re
 import shutil
 import struct
 import sys
@@ -33,6 +39,7 @@ ROOT = os.path.join(HERE, "..", "..")
 PACKAGES_DIR = os.path.join(ROOT, "romsrc", "rex")
 FIXTURES = True		# (fixtures/packages, when the checkout has it)
 ROM_BUILD = None
+NEWTONSCRIPT = None
 
 
 def package_files():
@@ -44,6 +51,23 @@ def package_files():
 					if f.read(7) == b"package":
 						files.append(path)
 	return files
+
+
+def package_trees():
+	"""romsrc.py's builder for the frames parts kept as source trees (it
+	compiles their functions with the host's newtonscript: --newtonscript),
+	or None."""
+	if NEWTONSCRIPT is None:
+		return None
+	sys.path.insert(0, os.path.join(HERE, "..", "newton-rom", "analysis"))
+	import romsrc
+	return romsrc.PackageTrees(os.path.abspath(NEWTONSCRIPT), ROM_BUILD)
+
+
+def has_trees(directory):
+	"""Whether a package's text form keeps a frames part as a tree."""
+	import newtonpkg
+	return any(p["file"].endswith("/") for p in newtonpkg.read_text(directory)["parts"])
 
 
 def committed():
@@ -58,7 +82,9 @@ def load(name):
 	if os.path.exists(path):
 		with open(path, "rb") as f:
 			return f.read()
-	return newtonpkg.pack(path[:-len(".pkg")])
+	if has_trees(path[:-len(".pkg")]) and package_trees() is None:
+		raise unittest.SkipTest("%s's frames parts are source trees: --newtonscript builds them" % name)
+	return newtonpkg.pack(path[:-len(".pkg")], trees=package_trees())
 
 
 def base_of(directory):
@@ -79,17 +105,25 @@ class RoundTrip(unittest.TestCase):
 		dirs = committed()
 		self.assertGreaterEqual(len(dirs), 5)
 		rom = newtonarm.RomNames(ROM_BUILD) if ROM_BUILD else None
+		trees = package_trees()
 		for d in dirs:
 			with self.subTest(package=os.path.relpath(d, ROOT)):
-				data = newtonpkg.pack(d)
+				if has_trees(d) and (trees is None or rom is None):
+					continue			# (the trees need --newtonscript and --rom)
+				data = newtonpkg.pack(d, trees=trees)
 				tmp = tempfile.mkdtemp(prefix="newtonpkg-")
 				try:
-					newtonpkg.unpack(data, tmp, rom, base_of(d))
-					self.assertEqual(newtonpkg.pack(tmp), data)
+					newtonpkg.unpack(data, tmp, rom, base_of(d), trees if has_trees(d) else None)
+					self.assertEqual(newtonpkg.pack(tmp, trees=trees), data)
 					if rom is not None:
 						for name in sorted(os.listdir(d)):
+							if os.path.isdir(os.path.join(d, name)) or name == "README.md":
+								continue		# (a tree: romsrc's round trip; the README is the tree's own)
 							with open(os.path.join(d, name), "rb") as a, open(os.path.join(tmp, name), "rb") as b:
-								self.assertEqual(a.read(), b.read(), name)
+								# (a part's .origin is worked out when packing: a part before it
+								# that grew leaves the committed one behind, harmlessly)
+								strip = lambda t: re.sub(rb"(?m)^\t\.origin [^\n]*\n", b"", t)
+								self.assertEqual(strip(a.read()), strip(b.read()), name)
 				finally:
 					shutil.rmtree(tmp)
 
@@ -211,5 +245,9 @@ if __name__ == "__main__":
 	if "--rom" in sys.argv:
 		i = sys.argv.index("--rom")
 		ROM_BUILD = sys.argv[i + 1]
+		del sys.argv[i:i + 2]
+	if "--newtonscript" in sys.argv:
+		i = sys.argv.index("--newtonscript")
+		NEWTONSCRIPT = sys.argv[i + 1]
 		del sys.argv[i:i + 2]
 	unittest.main()

@@ -1,0 +1,8 @@
+map_1006c75 := map(0, nil, '_ExportTable, 'installScript, 'devInstallScript, 'devRemoveScript);
+map_1006d5d := map(2, nil, 'name, 'major, 'minor, 'objects);
+map_1006e6d := map(3, nil, 'ConfigBeforeUse, 'DeleteClient, 'DeviceClass, 'AppleTalkAvailable, 'DeviceCISProductName, '_Clients, 'ConfigView, 'AddPacketReadyEventHandler, 'AddClient, 'DeviceInserted, 'ConfigChanged, '_LostPacketCount, 'DeviceRemoved, 'MapErrorCode, 'DeviceDisplayName, 'DeviceProtocolClassName, 'Config, 'EventDefs, 'StatusView, '_Buffer, 'DeviceType);
+map_100718d := map(0, nil, 'class, 'instructions, 'literals, 'argFrame, 'numArgs);
+map_10076f1 := map(2, nil, 'ErrorString, 'GenericErrorString, 'errorCode);
+map_1008f31 := map(3, nil, '_EventRegisterCount, 'Attach, 'RegisterForEvent, 'PostRequest, 'RemoveEventHandler, 'PostDriverEvent, 'Init, 'NewLanternClientAPI, 'DetachLanternClientAPI, '_EventDefs, 'MapErrorCode, 'DeleteLanternClientAPI, '_State, 'Detach, 'Instantiate, '_Device, '_ClientAPI, 'CPostDriverEvent, 'RemoveCallBack, 'EventDefs, 'Delete, 'AttachLanternClientAPI, 'UnRegisterForEvent, 'State, '_CISProductName, 'AddEventHandler);
+map_10096f5 := map(2, nil, 'class, 'code, 'numArgs, 'offset);
+map_100b58d := map(0, nil, 'class, 'code, 'numArgs, 'offset);

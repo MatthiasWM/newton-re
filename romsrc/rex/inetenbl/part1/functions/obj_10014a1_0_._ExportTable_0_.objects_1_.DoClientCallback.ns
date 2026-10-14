@@ -1,0 +1,9 @@
+@@ 0x101693d
+func(a1, a2) begin
+	(if fClientCallbackFrame then (try begin
+				Perform(fClientCallbackFrame, fClientCallbackSymbol, [Array: a1, a2])
+			end onexception |evt.ex| do begin
+				nil
+			end))
+end
+@@end

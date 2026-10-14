@@ -1,0 +1,5 @@
+@@ 0x103f9e1
+func(a1) begin
+	InetStartUp():MGetLinkEntryByLinkID(a1)
+end
+@@end

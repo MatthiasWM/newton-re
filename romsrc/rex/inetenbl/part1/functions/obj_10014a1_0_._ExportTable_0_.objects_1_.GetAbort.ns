@@ -1,0 +1,5 @@
+@@ 0x1016da9
+func() begin
+	fAbort
+end
+@@end

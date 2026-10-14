@@ -1,0 +1,5 @@
+@@ 0x10186f1
+func() begin
+	self:DoEvent('CleanUp, nil)
+end
+@@end

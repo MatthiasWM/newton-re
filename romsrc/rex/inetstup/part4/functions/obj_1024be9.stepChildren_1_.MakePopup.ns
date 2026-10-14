@@ -1,0 +1,5 @@
+@@ 0x1024e95
+func() begin
+	self:GetProtoCols()
+end
+@@end

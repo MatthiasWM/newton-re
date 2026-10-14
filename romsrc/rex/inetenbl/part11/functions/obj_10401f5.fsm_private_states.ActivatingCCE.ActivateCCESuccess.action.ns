@@ -1,0 +1,8 @@
+@@ 0x104aee9
+func() begin
+	if fAbort then begin
+			return self:DoEvent('Abort, nil)
+		end;
+	self:DoEvent('ProcessStackActivePhysicalLayer, nil)
+end
+@@end

@@ -1,0 +1,5 @@
+@@ 0x102b5c5
+func() begin
+	'[Array: {item: "Manual", symbol: manual}, {item: "Server", symbol: usingServer}]
+end
+@@end

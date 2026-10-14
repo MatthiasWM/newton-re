@@ -1,0 +1,5 @@
+@@ 0x1016f61
+func(a1) begin
+	{_proto: fCompletionSpec_Accept, _parent: self}
+end
+@@end

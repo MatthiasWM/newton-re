@@ -1,0 +1,7 @@
+@@ 0x101bcfd
+func() begin
+	text := labelText;
+	labelCommands := popupOptions;
+	inherited:?viewSetupFormScript()
+end
+@@end

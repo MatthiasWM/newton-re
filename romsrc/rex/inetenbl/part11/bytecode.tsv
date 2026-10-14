@@ -1,0 +1,3 @@
+# the functions kept as bytecode: they do not decompile, or do not compile back the same
+103ed49	.literals[0]: the tags differ
+104d981	.literals[3]: the tags differ

@@ -1,0 +1,8 @@
+@@ 0x104aa01
+func() begin
+	if fAbort then begin
+			return self:DoEvent('Abort, nil)
+		end;
+	self:DoEvent('ParseLoginScript, nil)
+end
+@@end

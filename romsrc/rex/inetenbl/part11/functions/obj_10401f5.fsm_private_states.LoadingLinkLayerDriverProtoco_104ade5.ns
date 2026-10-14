@@ -1,0 +1,5 @@
+@@ 0x104ade5
+func() begin
+	self:DoEvent('ConnectLinkFailure, nil)
+end
+@@end

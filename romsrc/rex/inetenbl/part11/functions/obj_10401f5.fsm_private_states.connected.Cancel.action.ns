@@ -1,0 +1,5 @@
+@@ 0x104a09d
+func() begin
+	(if fWhyLinkDropped then self:DoEvent('DisconnectLink, nil))
+end
+@@end

@@ -1,0 +1,5 @@
+@@ 0x104cac1
+func(a1) begin
+	InetStartUp():ObjectToString(a1)
+end
+@@end

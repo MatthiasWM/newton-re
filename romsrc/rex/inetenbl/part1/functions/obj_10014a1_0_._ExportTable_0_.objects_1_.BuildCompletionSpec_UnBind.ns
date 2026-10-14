@@ -1,0 +1,5 @@
+@@ 0x1016c79
+func(a1) begin
+	{_proto: fCompletionSpec_UnBind, _parent: self}
+end
+@@end

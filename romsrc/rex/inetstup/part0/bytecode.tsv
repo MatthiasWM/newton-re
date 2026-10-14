@@ -1,0 +1,2 @@
+# the functions kept as bytecode: they do not decompile, or do not compile back the same
+1014c65	.literals[5]._proto: the tags differ

@@ -2535,13 +2535,17 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/layout.tsv)
     # the protocol parts as ARM source and packages as text
     # (tools/armpart/): every committed package builds and splits back to
     # its text, every protocol part assembles back, edits move what follows
+    # (the NIE's packages' frames parts are source trees, which romsrc.py's
+    # builder builds with the host's newtonscript)
     add_test(NAME tools.ARMPart
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/armpart/test_newtonarm.py
+                     --rom ${NEWTON_ROM_BUILD_DIR} --newtonscript $<TARGET_FILE:newtonscript>
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     add_test(NAME tools.NewtonPackageText
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/armpart/test_newtonpkg.py
-                     --rom ${NEWTON_ROM_BUILD_DIR}
+                     --rom ${NEWTON_ROM_BUILD_DIR} --newtonscript $<TARGET_FILE:newtonscript>
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    set_tests_properties(tools.NewtonPackageText PROPERTIES TIMEOUT 900)
     # the WorldData package's store as text (tools/stores/newtonstore.py):
     # round trip, edits read back; host.NewtonStoreMount mounts an edited
     # copy in a package of its own and queries it

@@ -1,0 +1,4 @@
+map_1000b0d := map(0, nil, '_ExportTable, 'installScript, 'devInstallScript, 'devRemoveScript);
+map_1000bf5 := map(2, nil, 'name, 'major, 'minor, 'objects);
+map_1000cd1 := map(2, nil, 'class, 'code, 'numArgs, 'offset);
+map_1001481 := map(0, nil, 'class, 'instructions, 'literals, 'argFrame, 'numArgs);

@@ -1,0 +1,5 @@
+@@ 0x101578d argframe=nil,0
+func() begin
+	fsm:DoEvent_Loop()
+end
+@@end

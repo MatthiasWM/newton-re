@@ -46,8 +46,19 @@ is then its address, so a protocol part's branches out of it are written
 as the addresses they reach (the ROM's patch table at 0x01e00000, say),
 and pack(dir, base) puts the parts at another address keeping them so.
 
-As a module: unpack(data, dir, rom=None, base=0), pack(dir, base=None)
--> bytes, roundtrips(data) -> bool.
+A frames part may be kept as a NewtonScript source tree instead of its
+bytes (`file partN/`, a directory): romsrc.py writes and builds those
+(`romsrc.py package unpack|pack`, which hand unpack and pack their
+`trees`), as it does the ROM's own packages' parts.  pack() without
+`trees` refuses a package that has one.
+
+As a module: unpack(data, dir, rom=None, base=0, trees=None),
+pack(dir, base=None, trees=None) -> bytes, roundtrips(data) -> bool.
+trees is an object with extract(part, offset, relocations, path) -> bool
+(the part, at that offset in the package with those relocated words in
+it, written as a tree at path when it builds back the same) and
+build(path, offset) -> (bytes, relocations) (the tree built at that
+offset; its relocated words' offsets in the part).
 """
 
 from __future__ import annotations
@@ -309,7 +320,7 @@ def default_layout(pkg):
 	return keys + ["trailer"]
 
 
-def unpack(data: bytes, directory: str, rom=None, base: int = 0) -> None:
+def unpack(data: bytes, directory: str, rom=None, base: int = 0, trees=None) -> None:
 	"""Writes the package's text form to directory (made afresh); raises
 	PackageError unless packing it gives the package back exactly.  base:
 	the package's address, when it lies at one (the ROM extension's)."""
@@ -356,7 +367,11 @@ def unpack(data: bytes, directory: str, rom=None, base: int = 0) -> None:
 			lines.append("\tsize2 %d" % part["size2"])
 		lines += ["\tinfo %s" % bytes_text(part["info"]), "\tcompressor %s" % bytes_text(part["compressor"])]
 		path = os.path.join(directory, file)
-		if protocol:
+		tree = part["flags"] & 3 == KIND_FRAMES and not part["flags"] & COMPRESSED_FLAG and trees is not None \
+			and trees.extract(blob, part["origin"], part["relocations"], os.path.join(directory, "part%d" % i))
+		if tree:
+			lines[lines.index("\tfile %s" % file)] = "\tfile part%d/\t# a frames part as a source tree (romsrc.py)" % i
+		elif protocol:
 			title = '"%s" part %d: protocol (%d bytes)' % (name, i, len(blob))
 			newtonarm.unpack(blob, path, part["relocations"], part["origin"], rom, title)
 		else:
@@ -367,7 +382,7 @@ def unpack(data: bytes, directory: str, rom=None, base: int = 0) -> None:
 				lines.append("\trelocations " + " ".join("0x%x" % r for r in part["relocations"]))
 	with open(os.path.join(directory, "package.txt"), "w", encoding="utf-8", newline="\n") as f:
 		f.write("\n".join(lines) + "\n")
-	if pack(directory) != data:
+	if pack(directory, trees=trees) != data:
 		raise PackageError("%s: the text form does not give the package back byte for byte" % directory)
 
 
@@ -391,7 +406,7 @@ def read_text(directory: str):
 					pkg["parts"].append(part)
 				elif part is not None:
 					if key == "file":
-						part["file"] = value
+						part["file"] = value.split("#", 1)[0].strip()
 					elif key in ("type",):
 						part["type"] = fourcc_value(value)
 					elif key in ("flags", "reserved", "size2"):
@@ -426,9 +441,10 @@ def read_text(directory: str):
 	return pkg
 
 
-def pack(directory: str, base: int = None) -> bytes:
+def pack(directory: str, base: int = None, trees=None) -> bytes:
 	"""The package built from its text form, at base (the package's address:
-	package.txt's `base`, 0 if it has none, unless given)."""
+	package.txt's `base`, 0 if it has none, unless given); trees builds the
+	frames parts kept as source trees (the module's docstring)."""
 	import packages			# tools/newton-rom/analysis: rebase_frames_part
 	pkg = read_text(directory)
 	if base is None:
@@ -461,7 +477,17 @@ def pack(directory: str, base: int = None) -> bytes:
 	sizes = []
 	for p in parts:
 		path = os.path.join(directory, p["file"])
-		if p["file"].endswith(".s"):
+		if p["file"].endswith("/"):
+			if trees is None:
+				raise PackageError("%s: part %d is a source tree, which only romsrc.py builds "
+					"(romsrc.py package pack)" % (directory, p["index"]))
+			if base:
+				raise PackageError("a package at a base cannot have a part kept as a tree")
+			p["tree"] = path
+			p["trees"] = trees
+			p["built"] = {}
+			sizes.append(len(build_tree(p, trees, 0)[0]))
+		elif p["file"].endswith(".s"):
 			with open(path, encoding="utf-8") as f:
 				sources[id(p)] = f.read()
 			sizes.append(len(newtonarm.assemble(sources[id(p)], 0, path).data))
@@ -517,9 +543,18 @@ def pack(directory: str, base: int = None) -> bytes:
 	return bytes(head + tail + chunk + body)
 
 
+def build_tree(p, trees, origin):
+	"""A tree part built at origin (once for each origin asked for)."""
+	if origin not in p["built"]:
+		p["built"][origin] = (trees or p["trees"]).build(p["tree"], origin)
+	return p["built"][origin]
+
+
 def place(p, sources, origin, directory, packages, align):
 	"""(the part's bytes at origin in the package, its relocated words'
 	offsets in it)."""
+	if "tree" in p:
+		return build_tree(p, None, origin)
 	if id(p) in sources:
 		a = newtonarm.assemble(sources[id(p)], origin, os.path.join(directory, p["file"]))
 		return a.data, a.relocations

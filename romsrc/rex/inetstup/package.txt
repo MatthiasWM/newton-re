@@ -13,49 +13,43 @@ trailer "Newton Toolkit 1.6.4b2c2\0"
 pad 0xff
 
 part 0
-	file part0.bin
+	file part0/	# a frames part as a source tree (romsrc.py)
 	type 'form'
 	flags 0x81
 	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
 	compressor ""
-	linked-at 0x2d0
 
 part 1
-	file part1.bin
+	file part1/	# a frames part as a source tree (romsrc.py)
 	type 'auto'
 	flags 0x81
 	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
 	compressor ""
-	linked-at 0x17004
 
 part 2
-	file part2.bin
+	file part2/	# a frames part as a source tree (romsrc.py)
 	type 'auto'
 	flags 0x81
 	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
 	compressor ""
-	linked-at 0x1cac8
 
 part 3
-	file part3.bin
+	file part3/	# a frames part as a source tree (romsrc.py)
 	type 'auto'
 	flags 0x81
 	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
 	compressor ""
-	linked-at 0x20858
 
 part 4
-	file part4.bin
+	file part4/	# a frames part as a source tree (romsrc.py)
 	type 'auto'
 	flags 0x81
 	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
 	compressor ""
-	linked-at 0x23e44
 
 part 5
-	file part5.bin
+	file part5/	# a frames part as a source tree (romsrc.py)
 	type 'auto'
 	flags 0x81
 	info "Newton Toolkit 1.6.4b2c2; platform file Newton 2.1 v5"
 	compressor ""
-	linked-at 0x2a2fc

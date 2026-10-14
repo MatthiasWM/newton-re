@@ -1,0 +1,6 @@
+@@ 0x1024f41
+func() begin
+	labelCommands := self:GetProtoCols();
+	inherited:?viewSetupFormScript()
+end
+@@end

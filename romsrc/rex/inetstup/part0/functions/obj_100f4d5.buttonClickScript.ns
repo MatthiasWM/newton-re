@@ -1,0 +1,5 @@
+@@ 0x100f52d
+func() begin
+	base:CloseAction()
+end
+@@end

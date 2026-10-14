@@ -176,6 +176,12 @@ constructors of its own):
                     and a PNG per bitmap (black the set pixels); packed on
                     build (tools/pict/README.md).  A picture the text form
                     would not give back byte for byte stays a pict(...)
+    native('nativeModule, "resources/nativeModule/addr.s")   native ARM code
+                    (an NTK native module's, a 'code binary) as the assembly
+                    source tools/armpart/newtonarm.py writes: assembled on
+                    build at the address its bytes fall at (.origin), its
+                    .rword words - pointers into itself, which a package's
+                    relocation chunk names - made from it
     sfnt('sfnt, "resources/sfnt/addr")   a font - an sfnt container of
                     Apple's bitmap and metric tables, with no outlines, so
                     not a TrueType font - as the directory
@@ -257,6 +263,9 @@ MOVED_DATA_BASE = 0x10000000
 import wave							# noqa: E402
 
 BITMAP_CLASSES = ("bits", "mask", "cbits")
+# the binaries of native ARM code (an NTK native module's, NIE's): written as
+# assembly source (tools/armpart/newtonarm.py), native(...)
+NATIVE_CLASSES = ("nativeModule", "code")
 # the binaries of 16-bit values (IsHalfwordShapeClass in frames/ObjectAreaImport.cpp)
 HALFWORD_CLASSES = {"boundsrect", "rectangle", "oval", "roundrectangle", "line", "polygonshape", "polygondata", "regiondata"}
 PICT_HEADER = 512					# a PICT file's header: nought, before the picture
@@ -453,6 +462,8 @@ class Extractor:
 		self.ima_sounds = self.find_ima_sounds()
 		self.undecompiled = []			# (function, why): the ones kept as bytecode
 		self.odd_gaps = {}				# object -> the bytes after it, when they are not the pad byte
+		self.relocated = set()			# the addresses of words a package's relocation chunk names
+		self.link_base = 0				# what a native binary's .origin counts from (a package file's part: PACKAGE_BASE)
 		self.newtonscript = newtonscript
 		self.sources = self.function_sources()
 		self.in_function = 0			# inside a function written as source
@@ -604,6 +615,31 @@ class Extractor:
 				self.undecompiled.append((o, "decompile: %s" % e))
 		if self.newtonscript is None or not sources:
 			return sources
+		failed = self.verify_sources(sources)
+		# a function whose only difference is the argFrame the NTK's compiler
+		# gave it (three slots, where the host's compiler makes none): its
+		# record says so (ntk_arg_frame) and is tried again
+		again = {}
+		for o, why in failed.items():
+			flag = ntk_arg_frame_flag(self.rom, o)
+			if why.startswith(".argFrame: 0x2,") and flag:
+				head, body = sources[o].split("\n", 1)
+				again[o] = head + flag + "\n" + body
+		if again:
+			still = self.verify_sources(again)
+			for o, text in again.items():
+				if o not in still:
+					sources[o] = text
+					del failed[o]
+		for o, why in failed.items():
+			self.undecompiled.append((o, why))
+			del sources[o]
+		return sources
+
+	def verify_sources(self, sources):
+		"""The functions whose source does not compile back the same, with why
+		(one run of the host's compiler)."""
+		failed = {}
 		os.makedirs(self.out, exist_ok=True)
 		records = os.path.join(self.out, ".verify-records.txt")
 		compiled = os.path.join(self.out, ".verify-compiled.txt")
@@ -611,7 +647,7 @@ class Extractor:
 		with open(records, "w", encoding="utf-8", newline="\n") as f:
 			for n, o in enumerate(order):
 				head, body = sources[o].split("\n", 1)
-				f.write("@@ %x%s\n%s" % (n, " names" if head.endswith(" names") else "", body))
+				f.write("@@ %x%s\n%s" % (n, record_flags(head), body))
 		env = dict(os.environ, NEWTON_ROM=os.path.join(self.out, "no-rom-image"))
 		subprocess.run([nd.newtonscript_path(self.newtonscript), "--compile-records", records, compiled], env=env,
 					   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -628,17 +664,17 @@ class Extractor:
 			if len(fields) > 2:
 				why = "compile: " + " ".join(fields[3:])
 			else:
-				why = same_object(self.rom, Reader(lines[i + 1], "compiled", self.out).value(), o, "")
+				value = Reader(lines[i + 1], "compiled", self.out).value()
+				with_arg_frame(value, sources[o].split("\n", 1)[0])
+				why = same_object(self.rom, value, o, "")
 			if why:
-				self.undecompiled.append((o, why))
-				del sources[o]
+				failed[o] = why
 		for o in order:
-			if o not in done and o in sources:
-				self.undecompiled.append((o, "not compiled"))
-				del sources[o]
+			if o not in done:
+				failed[o] = "not compiled"
 		os.remove(records)
 		os.remove(compiled)
-		return sources
+		return failed
 
 	def find_ima_sounds(self):
 		"""The samples of the IMA/DVI ADPCM sounds (codecName "TIMACodec"),
@@ -1123,6 +1159,18 @@ class Extractor:
 			except ValueError:
 				pass
 			os.remove(where)
+		if cname in NATIVE_CLASSES and not self.in_function:
+			rel = "resources/%s/%x.s" % (folder, o)
+			where = os.path.join(self.out, rel)
+			os.makedirs(os.path.dirname(where), exist_ok=True)
+			at = o - 1 + 12
+			try:
+				newtonarm.unpack(data, where, sorted(r - at for r in self.relocated if at <= r < at + len(data)),
+								 at - self.link_base, None, "a %s binary (%s)" % (cname, path))
+				return "native(%s, \"%s\")" % (self.value(cls, path + "^"), rel)
+			except (ValueError, newtonarm.AsmError):
+				if os.path.exists(where):
+					os.remove(where)
 		if cname == "AirusA" and not self.in_function and len(data) > 1 and (data[1] & 7) in (1, 2, 3, 5, 7):
 			sized = struct.pack(">I", len(data)) + data
 			rel = "resources/%s/%x%s" % (folder, o, newtonlex.text_suffix(sized))
@@ -1597,6 +1645,7 @@ class Obj:
 	def __init__(self, kind, cls=None, items=None, tags=None, data=None):
 		self.kind, self.cls, self.items, self.tags, self.data = kind, cls, items or [], tags or [], data
 		self.path = None
+		self.native = None			# a binary of ARM code: its source (assembled where it falls)
 
 
 class Reader:
@@ -1703,7 +1752,7 @@ class Reader:
 		if kind == "name" and text in ("nil", "true"):
 			self.take()
 			return Imm(2 if text == "nil" else 0x1a)
-		if kind == "name" and text in ("real", "string", "binary", "array", "map", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "tonescore", "shorts", "fixed", "hexfile", "sfnt", "texttable", "lexicon", "picture") \
+		if kind == "name" and text in ("real", "string", "binary", "array", "map", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "tonescore", "shorts", "fixed", "hexfile", "sfnt", "texttable", "lexicon", "picture", "native") \
 				and self.toks[self.i + 1][1] == "(":
 			self.take()
 			self.take("(")
@@ -1711,7 +1760,7 @@ class Reader:
 			while self.peek()[1] != ")":
 				if text in ("real", "fixed") and self.peek()[0] == "number":
 					args.append(float(self.take()[1]))
-				elif text in ("string", "binary", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "hexfile", "sfnt", "texttable", "lexicon", "picture") and self.peek()[0] == "string":
+				elif text in ("string", "binary", "bytes", "function", "bitmap", "sound", "pict", "same", "imasound", "hexfile", "sfnt", "texttable", "lexicon", "picture", "native") and self.peek()[0] == "string":
 					args.append(self.take()[1])
 				elif text == "bitmap" and self.peek()[0] == "number":
 					args.append(self.take()[1])
@@ -1741,6 +1790,13 @@ class Reader:
 				return Obj("binary", args[0], data=newtontables.pack(os.path.join(self.root, args[1][1:-1])))
 			if text == "picture":
 				return Obj("binary", args[0], data=newtonpict.pack(os.path.join(self.root, args[1][1:-1])))
+			if text == "native":
+				# (its bytes at its own .origin - what a compiled function holding
+				# it has, Builder.same_value - until it is placed, Builder.build)
+				source = os.path.join(self.root, args[1][1:-1])
+				o = Obj("binary", args[0], data=newtonarm.pack(source))
+				o.native = source
+				return o
 			if text == "lexicon":
 				return Obj("binary", args[0], data=newtonlex.pack(os.path.join(self.root, args[1][1:-1]))[4:])
 			if text == "hexfile":
@@ -1772,6 +1828,52 @@ class Reader:
 		if kind in ("name", "quoted"):
 			return Name(self.name_text())
 		raise SyntaxError("%s: a value expected, found %s" % (self.where, text))
+
+
+def record_flags(head):
+	"""What a function record's @@ line says beyond the function it was: " names"
+	(compiled with the variables' names kept, the host's compiler is told),
+	" argframe=P,I" (with_arg_frame)."""
+	flags = ""
+	if re.search(r" names\b", head):
+		flags += " names"
+	m = re.search(r" argframe=(nil|0),(nil|0)\b", head)
+	if m:
+		flags += m.group(0)
+	return flags
+
+
+def ntk_arg_frame_flag(rom, ref):
+	"""" argframe=P,I" when the function's argFrame is the one the NTK's
+	compiler gives a function that keeps nothing in it - its three header
+	slots only, _nextArgFrame nil, _parent and _implementor nil or 0 - else
+	"".  (The host's compiler, as the ROM's, makes no argFrame for such a
+	function: the NTK's native compiler's bytecode fallbacks, bcFunc, have
+	one.)"""
+	af = rom.slots(ref)[3] if len(rom.slots(ref)) > 3 else 2
+	if not rom.is_ptr(af) or rom.flags(af) & 3 != 3:
+		return ""
+	slots = rom.frame_slots(af)
+	if [t for t, _ in slots] != ["_nextArgFrame", "_parent", "_implementor"] or slots[0][1] != 2 \
+			or any(v not in (0, 2) for _, v in slots[1:]):
+		return ""
+	return " argframe=%s,%s" % tuple("nil" if v == 2 else "0" for _, v in slots[1:])
+
+
+def with_arg_frame(value, head):
+	"""A compiled function given the argFrame its record's " argframe=P,I"
+	asks for, when the compiler made none: {_nextArgFrame: nil, _parent: P,
+	_implementor: I}."""
+	m = re.search(r" argframe=(nil|0),(nil|0)\b", head)
+	if not m or not isinstance(value, Obj) or value.kind != "frame" or "argFrame" not in value.tags:
+		return value
+	k = value.tags.index("argFrame")
+	if not (isinstance(value.items[k], Imm) and value.items[k].ref == 2):
+		return value
+	ref = {"nil": 2, "0": 0}
+	value.items[k] = Obj("frame", tags=["_nextArgFrame", "_parent", "_implementor"],
+						 items=[Imm(2), Imm(ref[m.group(1)]), Imm(ref[m.group(2)])])
+	return value
 
 
 def string_bytes(literal):
@@ -1814,6 +1916,8 @@ class Builder:
 		self.relayout = relayout
 		self.new_base = base				# (relayout: where the area now starts - a package part that has moved)
 		self.relocations = []			# (the ROM's ref, the ref now) for every object that moved
+		self.link_base = 0				# what a native binary's .origin counts from (a package file's part: PACKAGE_BASE)
+		self.native_relocations = []	# the addresses of the words native binaries' .rword made
 		self.defs = {}
 		files = [os.path.join(src, "maps.ns")]
 		objdir = os.path.join(src, "objects")
@@ -1887,8 +1991,8 @@ class Builder:
 				# (each record numbered afresh: the file's own @@ line names
 				# the ROM's function, which an edited tree need not have)
 				head, body = text.split("\n", 1)
-				out.write("@@ %x%s\n%s" % (n, " names" if head.endswith(" names") else "", body))
-				by_id[n] = v
+				out.write("@@ %x%s\n%s" % (n, record_flags(head), body))
+				by_id[n] = (v, head)
 		env = dict(os.environ, NEWTON_ROM=os.path.join(work, "no-rom-image"))
 		result = subprocess.run([nd.newtonscript_path(self.newtonscript), "--compile-records", records, compiled], env=env,
 								stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -1901,7 +2005,8 @@ class Builder:
 			if lines[i].startswith("@@ "):
 				n = int(lines[i][3:], 16)
 				value = Reader(lines[i + 1], "compiled %x" % n, self.src).value()
-				target = by_id.pop(n)
+				target, head = by_id.pop(n)
+				with_arg_frame(value, head)
 				target.kind, target.cls, target.items, target.tags, target.data = \
 					value.kind, value.cls, value.items, value.tags, value.data
 				i += 3
@@ -1920,7 +2025,13 @@ class Builder:
 		if name in seen:
 			raise ValueError("same() goes round in a circle at %s" % name)
 		seen.add(name)
-		self.defs[name] = self.at_path(v.data, seen)
+		try:
+			self.defs[name] = self.at_path(v.data, seen)
+		except (ValueError, IndexError, AttributeError):
+			raise ValueError("%s := same(\"%s\"): nothing is at that path - a function on it was edited so that "
+							 "its literals moved; point it at another function that holds the object (layout.tsv's "
+							 "alias lines for %s name them), and correct the alias line of the edited one"
+							 % (name, v.data, name))
 		return self.defs[name]
 
 	def at_path(self, path, seen):
@@ -1935,7 +2046,9 @@ class Builder:
 			if tag:
 				if tag.startswith("|"):
 					tag = re.sub(r"\\(.)", r"\1", tag[1:-1])
-				v = v.items[v.tags.index(tag)]
+				# (a symbol is the same whatever its case: the compiler keeps the
+				# first spelling it met, so a slot may be spelt otherwise here)
+				v = v.items[[t.lower() for t in v.tags].index(tag.lower())]
 			elif index:
 				v = v.items[int(index)]
 			else:
@@ -2119,8 +2232,9 @@ class Builder:
 				continue
 			if how == "rom-form":
 				if rel.endswith("/"):
-					# a package as text (tools/armpart/newtonpkg.py), built as the package file
-					blob = newtonpkg.pack(os.path.join(self.src, rel))
+					# a package as text (tools/armpart/newtonpkg.py), built as the package
+					# file, its frames parts kept as trees built here (PackageTrees)
+					blob = newtonpkg.pack(os.path.join(self.src, rel), trees=PackageTrees(self.newtonscript))
 				else:
 					with open(os.path.join(self.src, rel), "rb") as piece:
 						blob = piece.read()
@@ -2517,6 +2631,12 @@ class Builder:
 				v = self.by_path[path.lower()]
 				if v.kind == "binary":
 					body = v.data
+					if v.native is not None:
+						# ARM code assembled at the address its bytes fall at (less
+						# link_base: a package file's offsets), its relocated words noted
+						assembled = newtonarm.assemble_file(v.native, a + 12 - self.link_base)
+						body = assembled.data
+						self.native_relocations += [a + 12 + r for r in assembled.relocations]
 					cls = ref(v.cls)
 				elif v.kind == "frame":
 					body = b"".join(struct.pack(">I", ref(x)) for x in v.items)
@@ -2531,6 +2651,64 @@ class Builder:
 				gap = bytes.fromhex(extra["gap"])
 				out[o + len(words):o + len(words) + len(gap)] = gap
 		return area_base, bytes(out)
+
+
+# A package file's frames part (romsrc/rex/<package>/partN/: the packages
+# added to the extension) is written as a tree as if the package lay at
+# PACKAGE_BASE, an address nothing else uses: its pointer refs, offsets in
+# the package, are moved there to extract it and back to build it.
+PACKAGE_BASE = 0x01000000
+
+
+class PackageTrees:
+	"""What newtonpkg.py hands a package's frames parts to: extract writes
+	one as a tree (as write_rex does the ROM's own packages' parts), build
+	builds one at an offset in the package."""
+
+	def __init__(self, newtonscript, build_dir=None):
+		self.newtonscript = newtonscript
+		self.build_dir = build_dir
+
+	def extract(self, part, offset, relocations, path):
+		"""The part at offset in its package, with the words at relocations
+		(offsets in it) relocated, written as a tree at path when it builds
+		back the same (else nothing is written and the answer is False)."""
+		import shutil
+		blob = bytearray(part)
+		try:
+			rexpackages.rebase_frames_part(blob, 0, PACKAGE_BASE, PACKAGE_BASE, 4)
+		except ValueError:
+			return False
+		rom = nf.ROM(self.build_dir)
+		first = PACKAGE_BASE + offset
+		rom.rom = bytes(rom.rom) + bytes(first - len(rom.rom)) + bytes(blob)
+		found = part_objects(rom, first, first + len(blob), 4)
+		if found is None:
+			return False
+		objs, pad, odd = found
+		shutil.rmtree(path, ignore_errors=True)
+		sub = Extractor(rom, path, self.build_dir, objs, (first, len(blob)), pad, self.newtonscript, 4)
+		sub.odd_gaps = odd
+		sub.relocated = {first + r for r in relocations}
+		sub.link_base = PACKAGE_BASE
+		sub.run()
+		print("  %s: %d objects, %d functions as source, %d as bytecode"
+			  % (path, len(objs), len(sub.sources), len(sub.undecompiled)))
+		built, relocated = self.build(path, offset)
+		if built != bytes(part) or sorted(relocated) != sorted(relocations):
+			shutil.rmtree(path, ignore_errors=True)
+			return False
+		return True
+
+	def build(self, path, offset):
+		"""The tree built at offset in its package: (its bytes, the offsets in
+		it of the words its native binaries' .rword made)."""
+		b = Builder(path, self.newtonscript, relayout=True, base=PACKAGE_BASE + offset)
+		b.link_base = PACKAGE_BASE
+		start, part = b.build()
+		part = bytearray(part)
+		rexpackages.rebase_frames_part(part, PACKAGE_BASE, 2 * PACKAGE_BASE, -PACKAGE_BASE, 4)
+		return bytes(part), [r - start for r in b.native_relocations]
 
 
 # the modules the builder builds with, besides this one: what the stamp is a
@@ -2639,6 +2817,16 @@ def main(argv=None):
 	d = sub.add_parser("romdata", help="write the ROM's other data (ROMDATA) into an existing tree, as extract does")
 	d.add_argument("build_dir")
 	d.add_argument("tree")
+	k = sub.add_parser("package", help="a package file as text - its frames parts as trees, its protocol "
+					   "parts and native code as ARM source - and back (tools/armpart/newtonpkg.py)")
+	k.add_argument("action", choices=("unpack", "pack"))
+	k.add_argument("input", help="unpack: the package file; pack: the directory")
+	k.add_argument("output", help="unpack: the directory (made afresh); pack: the package file")
+	k.add_argument("--newtonscript", required=True, help="the host's newtonscript, which compiles the functions")
+	k.add_argument("--rom", metavar="BUILD_DIR", help="unpack: the extracted ROM, whose names the decompiler and "
+					   "the ARM disassembler use (required to unpack)")
+	k.add_argument("--patches", metavar="TSV", help="unpack: apply a <package>.patches.tsv first (its lines then "
+					   "are what the source says)")
 	s = sub.add_parser("stamp", help="print the builder's stamp, which an object file carries")
 	s.add_argument("--header", help="write it as a C header (kObjectsStamp) instead")
 	a = ap.parse_args(argv)
@@ -2658,6 +2846,23 @@ def main(argv=None):
 					return 0
 		with open(a.header, "w", encoding="utf-8", newline="\n") as f:
 			f.write(text)
+		return 0
+	if a.command == "package":
+		trees = PackageTrees(os.path.abspath(a.newtonscript), a.rom)
+		if a.action == "pack":
+			data = newtonpkg.pack(a.input, trees=trees)
+			with open(a.output, "wb") as f:
+				f.write(data)
+			print("%s -> %s, %d bytes" % (a.input, a.output, len(data)))
+			return 0
+		if a.rom is None:
+			ap.error("package unpack needs --rom")
+		with open(a.input, "rb") as f:
+			data = f.read()
+		if a.patches:
+			data = bytes(Builder.patched(data, a.patches))
+		newtonpkg.unpack(data, a.output, newtonarm.RomNames(a.rom), 0, trees)
+		print("%s -> %s" % (a.input, a.output))
 		return 0
 	if a.command == "romdata":
 		write_romdata(nf.ROM(a.build_dir), a.tree, a.build_dir)

@@ -1,0 +1,5 @@
+@@ 0x1011dd5
+func() begin
+	(_defaultButton := self)
+end
+@@end

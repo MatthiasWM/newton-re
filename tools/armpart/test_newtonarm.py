@@ -33,6 +33,8 @@ import armv4			# noqa: E402
 import newtonarm		# noqa: E402
 
 PACKAGES_DIR = os.path.join(HERE, "..", "..", "romsrc", "rex")
+NEWTONSCRIPT = None
+ROM_BUILD = None
 PACKAGES = ["ScreenBuffer.pkg", "ScreenDrivers.pkg", "newtdev.pkg", "inetenbl.pkg", "inetstup.pkg"]
 # the protocol parts of each (inetstup has none)
 EXPECTED_PARTS = {"ScreenBuffer.pkg": [0], "ScreenDrivers.pkg": [0], "newtdev.pkg": [2, 3, 4, 5, 8],
@@ -44,6 +46,23 @@ except ImportError:
 	capstone = None
 
 
+def package_trees():
+	"""romsrc.py's builder for the frames parts kept as source trees (it
+	compiles their functions with the host's newtonscript: --newtonscript),
+	or None."""
+	if NEWTONSCRIPT is None:
+		return None
+	sys.path.insert(0, os.path.join(HERE, "..", "newton-rom", "analysis"))
+	import romsrc
+	return romsrc.PackageTrees(os.path.abspath(NEWTONSCRIPT), ROM_BUILD)
+
+
+def has_trees(directory):
+	"""Whether a package's text form keeps a frames part as a tree."""
+	import newtonpkg
+	return any(p["file"].endswith("/") for p in newtonpkg.read_text(directory)["parts"])
+
+
 def package_bytes(name):
 	"""A package's bytes: DIR/name, or the directory romsrc keeps it as
 	(tools/armpart/newtonpkg.py) built at its base."""
@@ -52,13 +71,16 @@ def package_bytes(name):
 		with open(path, "rb") as f:
 			return f.read()
 	import newtonpkg
-	return newtonpkg.pack(path[:-len(".pkg")])
+	return newtonpkg.pack(path[:-len(".pkg")], trees=package_trees())
 
 
 def corpus():
 	"""(package name, ProtocolPart) for every protocol part."""
 	out = []
 	for name in PACKAGES:
+		d = os.path.join(PACKAGES_DIR, name[:-len(".pkg")])
+		if not os.path.exists(os.path.join(PACKAGES_DIR, name)) and has_trees(d) and NEWTONSCRIPT is None:
+			raise unittest.SkipTest("%s's frames parts are source trees: --newtonscript builds them" % name)
 		pkg = package_bytes(name)
 		for pp in newtonarm.protocol_parts(pkg):
 			out.append((name, pp))
@@ -382,5 +404,13 @@ if __name__ == "__main__":
 	if "--packages" in sys.argv:
 		i = sys.argv.index("--packages")
 		PACKAGES_DIR = sys.argv[i + 1]
+		del sys.argv[i:i + 2]
+	if "--rom" in sys.argv:
+		i = sys.argv.index("--rom")
+		ROM_BUILD = sys.argv[i + 1]
+		del sys.argv[i:i + 2]
+	if "--newtonscript" in sys.argv:
+		i = sys.argv.index("--newtonscript")
+		NEWTONSCRIPT = sys.argv[i + 1]
 		del sys.argv[i:i + 2]
 	unittest.main()

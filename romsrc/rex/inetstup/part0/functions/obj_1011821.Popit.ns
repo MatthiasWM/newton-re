@@ -1,0 +1,5 @@
+@@ 0x1011a7d
+func(a1) begin
+	(if labelCommands then inherited:?Popit(a1) else self:hilite(nil))
+end
+@@end

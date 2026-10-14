@@ -1,0 +1,5 @@
+@@ 0x1016635
+func(a1) begin
+	{_proto: fCompletionSpec_Listen, _parent: self}
+end
+@@end

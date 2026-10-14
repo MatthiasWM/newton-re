@@ -1,0 +1,5 @@
+@@ 0x1013249
+func() begin
+	(if self.viewCObject then self:SyncView())
+end
+@@end

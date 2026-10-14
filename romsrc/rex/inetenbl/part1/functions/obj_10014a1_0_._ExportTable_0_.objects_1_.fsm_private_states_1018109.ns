@@ -1,0 +1,8 @@
+@@ 0x1018109
+func() begin
+	if self:GetAbort() then begin
+			return self:DoEvent('Abort, nil)
+		end;
+	self:?DoClientCallback(fState, nil)
+end
+@@end

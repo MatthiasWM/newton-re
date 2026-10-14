@@ -1,0 +1,5 @@
+@@ 0x1013d55
+func() begin
+	(statsViewOpen := BuildContext(device.StatusView)):Open()
+end
+@@end

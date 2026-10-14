@@ -1,0 +1,6 @@
+@@ 0x10164e1
+func() begin
+	text := self:BuildComponentList();
+	inherited:?viewSetupFormScript()
+end
+@@end

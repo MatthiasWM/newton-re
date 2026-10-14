@@ -1,0 +1,2 @@
+map_10005d1 := map(0, nil, 'text, 'TapAction, 'installScript, 'devInstallScript, 'devRemoveScript);
+map_10006f1 := map(0, nil, 'class, 'instructions, 'literals, 'argFrame, 'numArgs);

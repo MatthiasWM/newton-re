@@ -1,0 +1,8 @@
+@@ 0x104ab69
+func() begin
+	if fAbort then begin
+			return self:DoEvent('Abort, nil)
+		end;
+	self:DoEvent('ActivateDomainManager, nil)
+end
+@@end
