@@ -294,8 +294,8 @@ host without one.  **Storage**: `--store /home/root/newton-data/internal.store`
 (the sparse flash file, 64 MB by default); the log beside it; printing
 (`--print-dir`) writes PNGs there too.  **Network**: the host's own TCP/IP
 over Wi-Fi as on the desktop - the NIE, NetHopper, IPP printing (when
-`avahi-browse` is missing or finds nothing - no printer was found on the
-tablet until 2026-10-14 - the mDNS question of
+`avahi-browse` is missing or finds nothing - the tablet has none, so no printer was found
+on it until 2026-10-14; since then it finds the owner's HP and prints to it - the mDNS question of
 `print/host/dnssd/HostDNSSD.cpp` finds them); the serial
 port is TCP 3679, so **a desktop docks with the tablet over the network**
 (`tools/dock/dock.py --connect <tablet>:3679`, NCU/NCX the same way), and

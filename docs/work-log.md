@@ -35,7 +35,7 @@ which ESP-IDF gives 3 KB of stack. The T-Deck now installs the IPP
 printers (no PNG host printer: the board has nowhere to put pages); it has
 no TLS, so no `ipps://`. ctest `print.HostDNSSD` takes canned answers
 (compressed names, a dot in an instance name, an answer without an
-address, a cut-off packet); `NEWTON_TEST_MDNS=1` asks the real link too. On the T-Deck the HP was found and a test page printed on it (`docs/host-tdeck-pro.md` "Printing"); the reMarkable build is not yet tried on the tablet.
+address, a cut-off packet); `NEWTON_TEST_MDNS=1` asks the real link too. On the T-Deck the HP was found and a test page printed on it (`docs/host-tdeck-pro.md` "Printing"); on the reMarkable (which has no `avahi-browse`) the HP was found and a test page printed too. The panel's alerts used `kNotifyAlert`, which is no constant in source compiled at run time: tapping Add with no printer picked - all the tablet's empty list allowed - threw -48807 (now 3).
 
 ## 2026-10-14: The host's battery on every host
 
