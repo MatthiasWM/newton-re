@@ -325,7 +325,7 @@
 		AddSelected: func() begin
 			local i := chosenRow;
 			if not rows or not i or i < 0 or i >= Length(rows) or not rows[i].found then begin
-				:Notify(kNotifyAlert, "Network Printers", "Pick a printer the network has in the list first.");
+				:Notify(3, "Network Printers", "Pick a printer the network has in the list first.");
 				return;
 			end;
 			local printer := GetGlobalVar('|NetworkPrinters:host|):AddPrinter(rows[i].found, rows[i].kind);
@@ -337,7 +337,7 @@
 			local i := chosenRow;
 			local printers := GetGlobalVar('|NetworkPrinters:host|);
 			if not rows or not i or i < 0 or i >= Length(rows) or not printers:Added(rows[i].name) then begin
-				:Notify(kNotifyAlert, "Network Printers", "Pick a printer that has been added in the list first.");
+				:Notify(3, "Network Printers", "Pick a printer that has been added in the list first.");
 				return;
 			end;
 			local name := rows[i].name;
