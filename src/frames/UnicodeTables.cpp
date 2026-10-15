@@ -13,6 +13,7 @@
 #include "ROMConstants.h"
 #include "NewtonMemory.h"
 #include "SortTables.h"
+#include "host/RomBugs.h"
 #include <string.h>
 
 static Ref	GetUnicodeSlot(const char* name)
@@ -91,4 +92,38 @@ InitUnicode(void)
 					  (const signed char*) CopyBinary(RefVar(GetUnicodeSlot("upperNoMarkList"))),
 					  (const signed char*) CopyBinary(RefVar(GetUnicodeSlot("noMarkList"))),
 					  breakTable);
+}
+
+
+// ROM 0x002571fc ShutDownUnicode__Fv
+// Once the tables are in, each of the 'unicode frame's charEncodings has
+// its two maps (InstallBuiltInEncodings's TEncodingMaps) disposed of.
+// Nothing in the ROM calls it.
+//
+// ROM BUG (fixed): the ROM leaves the converters installed over the maps
+// it has freed, and gUnicodeInited set - the next conversion reads a freed
+// map, and a second ShutDownUnicode frees them all again.  The fix takes
+// each encoding out of gUnicode and clears gUnicodeInited, so that the
+// converters fall back as they do for an encoding never installed, and a
+// second call does nothing.  (Host: the copies of the mapping binaries
+// the maps point into - CopyBinary, a DEVIATION - stay, as the ROM's own
+// objects would: gASCIItoUnicodeTable points into one.)
+void
+ShutDownUnicode(void)
+{
+	if (!gHasUnicode || !gUnicodeInited)
+		return;
+	RefVar encodings(GetUnicodeSlot("charEncodings"));
+	ULong count = Length(encodings);
+	for (ULong i = 0; i < count; i++)
+	{
+		RefVar encoding(GetArraySlotRef(encodings, i));
+		UShort id = (UShort) RINT(GetFrameSlotRef(encoding, RefVar(Intern((char*) "encodingID"))));
+		DisposPtr((Ptr) gUnicode[id].fFromMap);
+		DisposPtr((Ptr) gUnicode[id].fToMap);
+		if (RomBugFixed())
+			memset(&gUnicode[id], 0, sizeof(gUnicode[id]));
+	}
+	if (RomBugFixed())
+		gUnicodeInited = false;
 }

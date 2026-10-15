@@ -720,7 +720,11 @@ objects are imported - `Runicode`, the magic pointer @283, is the ROM's
   character below its start has no byte, 0x1a, else the byte at the
   character plus the offset).  `InstallCharEncoding` 0x002555ec puts the
   maps and converters in `gUnicode` (0x0c104858, five entries of
-  {fromMap, fromFn, toMap, toFn}); `ConvertToUnicode` 0x002553a0 and
+  {fromMap, fromFn, toMap, toFn}; in the US ROM - `InstallCharEncoding`
+  0x00257524 - `gUnicode` is 0x0c107790 and two tables, five {fromMap,
+  fromFn} pairs at +0 and five {toMap, toFn} at +0x28, the count of
+  encodings at +0x50: the host's one table of four-word entries is the
+  same information); `ConvertToUnicode` 0x002553a0 and
   `ConvertFromUnicode` 0x002568b8 go through them once `gUnicodeInited`
   is set (an encoding without a table converts nothing - so encoding 0),
   and before that widen bytes as they are / narrow characters over 0x7f
@@ -738,6 +742,12 @@ objects are imported - `Runicode`, the magic pointer @283, is the ROM's
   or the sharp s) are built on them.  Before `InitUnicode` the host's
   versions know Latin-1's letters (the ROM would read through null
   pointers).
+- `ShutDownUnicode` (US 0x002571fc), which nothing in the ROM calls,
+  frees the two maps of each of `charEncodings` again - and leaves the
+  converters installed over them with `gUnicodeInited` still set, so the
+  next conversion reads a freed map and a second call frees them again
+  (ROM BUG, fixed: the encodings are taken out of `gUnicode` and
+  `gUnicodeInited` cleared; `test_Strings` pins both).
 - `Rasciibreak` (the magic pointer @6): `gASCIIBreakTable`, a byte per
   Mac Roman character - `IsDelimiter` 0x00255678 - the word breakers of
   `StrCapitalizeWords` and `FindWordsInString` (space and the punctuation

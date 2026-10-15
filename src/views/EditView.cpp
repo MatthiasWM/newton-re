@@ -2456,6 +2456,42 @@ TEditView::HandleInk(TUnitPublic* unit)
 }
 
 
+// ROM 0x000a67d4 HandleInk__9TEditViewFPP7Polygon
+// A polygon's points made a stroke, ready for recognition as though just
+// written, and put on the page as ink (the stroke disposed of after).
+// Nothing in the ROM calls it.
+long
+TEditView::HandleInk(Handle polygon)
+{
+	HLock(polygon);
+	Polygon* poly = (Polygon*) *polygon;
+	Point none;
+	none.h = 0;
+	none.v = 0;
+	TStroke* stroke = MakeStroke(poly->polyPoints, PolyPointCount(poly), none);
+	if (stroke != nil)
+	{
+		PrepStrokeForRecognition(stroke);
+		TStroke* list[2];
+		list[0] = stroke;
+		list[1] = nil;
+		::HandleInk(this, list);
+		stroke->Dispose();
+	}
+	HUnlock(polygon);
+	return 1;
+}
+
+
+// ROM 0x000a8a8c BoundsOverlapsGraphics__9TEditViewFR5TRect
+// No, whatever the box (the ROM's is two instructions).
+Boolean
+TEditView::BoundsOverlapsGraphics(Rect& /*bounds*/)
+{
+	return false;
+}
+
+
 // ROM 0x000a6854 HandleInk__9TEditViewFRC6RefVar
 // ... and a whole bundle of them.
 long

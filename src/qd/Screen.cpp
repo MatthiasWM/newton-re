@@ -520,6 +520,15 @@ SetGrafInfo(long selector, long value)
 }
 
 
+// ROM 0x00202c6c SetScreenSize__FlT1
+// Empty in the ROM (a bare return), and nothing calls it: the screen's
+// size follows from its orientation (SetOrientation, just before it).
+void
+SetScreenSize(long /*width*/, long /*height*/)
+{
+}
+
+
 // ROM 0x00202b3c SetOrientation__Fl
 // The screen turned: the driver's orientation set, the default port's
 // bits, rect and regions re-made over the new screen, the screen size

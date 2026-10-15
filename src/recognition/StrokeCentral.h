@@ -134,6 +134,7 @@ extern StrokeCentral	gStrokeWorld;						// ROM 0x0c1018cc gStrokeWorld
 // the stroke domain, numbered as the controller's next stroke (defined
 // in ShapeDomain.cpp, whose shapes were their first users).
 void			PrepStrokeForRecognition(TStroke* stroke);
+TStroke*		MakeStroke(const Point* pts, long count, Point offset);	// ROM 0x00145d48 MakeStroke__FP6TPointl6TPoint - a stroke through the points, moved by the offset
 TStrokeUnit*	MakeStrokeUnit(TStroke* stroke, TArray* areas, long contextID);
 
 void	IdleStrokes(void);									// ROM 0x00144878 IdleStrokes__Fv - the stroke world idled, not re-entered

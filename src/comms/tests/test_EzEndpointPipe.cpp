@@ -7,6 +7,7 @@
 // listens.
 
 #include "EzEndpointPipe.h"
+#include "Docker.h"
 #include "Endpoint.h"
 #include "CommManager.h"
 #include "SerialTool.h"
@@ -121,6 +122,30 @@ Scenario(void)
 		Boolean eof = false;
 		pipe->ReadChunk(back, count, eof);
 		EXPECT(count == 12 && memcmp(back, text, 12) == 0);
+
+		// TDocker::WriteString (nothing in the ROM calls it), through the
+		// echo: the size, the big-endian characters and terminator, the
+		// padding to a word
+		TDocker* docker = new TDocker;
+		docker->fPipe = pipe;
+		UniChar name[] = { 'N', 'e', 'w', 't', 0 };
+		docker->WriteString(name);
+		docker->fPipe = nil;
+		delete docker;
+		const UByte expected[16] = { 0, 0, 0, 10, 0, 'N', 0, 'e', 0, 'w', 0, 't', 0, 0, 0, 0 };
+		available = 0;
+		for (int tries = 0; tries < 200 && available < 16; tries++)
+		{
+			available = pipe->BytesAvailable();
+			if (available < 16)
+				Sleep(10 * kMilliseconds);
+		}
+		EXPECT(available == 16);
+		UByte written[16];
+		memset(written, 0xff, sizeof(written));
+		count = 16;
+		pipe->ReadChunk(written, count, eof);
+		EXPECT(count == 16 && memcmp(written, expected, 16) == 0);
 		EXPECT(pipe->TearDown() == noErr);
 	}
 	newton_catch_all

@@ -226,6 +226,7 @@ public:
 	long			ReadResult(void);
 	Boolean			ReadChunk(void* buffer, long length, Boolean flushPadding);
 	void			Pad(ULong length);
+	void			WriteString(UniChar* str);		// its size, the characters and their terminator, padded (nothing in the ROM calls it)
 	void			FlushPadding(ULong length);
 	void			FlushCommand(void);
 	Ref				ReadRef(RefArg store);

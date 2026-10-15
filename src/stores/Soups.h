@@ -83,6 +83,7 @@ void	CheckWriteProtect(RefArg storeObject);
 void	KillStoreObject(RefArg storeObject);
 Ref		FlushSoupList(RefArg soups);
 long	GetRandomSignature(void);
+void	AdjustSoupsSignatures(void);					// ROM 0x0035570c AdjustSoupsSignatures__Fv - empty: nothing (nothing in the ROM calls it)
 void	AskForFlush(Boolean ask);
 NewtonErr	GetStoreVersion(TStore* store, long* version);
 NewtonErr	SetStoreVersion(RefArg storeObject, long version);		// ROM 0x00353230 SetStoreVersion__FRC6RefVarl

@@ -22,8 +22,8 @@ the way are all in `docs/work-log.md`.
   no function is kept as bytecode (`docs/rom-free/README.md`, "Every
   binary as text"; `docs/work-log.md`, 2026-10-15).  What is left of that
   work is under "Open", "romsrc".
-- `analysis/coverage.py build/MP2x00US --check`: 19283 citations, 0 bad;
-  13307 of 16671 functions (79.8%).
+- `analysis/coverage.py build/MP2x00US --check`: 19312 citations, 0 bad;
+  13336 of 16671 functions (80.0%).
 - `analysis/natives.py --unbound`: 1284 of 1326 natives answered (96.8%).
   Left: comms 38 (AppleTalk and NBP, the online services and eWorld's
   `EW*`, the TV remote), intl 4 (the AppleTalk zones).
@@ -133,8 +133,8 @@ rules (a regex on the mangled name per category) being that file's; a
 function's size is the distance to the next symbol, so the data behind a
 module is not counted as code, and a function that is nothing but a
 branch to a reconstructed one (followed through branches to branches) is
-counted as an alias of it.  By functions 79.8% is cited; by bytes of
-code, **88.7%**.  The rest, 338 KB in 3364 functions:
+counted as an alias of it.  By functions 80.0% is cited; by bytes of
+code, **88.8%**.  The rest, 335 KB in 3335 functions:
 
 | category | functions | KB | % of the code |
 |---|---:|---:|---:|
@@ -147,13 +147,12 @@ code, **88.7%**.  The rest, 338 KB in 3364 functions:
 | declined: the StyleWriter and LaserWriter LS drivers | 140 | 15.2 | 0.5 |
 | performance variants (the blitter's special cases; the host's blitter is its own) | 37 | 8.2 | 0.3 |
 | runtime (the compiler's C++ runtime - `__nw_v`, `__dl_v`, `__vc__`, `__pvfn__`, `__push_ddtor` - `ByteSwap`, and three one-line forms nothing on the host calls) | 11 | 0.9 | 0.0 |
-| unreferenced (nothing in the ROM refers to it, and it is not public: older text-layout helpers of the paragraph view, ink hit-testing of the edit view, `ShutDownUnicode`, string helpers, and five empty or nought-answering stubs) | 28 | 2.7 | 0.1 |
-| **other - what is left** | 2 | 0.0 | 0.0 |
+| **other - what is left** | 1 | 0.0 | 0.0 |
 | system patches (the host has none) | 10 | 1.1 | 0.0 |
 | host stand-ins (DEVIATION: the text objects' TextWalker - the host's text layout takes the characters whole) | 10 | 1.2 | 0.0 |
 | aliases of reconstructed functions (one branch to one) | 33 | 0.1 | 0.0 |
 
-Three categories are empty since 2026-10-15 (`docs/work-log.md`): the
+Four categories are empty since 2026-10-15 (`docs/work-log.md`): the
 **protocol glue** (368 functions: the interfaces' dispatch stubs, `Sizeof`
 and `ClassInfo` cited at their declarations; `TQDLibraryDriver`,
 `TPinPad` and `TStoreDriver` reconstructed), the
@@ -162,7 +161,10 @@ answered by armcpu) and the **dead in the U.S. ROM** (56: the math views,
 the sixteen-bit Airus walkers, the French/German accent checks,
 TextArrow, the package validation driver, the ink codec's default point
 procs, `MemBufferPipe` - each reconstructed and wired in where the ROM
-wires it).  The 28 "unreferenced" functions are the dead code still left.
+wires it) and the **unreferenced** (28 that nothing in the ROM refers to:
+the paragraph view's older text-layout helpers, the edit view's ink
+hit-testing, `ShutDownUnicode`, string helpers, empty stubs - each called
+by its area's test).  No dead code is left uncited.
 
 "Other" was 418 functions and 22.6 KB at the first count; it went down
 by reconstructing what the reconstructed code calls where the ROM calls
@@ -172,12 +174,12 @@ helpers, V.42bis's `dict_init`, the cursor's `PtrToPtr`, ...) and by
 sorting the rest into the categories above, each with its reason in
 `uncited-categories.tsv` (`InitExternal`, whose work `InitQueries` does,
 and the exception-cleanup procs the host's destructors stand in for are
-host stand-ins).  Two pieces are left, both inside functions that are
-cited but simplified: `GetCStringFormat`, which the ROM's
-`TRichString::Verify` (0x001ac324, a character-by-character consistency
-check answering an error code) uses - the host's `Verify` is a short
-sanity check; and `SaveResource`, which the ROM's `TArray::Save` reaches
-after `MakeHandle`/`NameHandle` - the host's only compacts.
+host stand-ins).  One piece is left, inside a function that is cited but
+simplified: `SaveResource`, which the ROM's `TArray::Save` reaches after
+`MakeHandle`/`NameHandle` - the host's only compacts.  (`GetCStringFormat`
+is reconstructed, for `IsRichCString`; the host's `TRichString::Verify`
+is still a short sanity check where the ROM's, 0x001ac324, checks
+character by character.)
 
 Printing: PostScript and HP PCL to a network printer by IPP are done, and
 printers on the network are found and added both ways and kept - on the

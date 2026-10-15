@@ -23,5 +23,9 @@
 
 void	InitUnicode(void);			// ROM 0x00256acc InitUnicode__Fv
 void	InstallBuiltInEncodings(void);	// ROM 0x002577e4 InstallBuiltInEncodings__Fv
+// The two encoding maps InstallBuiltInEncodings made for each of the
+// charEncodings freed again.  Nothing in the ROM calls it (the Newton
+// never shuts its Unicode down).
+void	ShutDownUnicode(void);			// ROM 0x002571fc ShutDownUnicode__Fv
 
 #endif	/* __UNICODETABLES_H */

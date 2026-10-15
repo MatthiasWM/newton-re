@@ -737,6 +737,35 @@ TParagraphView::FlushWordAtCaret(void)
 }
 
 
+// ROM 0x0017862c FindLineContainingRect__14TParagraphViewFRC5TRectClUcT3
+// The first of the lines that the box covers at least `percent` per cent
+// of (CoveredBy), each line's box first let out a thousand pixels to
+// either side when `wide` is asked for, and raised by half its height
+// when `halfUp` is.  Nothing in the ROM calls it.  (host: the line's
+// index, -1 for none; the ROM answers the line's slot in the cache, as
+// FindLineContainingCharOffset does.)
+long
+TParagraphView::FindLineContainingRect(const Rect& box, const long percent, Boolean wide, Boolean halfUp)
+{
+	if (fLineCache == nil)		// DEVIATION: the ROM reads the first slot from address 0 (it is never asked without lines)
+		return -1;
+	for (long i = 0; fLineCache[i] != nil; i++)
+	{
+		Rect bounds = fLineCache[i]->fBounds;
+		if (wide)
+			InsetRect(&bounds, -1000, 0);
+		if (halfUp)
+		{
+			short height = (short) (bounds.bottom - bounds.top);
+			bounds.top = (short) (bounds.top - height / 2);
+		}
+		if (CoveredBy(&box, &bounds) >= percent)
+			return i;
+	}
+	return -1;
+}
+
+
 // ROM 0x001786f8 FindLineContainingCharOffset__14TParagraphViewFl
 // The line the offset is on: the first that holds it, the last for an
 // offset at or past the text's end; none without lines or for an offset
@@ -1153,6 +1182,14 @@ TParagraphView::ExtractTextRange(ULong offset, ULong length)
 	BlockMove(chars + offset, out, (long) length * (long) sizeof(UniChar));
 	out[length] = 0;
 	return result;
+}
+
+
+// ROM 0x00180244 RegisterIdler__14TParagraphViewFv
+// Empty in the ROM (a bare return), and nothing calls it.
+void
+TParagraphView::RegisterIdler(void)
+{
 }
 
 
@@ -1597,6 +1634,16 @@ TParagraphView::DrawHilitedData(void)
 			break;
 	}
 	SetClip(savedClip);
+}
+
+
+// ROM 0x0017e594 SimpleOffset__14TParagraphViewF6TPoint
+// Empty in the ROM - a frame made and taken down again, the point spilled
+// to it and nothing else - and nothing calls it.  (Its r0 comes back as it
+// went in: no answer anyone reads.)
+void
+TParagraphView::SimpleOffset(Point /*delta*/)
+{
 }
 
 
@@ -2890,6 +2937,51 @@ TParagraphView::FindClosestBaseline(short v)
 }
 
 
+// ROM 0x001756a4 ValidateCaretPoint__FP6TPointPP8LineInfolT3Pl
+// Whether a caret point belongs on one of the lines, from the first given
+// down: the line whose box - let down by half the next line's height (its
+// own for the last) - holds the point, provided the point is no more than
+// `above` over its baseline and no more than the larger of `below` and
+// the distance from the baseline to that lowered bottom under it.  The
+// point is then moved to the line's middle and the line's height handed
+// back (outHeight may be nil).  The search ends at the first line that
+// starts below the point, or at a line that holds it but is too far.
+// Nothing in the ROM calls it.
+Boolean
+ValidateCaretPoint(Point* pt, LineInfo** lines, long above, long below, long* outHeight)
+{
+	for ( ; *lines != nil; lines++)
+	{
+		Rect bounds = (*lines)->fBounds;
+		long next;
+		if (lines[1] != nil)
+			next = lines[1]->fBounds.bottom - lines[1]->fBounds.top;
+		else
+			next = bounds.bottom - bounds.top;
+		Rect r = bounds;
+		r.bottom = (short) (r.bottom + ((short) next >> 1));
+		if (PtInRect(*pt, &r))
+		{
+			short baseline = (short) (bounds.bottom - (*lines)->fHeight);
+			short limit = (short) (r.bottom - baseline);
+			if ((short) below > limit)
+				limit = (short) below;
+			long v = pt->v;
+			if (baseline - v > above || v - baseline > limit)
+				return false;
+			short height = (short) (bounds.bottom - bounds.top);
+			if (outHeight != nil)
+				*outHeight = height;
+			pt->v = (short) (bounds.top + (height >> 1));
+			return true;
+		}
+		if (bounds.top > pt->v)
+			return false;
+	}
+	return false;
+}
+
+
 // ROM 0x00175840 FindLineForWord__14TParagraphViewFRC5TRectl
 // Which line something written in the box belongs to.  The box's middle
 // is tried first when flag 1 is asked for, and taken when the line it
@@ -3984,6 +4076,102 @@ ContainsChar(const UniChar* text, UniChar c, ULong length)
 }
 
 
+// ROM 0x00173270 WordFitsAtEndOfLine__14TParagraphViewFPCUsUlT2R5TRect
+// Whether a word written in the box goes at the end of the line the
+// offset is on.  Yes outright when the view's viewJustify has bit 25
+// (0x02000000) set, when it has no lines, when the word is a lone bullet
+// or hyphen (IsBullet) or holds a space, tab or return; no when the
+// offset is on no line.  Otherwise there must be more than a hundred
+// pixels between the line's end and the view's right edge, and room
+// there for the word's width (fifteen pixels a character when the box
+// is empty - its top -32768) and ten more; and when the word the
+// recogniser last put into this view sits on the line above the box,
+// the same must hold between that word's right edge and the view's.
+// Nothing in the ROM calls it.
+Boolean
+TParagraphView::WordFitsAtEndOfLine(const UniChar* word, ULong length, ULong offset, Rect& box)
+{
+	if (fViewJustify & 0x02000000)
+		return true;
+	long right = viewBounds.right;
+	if (fLineCache == nil || fLineCache[0] == nil)	// DEVIATION: a nil cache is no lines (the ROM reads its first slot from address 0, which is not nil)
+		return true;
+	long line = FindLineContainingCharOffset((long) offset);
+	if (line < 0)
+		return false;
+	if (word[1] == 0 && IsBullet(word[0]))
+		return true;
+	if (ContainsChar(word, ' ', length) || ContainsChar(word, '\t', length) || ContainsChar(word, '\r', length))
+		return true;
+	long room = right - Line(line).fBounds.right;
+	if (room <= 100)
+		return false;
+	long width;
+	if (box.top != -32768)
+		width = (short) (box.right - box.left);
+	else
+		width = 15 * (long) length;
+	long needed = width + 10;
+	if (needed > room)
+		return false;
+	if (GetLastAddedWordView() != this)
+		return true;
+	Rect last = *GetLastAddedWordBox();
+	if (BoxAboveBox(last, box))
+	{
+		long gap = right - last.right;
+		if (gap < 100 || gap < needed)
+			return false;
+	}
+	return true;
+}
+
+
+// ROM 0x00173d5c CountTabStops__14TParagraphViewFlT1
+// How many of the view's tab stops a gap from `from` to `to` spans: the
+// stops are walked in order, `first` being the one before the first stop
+// past `from`.  A stop within ten pixels of `to` (but not on it) ends the
+// walk there - with nought when no stop past `from` has been seen yet; a
+// stop past `to` ends it too, counting that stop only when the half-way
+// point between the view's left edge and it is at or before `to`; with
+// no stop past `to` the count runs to the end of the array.  One when
+// the view has no tabs, nought when `to` is not after `from`.  Nothing in
+// the ROM calls it.
+long
+TParagraphView::CountTabStops(long from, long to)
+{
+	if (to <= from)
+		return 0;
+	RefVar tabs(Tabs());
+	if (ISNIL(tabs))
+		return 1;
+	long count = Length(tabs);
+	long first = -2;
+	long left = viewBounds.left;
+	for (long i = 0; i < count; i++)
+	{
+		long stop = RINT(GetArraySlotRef(tabs, i));
+		if (first == -2 && stop > from)
+			first = i - 1;
+		if ((stop > to && stop - to <= 10) || (stop < to && to - stop <= 10))
+		{
+			if (first == -2)
+				return 0;
+			return i - first;
+		}
+		if (stop > to)
+		{
+			if (stop - ((stop - left) >> 1) > to)
+				i--;
+			return i - first;
+		}
+	}
+	if (first == -2)
+		first = count - 1;
+	return count - first;
+}
+
+
 // ROM 0x00173b34 AddTabStop__14TParagraphViewFR5TRect
 // A word written at a tab: its box moved onto the nearest of the view's
 // tab stops when one is within ten pixels of its left edge, and otherwise
@@ -4018,6 +4206,17 @@ TParagraphView::AddTabStop(Rect& box)
 		SetArraySlotRef(tabs, count, MAKEINT(left));
 		Changed(RSSYMtabs);
 	}
+}
+
+
+// ROM 0x00172e60 PlaceAndAddWord__14TParagraphViewFPCUsUlRC5TRectRC6TPointN22RC6RefVarPlP11TUnitPublicl
+// Nought, and nothing else: the ROM's is two instructions, and nothing
+// calls it.
+long
+TParagraphView::PlaceAndAddWord(const UniChar* /*text*/, ULong /*length*/, const Rect& /*box*/, const Point& /*base*/,
+								ULong /*a*/, ULong /*b*/, RefArg /*info*/, long* /*outOffset*/, TUnitPublic* /*unit*/, long /*flags*/)
+{
+	return 0;
 }
 
 
@@ -7945,6 +8144,40 @@ TParagraphView::AddHilited(RefArg hilite, TEditView* editor)
 
 // ROM 0x0c101760 (unnamed) - when a paragraph's selection was last pressed
 ULong	gLastParagraphClick = 0;
+
+
+// ROM 0x0017ae80 ContainsTabsOrCRs__FPUs
+// Whether a tab or a return comes before the text's nought.  Nothing in
+// the ROM calls it.
+Boolean
+ContainsTabsOrCRs(UniChar* text)
+{
+	for ( ; *text != 0; text++)
+		if (*text == '\t' || *text == '\r')
+			return true;
+	return false;
+}
+
+
+// ROM 0x0017a288 IsBullet__FUs
+// A hyphen or a bullet (Mac Roman 0xa5).
+Boolean
+IsBullet(UniChar c)
+{
+	return c == U_CONST_CHAR('-') || c == U_CONST_CHAR(0xa5);
+}
+
+
+// ROM 0x0017a498 FindEndOfWord__FPUsRC6RefVar
+// The end of the word at the start of the text, by the break table.
+// Nothing in the ROM calls it.
+ULong
+FindEndOfWord(UniChar* text, RefArg breakTable)
+{
+	ULong start, end;
+	FindWordBreaks(text, Ustrlen(text), 0, true, breakTable, &start, &end);
+	return end;
+}
 
 
 // ROM 0x0017aefc LengthSansTabsAndCRs__FPUsPUc

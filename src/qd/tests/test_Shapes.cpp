@@ -454,6 +454,19 @@ TestTransforms()
 	SetRect(&r, 0, 0, 10, 10);
 	Scale(&r, stretch);
 	EXPECT(r.right == 20 && r.bottom == 5);
+	// and back (InverseScale, which nothing in the ROM calls)
+	pt.h = 13;
+	pt.v = 4;
+	InverseScale(&pt, stretch);
+	EXPECT(pt.h == 7 && pt.v == 8);								// 13 / 2 rounded up, 4 * 2
+	pt.h = 8;
+	pt.v = 31;
+	InverseScale(&pt, move);
+	EXPECT(pt.h == 5 && pt.v == 7);
+	TTransform none;
+	none.fFlags = 0;
+	InverseScale(&pt, none);										// not set up: nothing
+	EXPECT(pt.h == 5 && pt.v == 7);
 
 	// `square` keeps the shape: the smaller scale for both, and the
 	// destination cut back to what that leaves

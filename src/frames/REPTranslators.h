@@ -247,6 +247,10 @@ Ref		SPrintObject(RefArg obj);
 Ref		Stringer(RefArg array);					// the objects of an array as one string (&)
 Boolean	IsRichString(RefArg str);
 long	GetStringFormat(RefArg str);
+// the same of a string's characters given its size in bytes (terminator
+// included): the format bits of its last UniChar, and whether there are any
+long	GetCStringFormat(UniChar* str, ULong size);		// ROM 0x001abe14 GetCStringFormat__FPUsUl
+Boolean	IsRichCString(UniChar* str, ULong size);		// ROM 0x001ab1fc IsRichCString__FPUsUl (nothing in the ROM calls it)
 void	IntegerString(Long i, UniChar* str);		// (Long: an integer's width)
 
 // natives

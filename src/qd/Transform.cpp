@@ -74,6 +74,22 @@ Scale(Point* pt, const TTransform& transform)
 }
 
 
+// ROM 0x001982e8 InverseScale__6TPointFRC10TTransform
+// The other way: a point in the destination rectangle taken back into the
+// source, its distance from the destination's corner divided by the
+// scale (FixedDivide of a whole number by a Fixed is a whole number,
+// rounded).  Nothing in the ROM calls it (the ROM keeps it among
+// TStyleSave's functions, 0x001982e8).
+void
+InverseScale(Point* pt, const TTransform& transform)
+{
+	if ((transform.fFlags & kTransformSetUp) == 0)
+		return;
+	pt->h = (short) (FixedDivide(pt->h - transform.fDst.left, transform.fScaleH) + transform.fSrc.left);
+	pt->v = (short) (FixedDivide(pt->v - transform.fDst.top, transform.fScaleV) + transform.fSrc.top);
+}
+
+
 // ROM 0x001979bc Scale__5TRectFRC10TTransform
 // A rectangle's two corners, each moved as a point is.
 void

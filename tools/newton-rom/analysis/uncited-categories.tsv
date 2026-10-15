@@ -51,7 +51,10 @@ dead in the U.S. ROM	\d+MemBufferPipe|LengthOfTraj|CurvFromSquare|StorePointProc
 
 # nothing in the ROM refers to these at all - no call, no branch, no
 # address as data (callgraph.py --callers) - and they are not in the public
-# jump table a package's native code calls through
+# jump table a package's native code calls through.  All 28 are
+# reconstructed now (2026-10-15), each called by its area's test, so the
+# category is empty; the pattern stays so that a citation lost is put back
+# here rather than in "other"
 unreferenced	SimpleOffset__14TParagraphView|ValidateCaretPoint|WordFitsAtEndOfLine|CountTabStops__14TParagraphView|ShutDownUnicode|FindLineContainingRect|HitsOldHilitedInk|InverseScale__6TPoint|HandleInk__9TEditViewFPP7Polygon|WriteString__7TDocker|MakeStringHandle|MakeStringPtr|GetLastClipper|FindEndOfWord|CToPString__FPUcT1|ContainsTabsOrCRs|DeleteLargeObject__FUl|TRef(Struct)?StackReleaseProc|IsRichCString|UnsafeArrayLength|PlaceAndAddWord|BoundsOverlapsGraphics|AdjustSoupsSignatures|SetScreenSize|RegisterIdler__14TParagraphView|CMPExportListSourceComparer|IsBullet__FUs
 
 # --- the protocols' interface glue -----------------------------------------

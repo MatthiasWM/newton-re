@@ -142,6 +142,14 @@ public:
 	RefHandle**	fHandlesEnd;	// +0x14  filled up to here
 };
 
+// The two stacks' release procs: the range of a stack's memory that is in
+// use, in the form a stack manager's release proc answers it - the start
+// and the end, and the flag it was passed handed straight back.  The ROM
+// has them beside the stacks but nothing installs either (the stacks are
+// fixed allocations, never released), so only a test calls them.
+Boolean		TRefStackReleaseProc(void* stack, ULong* start, ULong* end, Boolean flag);			// ROM 0x001a4600 TRefStackReleaseProc__FPvPUlT2Uc - fBase to fLimit
+Boolean		TRefStructStackReleaseProc(void* stack, ULong* start, ULong* end, Boolean flag);	// ROM 0x001a4a48 TRefStructStackReleaseProc__FPvPUlT2Uc - the pointer stack, as deep as the ref stack
+
 // The VM state of a call: six refs on the control stack, addressed
 // through the pointer stack so that each field is a RefVar.
 struct VMState
