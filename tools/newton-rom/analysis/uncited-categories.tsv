@@ -58,11 +58,14 @@ unreferenced	SimpleOffset__14TParagraphView|ValidateCaretPoint|WordFitsAtEndOfLi
 # for; most are cited at the interface's declaration, these are not
 protocol glue	Sizeof__\d+\w+SFv|\d+TEndpointF|TQDLibraryDriver|\d+TWRecognizer|POutTranslator|PInTranslator|TEventCollector|\d+TCMService|\d+TSoundCodec|\d+TCompressor|\d+TDecompressor|CallbackCompressor|CallbackDecompressor|PFrameSink|PFrameSource|\d+TStoreDriver|\d+TPinPad|StdioOutTranslator|StdioInTranslator|NullOutTranslator|NullInTranslator|NTKOutTranslator|NTKInTranslator|SerialOutTranslator|SerialInTranslator
 
-# --- the compiler's and the C library's runtime, and overloads -------------
-# array new/delete helpers, pure-virtual stubs, the NSSend family's fixed-
-# argument overloads (the host has one variadic form of each), RefStruct's
-# constructors
-runtime and overloads	^(GetFrameSlot|SetArraySlot|GetArraySlot|ReplaceObject|EQ|IsInt|IsPtr|IsChar|IsRealPtr|IsMagicPtr|SymbolHash|MAKEBOOLEAN|MAKECHAR|MAKEIMMED|MakeChar|UMinMax_noninline|MinMax_noninline|__GetErrNo|__nw__FUiPv|__push_ddtor|SetMemory|x[A-Z]\w+)__|__vc__|__vec_new|__vec_delete|__nw_v|__dl_v|__pvfn__|^NSSend|^NSCallGlobalFn|^NSSendRoot|\d+RefStruct|__ct__6RefVarFRC6RefVar|ByteSwap|realloc
+# --- the compiler's and the C library's runtime ----------------------------
+# the C++ runtime the compiler calls (__nw_v, __dl_v, __vc__, __pvfn__,
+# __push_ddtor: the host's compiler has its own), ByteSwap, and one-line
+# forms nothing on the host calls (xHandToHand, xNumToString, SymbolHash's
+# RefArg form).  The NSSend family's fixed-argument forms, the RefArg tests
+# and makers and the run-time helpers a package's code can call through the
+# public jump table are reconstructed or answered by armcpu (2026-10-15)
+runtime	^(GetFrameSlot|SetArraySlot|GetArraySlot|ReplaceObject|EQ|IsInt|IsPtr|IsChar|IsRealPtr|IsMagicPtr|SymbolHash|MAKEBOOLEAN|MAKECHAR|MAKEIMMED|MakeChar|UMinMax_noninline|MinMax_noninline|__GetErrNo|__nw__FUiPv|__push_ddtor|SetMemory|x[A-Z]\w+)__|__vc__|__vec_new|__vec_delete|__nw_v|__dl_v|__pvfn__|^NSSend|^NSCallGlobalFn|^NSSendRoot|\d+RefStruct|__ct__6RefVarFRC6RefVar|ByteSwap|realloc
 
 # --- performance variants (the host's blitter and loops are its own) --------
 performance variants	^BB[A-Z]|Slab|FastLine|FastPartiallyReal|PatExpand|LSeekMask|CopyScan|RepeatScan|IsScanEqual|AllWhiteScan

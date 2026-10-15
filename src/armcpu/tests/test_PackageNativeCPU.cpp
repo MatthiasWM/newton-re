@@ -24,6 +24,9 @@
 #include "RSSymbols.h"
 #include "ROMImport.h"
 #include "memory/host/KernelHeap.h"
+#include "ARMWorld.h"
+#include "PublicJumpTable.h"
+#include <initializer_list>
 
 #include <stdio.h>
 #include <string.h>
@@ -74,6 +77,127 @@ Stub(RefArg code, unsigned long at, unsigned long entry)
 {
 	Put(code, at, 0xe51ff004);
 	Put(code, at + 4, 0x01800000 + entry);
+}
+
+/*------------------------------------------------------------------------------
+	The public API's runtime and fixed-argument forms, called through their
+	public jump table entries as a package's code calls them.
+------------------------------------------------------------------------------*/
+
+// an entry's address in the public jump table
+static uint32_t
+PublicEntry(const char* name)
+{
+	for (unsigned long i = 0; i < kPublicJumpTableCount; i++)
+		if (strcmp(kPublicJumpTable[i].fName, name) == 0)
+			return kPublicJumpTable[i].fSlot;
+	printf("FAIL: no public entry %s\n", name);
+	failures++;
+	return 0;
+}
+
+static uint32_t
+CallEntry(const char* name, std::initializer_list<uint32_t> args)
+{
+	uint32_t a[16];
+	int n = 0;
+	for (uint32_t v : args)
+		a[n++] = v;
+	return ARMCall(PublicEntry(name), a, n);
+}
+
+// a constructor or destructor for __vec_new/__vec_delete: notes each object
+static uint32_t	gMade[8];
+static int		gMadeCount = 0;
+static bool
+NoteObject(void*, ARMTrapContext& c)
+{
+	if (gMadeCount < 8)
+		gMade[gMadeCount] = c.Arg(0);
+	gMadeCount++;
+	c.Return(c.Arg(0));
+	return true;
+}
+
+// the sends, run inside an ARM call (a trap: refs cross by its context), each
+// argument a RefStruct in the ARM world made by the public constructor
+static int	gSendFailures = 0;
+static bool
+TrySends(void*, ARMTrapContext& c)
+{
+	auto var = [&](Ref r) { return CallEntry("__ct__9RefStructFCl", { 0, c.RefToARM((intptr_t) r) }); };
+	auto host = [&](uint32_t r) { return (Ref) c.RefToHost(r); };
+	RefVar frame(Eval("{sum: func(a, b, c, d, e, f) a + b + c + d + e + f, _proto: {two: func(a, b) a * b}}"));
+	uint32_t rcvr = var(frame), sum = var(Intern("sum")), two = var(Intern("two")), none = var(Intern("noSuchMethod"));
+	uint32_t n[7];
+	for (int i = 1; i <= 6; i++)
+		n[i] = var(MAKEINT(i));
+	if (host(CallEntry("NSSend__FRC6RefVarN71", { rcvr, sum, n[1], n[2], n[3], n[4], n[5], n[6] })) != MAKEINT(21))
+		{ gSendFailures++; printf("FAIL: NSSend of six arguments\n"); }
+	if (host(CallEntry("NSSendIfDefined__FRC6RefVarN71", { rcvr, sum, n[6], n[5], n[4], n[3], n[2], n[1] })) != MAKEINT(21))
+		{ gSendFailures++; printf("FAIL: NSSendIfDefined of six arguments\n"); }
+	if (host(CallEntry("NSSendIfDefined__FRC6RefVarN31", { rcvr, none, n[1], n[2] })) != NILREF)
+		{ gSendFailures++; printf("FAIL: NSSendIfDefined of a message not defined\n"); }
+	if (host(CallEntry("NSSendProto__FRC6RefVarN31", { rcvr, two, n[3], n[4] })) != MAKEINT(12))
+		{ gSendFailures++; printf("FAIL: NSSendProto of two arguments\n"); }
+	if (host(CallEntry("NSSendProtoIfDefined__FRC6RefVarN31", { rcvr, none, n[3], n[4] })) != NILREF)
+		{ gSendFailures++; printf("FAIL: NSSendProtoIfDefined of a message not defined\n"); }
+	RefVar args(MakeArray(2));
+	SetArraySlot(args, 0, MAKEINT(5));
+	SetArraySlot(args, 1, MAKEINT(6));
+	if (host(CallEntry("NSSendProtoWithArgArray__FRC6RefVarN21", { rcvr, two, var(args) })) != MAKEINT(30))
+		{ gSendFailures++; printf("FAIL: NSSendProtoWithArgArray\n"); }
+	Eval("DefGlobalFn('runtimeSum6, func(a, b, c, d, e, f) a + b + c + d + e + f)");
+	if (host(CallEntry("NSCallGlobalFn__FRC6RefVarN61", { var(Intern("runtimeSum6")), n[1], n[2], n[3], n[4], n[5], n[6] })) != MAKEINT(21))
+		{ gSendFailures++; printf("FAIL: NSCallGlobalFn of six arguments\n"); }
+	c.Return(0);
+	return true;
+}
+
+static void
+TestRuntimeForms(void)
+{
+	// MinMax and UMinMax: the value kept between the two
+	EXPECT(CallEntry("MinMax_noninline__FlN21", { 0, 10, 5 }) == 5);
+	EXPECT(CallEntry("MinMax_noninline__FlN21", { 0, (uint32_t) -3, 5 }) == 0);
+	EXPECT(CallEntry("UMinMax_noninline__FUlN21", { 0, 0xffffffff, 5 }) == 5);
+	// the immediates
+	EXPECT(CallEntry("MAKECHAR__Fc", { 0x141 }) == (uint32_t) MAKECHAR('A'));
+	EXPECT(CallEntry("MakeChar__FUc", { 'A' }) == (uint32_t) MAKECHAR('A'));
+	EXPECT(CallEntry("MAKECHAR__FUs", { 0x20ac }) == (uint32_t) MAKECHAR(0x20ac));
+	EXPECT(CallEntry("MAKEIMMED__FUlT1", { 0, 0x5555 }) == (uint32_t) kSymbolClass);
+	// the RefArg tests, on RefStructs made by the public constructor
+	uint32_t i3 = CallEntry("__ct__9RefStructFCl", { 0, (uint32_t) MAKEINT(3) });
+	uint32_t ca = CallEntry("__ct__9RefStructFCl", { 0, (uint32_t) MAKECHAR('A') });
+	EXPECT(i3 != 0 && ca != 0);
+	EXPECT(CallEntry("IsInt__FRC6RefVar", { i3 }) == 1 && CallEntry("IsInt__FRC6RefVar", { ca }) == 0);
+	EXPECT(CallEntry("IsChar__FRC6RefVar", { ca }) == 1 && CallEntry("IsChar__FRC6RefVar", { i3 }) == 0);
+	EXPECT(CallEntry("IsPtr__FRC6RefVar", { i3 }) == 0 && CallEntry("IsRealPtr__FRC6RefVar", { i3 }) == 0);
+	EXPECT(CallEntry("IsMagicPtr__FRC6RefVar", { ca }) == 0);
+	uint32_t copy = CallEntry("__ct__9RefStructFRC9RefStruct", { 0, i3 });
+	EXPECT(copy != 0 && CallEntry("IsInt__FRC6RefVar", { copy }) == 1);
+	// memory: SetMemory, realloc, errno's address
+	uint32_t p = ARMAlloc(8, false);
+	CallEntry("SetMemory__FPvlc", { p, 8, 0xab });
+	uint8_t b = 0;
+	EXPECT(ARMRead8(p + 7, &b) && b == 0xab);
+	uint32_t q = CallEntry("realloc", { p, 32 });
+	EXPECT(q != 0 && ARMRead8(q + 7, &b) && b == 0xab);
+	EXPECT(CallEntry("realloc__FPvUi", { 0, 8 }) != 0);
+	uint32_t e = CallEntry("__GetErrNo__Fv", {});
+	EXPECT(e != 0 && CallEntry("__GetErrNo__Fv", {}) == e);
+	// array new and delete: each object made in order, destroyed last first
+	uint32_t note = ARMHostTrap(NoteObject, nil, "NoteObject");
+	gMadeCount = 0;
+	uint32_t block = CallEntry("__vec_new__FPviT2T1", { 0, 3, 8, note });
+	EXPECT(block != 0 && gMadeCount == 3 && gMade[0] == block && gMade[1] == block + 8 && gMade[2] == block + 16);
+	gMadeCount = 0;
+	CallEntry("__vec_delete__FPviT2T1N22", { block, 3, 8, note, 1 });
+	EXPECT(gMadeCount == 3 && gMade[0] == block + 16 && gMade[2] == block);
+	// the sends and calls of every arity, from inside an ARM call
+	gSendFailures = 0;
+	ARMCall(ARMHostTrap(TrySends, nil, "TrySends"), nil, 0);
+	failures += gSendFailures;
 }
 
 int
@@ -491,7 +615,32 @@ main()
 		"__nw__FUi", "__opl__6RefVarCFv", "__opl__9RefStructCFv",
 		"atoi", "atol", "sprintf", "strcat", "strchr", "strcmp", "strncat",
 		"strncmp", "strncpy", "strpbrk", "strstr", "strtok",
+		// the public API's runtime and fixed-argument forms (answered for any
+		// package's code: none of the fixtures' reaches them)
+		"NSSend__FRC6RefVarN21", "NSSend__FRC6RefVarN61", "NSSend__FRC6RefVarN71",
+		"NSSendWithArgArray__FRC6RefVarN21", "NSSendProto__FRC6RefVarT1", "NSSendProto__FRC6RefVarN21",
+		"NSSendProto__FRC6RefVarN31", "NSSendProto__FRC6RefVarN41", "NSSendProto__FRC6RefVarN51",
+		"NSSendProto__FRC6RefVarN61", "NSSendProto__FRC6RefVarN71", "NSSendProtoWithArgArray__FRC6RefVarN21",
+		"NSSendIfDefined__FRC6RefVarT1", "NSSendIfDefined__FRC6RefVarN21", "NSSendIfDefined__FRC6RefVarN31",
+		"NSSendIfDefined__FRC6RefVarN41", "NSSendIfDefined__FRC6RefVarN51", "NSSendIfDefined__FRC6RefVarN61",
+		"NSSendIfDefined__FRC6RefVarN71", "NSSendIfDefinedWithArgArray__FRC6RefVarN21",
+		"NSSendProtoIfDefined__FRC6RefVarT1", "NSSendProtoIfDefined__FRC6RefVarN21",
+		"NSSendProtoIfDefined__FRC6RefVarN31", "NSSendProtoIfDefined__FRC6RefVarN41",
+		"NSSendProtoIfDefined__FRC6RefVarN51", "NSSendProtoIfDefined__FRC6RefVarN61",
+		"NSSendProtoIfDefined__FRC6RefVarN71", "NSSendProtoIfDefinedWithArgArray__FRC6RefVarN21",
+		"NSCallGlobalFn__FRC6RefVarN41", "NSCallGlobalFn__FRC6RefVarN51", "NSCallGlobalFn__FRC6RefVarN61",
+		"NSCallGlobalFnWithArgArray__FRC6RefVarT1", "NSSendRootMessage__FRC6RefVar",
+		"NSSendRootMessage__FRC6RefVarT1", "NSSendRootMessage__FRC6RefVarN21", "NSSendRootMessage__FRC6RefVarN31",
+		"NSSendRootMessage__FRC6RefVarN41", "NSSendRootMessage__FRC6RefVarN51", "NSSendRootMessage__FRC6RefVarN61",
+		"NSSendRootMessageWithArgArray__FRC6RefVarT1", "IsInt__FRC6RefVar", "IsChar__FRC6RefVar",
+		"IsPtr__FRC6RefVar", "IsMagicPtr__FRC6RefVar", "IsRealPtr__FRC6RefVar", "ReplaceObject__FRC6RefVarT1",
+		"MAKEIMMED__FUlT1", "MAKECHAR__Fc", "MAKECHAR__FUs", "MakeChar__FUc", "SymbolHash__Fl",
+		"MinMax_noninline__FlN21", "UMinMax_noninline__FUlN21", "SetMemory__FPvlc", "realloc", "realloc__FPvUi",
+		"__GetErrNo__Fv", "__vec_new__FPviT2T1", "__vec_delete__FPviT2T1N22", "__ct__6RefVarFRC6RefVar",
+		"__ct__9RefStructFCl", "__ct__9RefStructFRC6RefVar", "__ct__9RefStructFRC9RefStruct",
+		"__ct__10TObjectPtrFRC9RefStruct",
 	};
+	TestRuntimeForms();
 	for (const char* n : kReached)
 		if (!PackageNativeCPUAnswers(n))
 		{

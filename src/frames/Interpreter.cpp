@@ -3856,6 +3856,54 @@ NSSend(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3)
 }
 
 
+// ROM 0x002f0070 NSSend__FRC6RefVarN51
+Ref
+NSSend(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindImplementor(receiver, message));
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	return DoSend(receiver, implementor, message, 4);
+}
+
+
+// ROM 0x002f012c NSSend__FRC6RefVarN61
+Ref
+NSSend(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindImplementor(receiver, message));
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	gInterpreter->PushValue(a5);
+	return DoSend(receiver, implementor, message, 5);
+}
+
+
+// ROM 0x002f01f8 NSSend__FRC6RefVarN71
+Ref
+NSSend(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5, RefArg a6)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindImplementor(receiver, message));
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	gInterpreter->PushValue(a5);
+	gInterpreter->PushValue(a6);
+	return DoSend(receiver, implementor, message, 6);
+}
+
+
 // ROM 0x002f02d4 NSSendWithArgArray__FRC6RefVarN21
 Ref
 NSSendWithArgArray(RefArg receiver, RefArg message, RefArg args)
@@ -3910,6 +3958,90 @@ NSSendIfDefined(RefArg receiver, RefArg message, RefArg a1, RefArg a2)
 }
 
 
+// ROM 0x002f0bb8 NSSendIfDefined__FRC6RefVarN41
+Ref
+NSSendIfDefined(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindImplementor(receiver, message));
+	if ((Ref) implementor == NILREF)
+		return NILREF;
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	return DoSend(receiver, implementor, message, 3);
+}
+
+
+// ROM 0x002f0c80 NSSendIfDefined__FRC6RefVarN51
+Ref
+NSSendIfDefined(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindImplementor(receiver, message));
+	if ((Ref) implementor == NILREF)
+		return NILREF;
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	return DoSend(receiver, implementor, message, 4);
+}
+
+
+// ROM 0x002f0d58 NSSendIfDefined__FRC6RefVarN61
+Ref
+NSSendIfDefined(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindImplementor(receiver, message));
+	if ((Ref) implementor == NILREF)
+		return NILREF;
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	gInterpreter->PushValue(a5);
+	return DoSend(receiver, implementor, message, 5);
+}
+
+
+// ROM 0x002f0ec0 NSSendIfDefined__FRC6RefVarN71
+Ref
+NSSendIfDefined(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5, RefArg a6)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindImplementor(receiver, message));
+	if ((Ref) implementor == NILREF)
+		return NILREF;
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	gInterpreter->PushValue(a5);
+	gInterpreter->PushValue(a6);
+	return DoSend(receiver, implementor, message, 6);
+}
+
+
+// ROM 0x002f0fb8 NSSendIfDefinedWithArgArray__FRC6RefVarN21
+Ref
+NSSendIfDefinedWithArgArray(RefArg receiver, RefArg message, RefArg args)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindImplementor(receiver, message));
+	if ((Ref) implementor == NILREF)
+		return NILREF;
+	long numArgs = PushArgArray(args);
+	return DoSend(receiver, implementor, message, numArgs);
+}
+
+
 // ROM 0x002f0354 NSSendProto__FRC6RefVarT1
 Ref
 NSSendProto(RefArg receiver, RefArg message)
@@ -3930,6 +4062,93 @@ NSSendProto(RefArg receiver, RefArg message, RefArg a1)
 	RefVar implementor(FindProtoImplementor(receiver, message));
 	gInterpreter->PushValue(a1);
 	return DoSend(receiver, implementor, message, 1);
+}
+
+
+// ROM 0x002f0454 NSSendProto__FRC6RefVarN31
+Ref
+NSSendProto(RefArg receiver, RefArg message, RefArg a1, RefArg a2)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	return DoSend(receiver, implementor, message, 2);
+}
+
+
+// ROM 0x002f04f0 NSSendProto__FRC6RefVarN41
+Ref
+NSSendProto(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	return DoSend(receiver, implementor, message, 3);
+}
+
+
+// ROM 0x002f06e4 NSSendProto__FRC6RefVarN51
+Ref
+NSSendProto(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	return DoSend(receiver, implementor, message, 4);
+}
+
+
+// ROM 0x002f07a0 NSSendProto__FRC6RefVarN61
+Ref
+NSSendProto(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	gInterpreter->PushValue(a5);
+	return DoSend(receiver, implementor, message, 5);
+}
+
+
+// ROM 0x002f086c NSSendProto__FRC6RefVarN71
+Ref
+NSSendProto(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5, RefArg a6)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	gInterpreter->PushValue(a5);
+	gInterpreter->PushValue(a6);
+	return DoSend(receiver, implementor, message, 6);
+}
+
+
+// ROM 0x002f0948 NSSendProtoWithArgArray__FRC6RefVarN21
+Ref
+NSSendProtoWithArgArray(RefArg receiver, RefArg message, RefArg args)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	long numArgs = PushArgArray(args);
+	return DoSend(receiver, implementor, message, numArgs);
 }
 
 
@@ -3957,6 +4176,105 @@ NSSendProtoIfDefined(RefArg receiver, RefArg message, RefArg a1)
 		return NILREF;
 	gInterpreter->PushValue(a1);
 	return DoSend(receiver, implementor, message, 1);
+}
+
+
+// ROM 0x002f118c NSSendProtoIfDefined__FRC6RefVarN31
+Ref
+NSSendProtoIfDefined(RefArg receiver, RefArg message, RefArg a1, RefArg a2)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	if ((Ref) implementor == NILREF)
+		return NILREF;
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	return DoSend(receiver, implementor, message, 2);
+}
+
+
+// ROM 0x002f1244 NSSendProtoIfDefined__FRC6RefVarN41
+Ref
+NSSendProtoIfDefined(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	if ((Ref) implementor == NILREF)
+		return NILREF;
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	return DoSend(receiver, implementor, message, 3);
+}
+
+
+// ROM 0x002f130c NSSendProtoIfDefined__FRC6RefVarN51
+Ref
+NSSendProtoIfDefined(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	if ((Ref) implementor == NILREF)
+		return NILREF;
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	return DoSend(receiver, implementor, message, 4);
+}
+
+
+// ROM 0x002f13e4 NSSendProtoIfDefined__FRC6RefVarN61
+Ref
+NSSendProtoIfDefined(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	if ((Ref) implementor == NILREF)
+		return NILREF;
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	gInterpreter->PushValue(a5);
+	return DoSend(receiver, implementor, message, 5);
+}
+
+
+// ROM 0x002f14cc NSSendProtoIfDefined__FRC6RefVarN71
+Ref
+NSSendProtoIfDefined(RefArg receiver, RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5, RefArg a6)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	if ((Ref) implementor == NILREF)
+		return NILREF;
+	gInterpreter->PushValue(a1);
+	gInterpreter->PushValue(a2);
+	gInterpreter->PushValue(a3);
+	gInterpreter->PushValue(a4);
+	gInterpreter->PushValue(a5);
+	gInterpreter->PushValue(a6);
+	return DoSend(receiver, implementor, message, 6);
+}
+
+
+// ROM 0x002f15c4 NSSendProtoIfDefinedWithArgArray__FRC6RefVarN21
+Ref
+NSSendProtoIfDefinedWithArgArray(RefArg receiver, RefArg message, RefArg args)
+{
+	if (!IsSymbol(message))
+		ThrowBadTypeWithFrameData(kNSErrNotASymbol, message);
+	RefVar implementor(FindProtoImplementor(receiver, message));
+	if ((Ref) implementor == NILREF)
+		return NILREF;
+	long numArgs = PushArgArray(args);
+	return DoSend(receiver, implementor, message, numArgs);
 }
 
 
@@ -4004,6 +4322,33 @@ NSCallGlobalFn(RefArg name, RefArg a1, RefArg a2, RefArg a3)
 {
 	RefVar fn(NSGetGlobalFn(name));
 	return NSCall(fn, a1, a2, a3);
+}
+
+
+// ROM 0x002f1838 NSCallGlobalFn__FRC6RefVarN41
+Ref
+NSCallGlobalFn(RefArg name, RefArg a1, RefArg a2, RefArg a3, RefArg a4)
+{
+	RefVar fn(NSGetGlobalFn(name));
+	return NSCall(fn, a1, a2, a3, a4);
+}
+
+
+// ROM 0x002f1890 NSCallGlobalFn__FRC6RefVarN51
+Ref
+NSCallGlobalFn(RefArg name, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5)
+{
+	RefVar fn(NSGetGlobalFn(name));
+	return NSCall(fn, a1, a2, a3, a4, a5);
+}
+
+
+// ROM 0x002f18e8 NSCallGlobalFn__FRC6RefVarN61
+Ref
+NSCallGlobalFn(RefArg name, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5, RefArg a6)
+{
+	RefVar fn(NSGetGlobalFn(name));
+	return NSCall(fn, a1, a2, a3, a4, a5, a6);
 }
 
 

@@ -2080,6 +2080,55 @@ NSSendRootMessage(RefArg message, RefArg a1)
 }
 
 
+// ROM 0x001b39bc NSSendRootMessage__FRC6RefVarN21
+// (the root view's context and the message handed to NSSend)
+Ref
+NSSendRootMessage(RefArg message, RefArg a1, RefArg a2)
+{
+	return NSSend(gRootView->fContext, message, a1, a2);
+}
+
+
+// ROM 0x001b4320 NSSendRootMessage__FRC6RefVarN31
+Ref
+NSSendRootMessage(RefArg message, RefArg a1, RefArg a2, RefArg a3)
+{
+	return NSSend(gRootView->fContext, message, a1, a2, a3);
+}
+
+
+// ROM 0x001b4840 NSSendRootMessage__FRC6RefVarN41
+Ref
+NSSendRootMessage(RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4)
+{
+	return NSSend(gRootView->fContext, message, a1, a2, a3, a4);
+}
+
+
+// ROM 0x001b4cf0 NSSendRootMessage__FRC6RefVarN51
+Ref
+NSSendRootMessage(RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5)
+{
+	return NSSend(gRootView->fContext, message, a1, a2, a3, a4, a5);
+}
+
+
+// ROM 0x001b564c NSSendRootMessage__FRC6RefVarN61
+Ref
+NSSendRootMessage(RefArg message, RefArg a1, RefArg a2, RefArg a3, RefArg a4, RefArg a5, RefArg a6)
+{
+	return NSSend(gRootView->fContext, message, a1, a2, a3, a4, a5, a6);
+}
+
+
+// ROM 0x001b5b34 NSSendRootMessageWithArgArray__FRC6RefVarT1
+Ref
+NSSendRootMessageWithArgArray(RefArg message, RefArg args)
+{
+	return DoMessage(gRootView->fContext, message, args);
+}
+
+
 /*------------------------------------------------------------------------------
 	S h o w i n g   a   v i e w   w h i l e   a   m o d a l   d i a l o g
 	i s   u p

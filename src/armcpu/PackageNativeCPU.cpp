@@ -1749,6 +1749,7 @@ GLUE(Glue_AllocateFrameWithMap)	{ w.Return(cpu, w.ToARM(AllocateFrameWithMap(Ref
 GLUE(Glue_AllocateArray)		{ w.Return(cpu, w.ToARM(AllocateArray(RefVar(w.ArgRef(cpu.r[0])), (int32_t) cpu.r[1]))); return true; }
 GLUE(Glue_AddArraySlot)			{ AddArraySlot(RefVar(w.ArgRef(cpu.r[0])), RefVar(w.ArgRef(cpu.r[1]))); w.Return(cpu, 0); return true; }
 GLUE(Glue_SetFrameSlot)			{ SetFrameSlot(RefVar(w.ArgRef(cpu.r[0])), RefVar(w.ArgRef(cpu.r[1])), RefVar(w.ArgRef(cpu.r[2]))); w.Return(cpu, 0); return true; }
+// ROM 0x00319864 MAKEBOOLEAN__Fi
 GLUE(Glue_MAKEBOOLEAN)			{ w.Return(cpu, cpu.r[0] != 0 ? (uint32_t) TRUEREF : (uint32_t) NILREF); return true; }
 GLUE(Glue_LockRef)				{ LockRef(w.ToHost(cpu.r[0])); w.Return(cpu, 0); return true; }
 GLUE(Glue_UnlockRef)			{ Ref obj = w.ToHost(cpu.r[0]); UnlockBinaryWindow(obj); UnlockRef(obj); w.Return(cpu, 0); return true; }
@@ -2138,7 +2139,8 @@ GLUE(Glue_RefStruct_ctor)
 	w.Return(cpu, self);
 	return true;
 }
-// ROM 0x00079ee4 __dt__6RefVarFv (and 0x00079f80 __dt__9RefStructFv, which
+// ROM 0x00079ee4 __dt__6RefVarFv
+// ROM 0x00079f80 __dt__9RefStructFv (the RefVar's destructor, which
 // is it with the flags nought and then the delete)
 GLUE(Glue_RefVar_dtor)
 {
@@ -2200,8 +2202,11 @@ GLUE(Glue_MakeSymbol)
 	return true;
 }
 GLUE(Glue_LengthArg)			{ w.Return(cpu, (uint32_t) Length(REFARG(0))); return true; }
+// ROM 0x0031c878 GetFrameSlot__FRC6RefVarT1
 GLUE(Glue_GetFrameSlot)			{ w.Return(cpu, w.ToARM(GetFrameSlot(REFARG(0), REFARG(1)))); return true; }
+// ROM 0x0031c80c SetArraySlot__FRC6RefVarlT1
 GLUE(Glue_SetArraySlot)			{ SetArraySlot(REFARG(0), (int32_t) cpu.r[1], REFARG(2)); w.Return(cpu, 0); return true; }
+// ROM 0x0031c800 GetArraySlot__FRC6RefVarl
 GLUE(Glue_GetArraySlot)			{ w.Return(cpu, w.ToARM(GetArraySlot(REFARG(0), (int32_t) cpu.r[1]))); return true; }
 GLUE(Glue_SetVariable)			{ w.Return(cpu, SetVariable(REFARG(0), REFARG(1), REFARG(2)) ? 1 : 0); return true; }
 // (NEWTON_TRACE_ARMCPU=2 names the global function)
@@ -2490,7 +2495,9 @@ GLUE(Glue_IsString)				{ w.Return(cpu, IsString(RefVar(w.ArgRef(cpu.r[0]))) ? 1 
 GLUE(Glue_IsInstance)			{ w.Return(cpu, IsInstance(RefVar(w.ArgRef(cpu.r[0])), RefVar(w.ArgRef(cpu.r[1]))) ? 1 : 0); return true; }
 GLUE(Glue_IsSubclassRef)		{ w.Return(cpu, IsSubclassRef(w.ToHost(cpu.r[0]), w.ToHost(cpu.r[1])) ? 1 : 0); return true; }
 GLUE(Glue_IsBinary)				{ w.Return(cpu, IsBinary(RefVar(w.ArgRef(cpu.r[0]))) ? 1 : 0); return true; }
-GLUE(Glue_EQ)					{ w.Return(cpu, EQ(RefVar(w.ArgRef(cpu.r[0])), RefVar(w.ArgRef(cpu.r[1]))) ? 1 : 0); return true; }	// (ROM 0x0031c820: EQRef of the two refs)
+// ROM 0x0031c820 EQ__FRC6RefVarT1
+// (EQRef of the two refs)
+GLUE(Glue_EQ)					{ w.Return(cpu, EQ(RefVar(w.ArgRef(cpu.r[0])), RefVar(w.ArgRef(cpu.r[1]))) ? 1 : 0); return true; }
 GLUE(Glue_IsNumber)				{ w.Return(cpu, IsNumber(RefVar(w.ArgRef(cpu.r[0]))) ? 1 : 0); return true; }
 GLUE(Glue_CoerceToInt)			{ w.Return(cpu, (uint32_t) (int32_t) NarrowToWord(CoerceToInt(RefVar(w.ArgRef(cpu.r[0]))), "armcpu CoerceToInt")); return true; }
 GLUE(Glue_IsReal)				{ w.Return(cpu, IsReal(RefVar(w.ArgRef(cpu.r[0]))) ? 1 : 0); return true; }
@@ -2930,6 +2937,337 @@ GLUE(Glue_NativeEntry)
 	return true;
 }
 
+/*------------------------------------------------------------------------------
+	The rest of the public API's runtime and fixed-argument forms
+
+	The fixed-argument sends, calls and root messages of every arity the
+	public jump table has, the RefArg tests and makers the Newton C++ Tools'
+	headers made out of line, and the C and C++ run-time helpers a native
+	module calls (array new and delete, realloc, the errno address).
+------------------------------------------------------------------------------*/
+
+// a register argument by reference (REFARG's, which is no longer defined here)
+#define ARGREF(n)	RefVar(w.ArgRef(cpu.r[n]))
+
+// an argument by reference: the first four in r0-r3, the rest on the stack
+static Ref
+RefArgAt(TNativeWorld& w, TARMCPU& cpu, int i)
+{
+	return w.ArgRef(i < 4 ? cpu.r[i] : w.Arg(cpu, i));
+}
+
+// arguments first..first+n-1 as an array (what the WithArgArray forms take:
+// they push each element as the fixed forms push their arguments)
+static Ref
+RefArgsArray(TNativeWorld& w, TARMCPU& cpu, int first, int n)
+{
+	RefVar args(MakeArray(n));
+	for (int k = 0; k < n; k++)
+		SetArraySlot(args, k, RefVar(RefArgAt(w, cpu, first + k)));
+	return args;
+}
+
+enum { kGlueSend, kGlueSendIfDefined, kGlueSendProto, kGlueSendProtoIfDefined };
+
+static Ref
+SendWithArgArray(int kind, RefArg receiver, RefArg message, RefArg args)
+{
+	switch (kind)
+	{
+	case kGlueSendIfDefined:		return NSSendIfDefinedWithArgArray(receiver, message, args);
+	case kGlueSendProto:			return NSSendProtoWithArgArray(receiver, message, args);
+	case kGlueSendProtoIfDefined:	return NSSendProtoIfDefinedWithArgArray(receiver, message, args);
+	default:						return NSSendWithArgArray(receiver, message, args);
+	}
+}
+
+// ROM 0x002efdbc NSSend__FRC6RefVarN21
+// ROM 0x002f012c NSSend__FRC6RefVarN61
+// ROM 0x002f01f8 NSSend__FRC6RefVarN71
+// ROM 0x002f0354 NSSendProto__FRC6RefVarT1
+// ROM 0x002f03c8 NSSendProto__FRC6RefVarN21
+// ROM 0x002f0454 NSSendProto__FRC6RefVarN31
+// ROM 0x002f04f0 NSSendProto__FRC6RefVarN41
+// ROM 0x002f06e4 NSSendProto__FRC6RefVarN51
+// ROM 0x002f07a0 NSSendProto__FRC6RefVarN61
+// ROM 0x002f086c NSSendProto__FRC6RefVarN71
+// ROM 0x002f09c8 NSSendIfDefined__FRC6RefVarT1
+// ROM 0x002f0a58 NSSendIfDefined__FRC6RefVarN21
+// ROM 0x002f0b00 NSSendIfDefined__FRC6RefVarN31
+// ROM 0x002f0bb8 NSSendIfDefined__FRC6RefVarN41
+// ROM 0x002f0c80 NSSendIfDefined__FRC6RefVarN51
+// ROM 0x002f0d58 NSSendIfDefined__FRC6RefVarN61
+// ROM 0x002f0ec0 NSSendIfDefined__FRC6RefVarN71
+// ROM 0x002f1054 NSSendProtoIfDefined__FRC6RefVarT1
+// ROM 0x002f10e4 NSSendProtoIfDefined__FRC6RefVarN21
+// ROM 0x002f118c NSSendProtoIfDefined__FRC6RefVarN31
+// ROM 0x002f1244 NSSendProtoIfDefined__FRC6RefVarN41
+// ROM 0x002f130c NSSendProtoIfDefined__FRC6RefVarN51
+// ROM 0x002f13e4 NSSendProtoIfDefined__FRC6RefVarN61
+// ROM 0x002f14cc NSSendProtoIfDefined__FRC6RefVarN71
+// a message with n arguments: the receiver, the message, then the arguments
+template <int kind, int n>
+static bool
+Glue_SendN(TNativeWorld& w, TARMCPU& cpu)
+{
+	RefVar args(RefArgsArray(w, cpu, 2, n));
+	w.Return(cpu, w.ToARM(SendWithArgArray(kind, RefVar(RefArgAt(w, cpu, 0)), RefVar(RefArgAt(w, cpu, 1)), args)));
+	return true;
+}
+
+// ROM 0x002f02d4 NSSendWithArgArray__FRC6RefVarN21
+// ROM 0x002f0948 NSSendProtoWithArgArray__FRC6RefVarN21
+// ROM 0x002f0fb8 NSSendIfDefinedWithArgArray__FRC6RefVarN21
+// ROM 0x002f15c4 NSSendProtoIfDefinedWithArgArray__FRC6RefVarN21
+template <int kind>
+static bool
+Glue_SendArray(TNativeWorld& w, TARMCPU& cpu)
+{
+	w.Return(cpu, w.ToARM(SendWithArgArray(kind, ARGREF(0), ARGREF(1), ARGREF(2))));
+	return true;
+}
+
+// ROM 0x002f1838 NSCallGlobalFn__FRC6RefVarN41
+// ROM 0x002f1890 NSCallGlobalFn__FRC6RefVarN51
+// ROM 0x002f18e8 NSCallGlobalFn__FRC6RefVarN61
+template <int n>
+static bool
+Glue_CallGlobalFnN(TNativeWorld& w, TARMCPU& cpu)
+{
+	TraceGlobalFn(w, cpu);
+	RefVar args(RefArgsArray(w, cpu, 1, n));
+	w.Return(cpu, w.ToARM(NSCallGlobalFnWithArgArray(ARGREF(0), args)));
+	return true;
+}
+
+// ROM 0x002f1940 NSCallGlobalFnWithArgArray__FRC6RefVarT1
+GLUE(Glue_CallGlobalFnArray)	{ TraceGlobalFn(w, cpu); w.Return(cpu, w.ToARM(NSCallGlobalFnWithArgArray(ARGREF(0), ARGREF(1)))); return true; }
+
+// ROM 0x001b1fe4 NSSendRootMessage__FRC6RefVar
+// ROM 0x001b2a94 NSSendRootMessage__FRC6RefVarT1
+// ROM 0x001b39bc NSSendRootMessage__FRC6RefVarN21
+// ROM 0x001b4320 NSSendRootMessage__FRC6RefVarN31
+// ROM 0x001b4840 NSSendRootMessage__FRC6RefVarN41
+// ROM 0x001b4cf0 NSSendRootMessage__FRC6RefVarN51
+// ROM 0x001b564c NSSendRootMessage__FRC6RefVarN61
+// ROM 0x001b5b34 NSSendRootMessageWithArgArray__FRC6RefVarT1
+// a message to the root view's context.  DEVIATION: the context is GetRoot()'s
+// (the global function answers the root view's context), not read from
+// gRootView, which the views library - above this one - keeps.
+static Ref
+RootContext(void)
+{
+	return NSCallGlobalFn(RefVar(Intern("GetRoot")));
+}
+
+template <int n>
+static bool
+Glue_RootMessageN(TNativeWorld& w, TARMCPU& cpu)
+{
+	RefVar args(RefArgsArray(w, cpu, 1, n));
+	RefVar root(RootContext());
+	w.Return(cpu, w.ToARM(NSSendWithArgArray(root, ARGREF(0), args)));
+	return true;
+}
+
+GLUE(Glue_RootMessageArray)
+{
+	RefVar root(RootContext());
+	w.Return(cpu, w.ToARM(DoMessage(root, ARGREF(0), ARGREF(1))));
+	return true;
+}
+
+// a RefArg's ref
+static uint32_t
+RefOfArg(TNativeWorld& w, uint32_t var)
+{
+	uint32_t ref = 0;
+	w.Read32(RefHandleOf(w, var), &ref);
+	return ref;
+}
+
+// ROM 0x0031c6c4 IsInt__FRC6RefVar
+GLUE(Glue_IsIntArg)				{ w.Return(cpu, (RefOfArg(w, cpu.r[0]) & 3) == 0 ? 1 : 0); return true; }
+// ROM 0x0031c6e0 IsChar__FRC6RefVar
+GLUE(Glue_IsCharArg)
+{
+	uint32_t ref = RefOfArg(w, cpu.r[0]);
+	w.Return(cpu, (ref & 3) == 2 && ((ref >> 2) & 3) == 1 ? 1 : 0);
+	return true;
+}
+// ROM 0x0031c70c IsPtr__FRC6RefVar
+// (the ref's low bit, as the ROM answers it: a magic pointer is one too)
+GLUE(Glue_IsPtrArg)				{ w.Return(cpu, RefOfArg(w, cpu.r[0]) & 1); return true; }
+// ROM 0x0031c75c IsMagicPtr__FRC6RefVar
+GLUE(Glue_IsMagicPtrArg)		{ w.Return(cpu, (RefOfArg(w, cpu.r[0]) & 3) == 3 ? 1 : 0); return true; }
+// ROM 0x0031c77c IsRealPtr__FRC6RefVar
+GLUE(Glue_IsRealPtrArg)			{ w.Return(cpu, (RefOfArg(w, cpu.r[0]) & 3) == 1 ? 1 : 0); return true; }
+// ROM 0x0031c834 ReplaceObject__FRC6RefVarT1
+GLUE(Glue_ReplaceObjectArg)		{ ReplaceObjectRef(w.ToHost(RefOfArg(w, cpu.r[0])), w.ToHost(RefOfArg(w, cpu.r[1]))); w.Return(cpu, 0); return true; }
+// ROM 0x00319510 MAKEIMMED__FUlT1
+// an immediate of a type (r0) and a value (r1)
+static uint32_t
+MakeImmed(uint32_t type, uint32_t value)
+{
+	return (((value << 2) | type) << 2) | 2;
+}
+GLUE(Glue_MAKEIMMED)			{ w.Return(cpu, MakeImmed(cpu.r[0], cpu.r[1])); return true; }
+// ROM 0x00319520 MAKECHAR__Fc
+// ROM 0x0031c69c MakeChar__FUc
+GLUE(Glue_MAKECHARc)			{ w.Return(cpu, MakeImmed(1, cpu.r[0] & 0xff)); return true; }
+// ROM 0x00319818 MAKECHAR__FUs
+GLUE(Glue_MAKECHARus)			{ w.Return(cpu, MakeImmed(1, cpu.r[0] & 0xffff)); return true; }
+// ROM 0x0035865c SymbolHash__Fl
+GLUE(Glue_SymbolHash)			{ w.Return(cpu, (uint32_t) SymbolHash(w.ToHost(cpu.r[0]))); return true; }
+// ROM 0x002725d4 MinMax_noninline__FlN21
+// the value (r1) kept between low (r0) and high (r2): max(low, value), then min with high
+GLUE(Glue_MinMax)
+{
+	int32_t v = (int32_t) cpu.r[0] <= (int32_t) cpu.r[1] ? (int32_t) cpu.r[1] : (int32_t) cpu.r[0];
+	w.Return(cpu, (uint32_t) (v >= (int32_t) cpu.r[2] ? (int32_t) cpu.r[2] : v));
+	return true;
+}
+// ROM 0x002725e8 UMinMax_noninline__FUlN21
+GLUE(Glue_UMinMax)
+{
+	uint32_t v = cpu.r[0] <= cpu.r[1] ? cpu.r[1] : cpu.r[0];
+	w.Return(cpu, v >= cpu.r[2] ? cpu.r[2] : v);
+	return true;
+}
+// ROM 0x0011f320 SetMemory__FPvlc
+// (FillBytes with the byte)
+GLUE(Glue_SetMemory)
+{
+	for (uint32_t i = 0; i < cpu.r[1]; i++)
+		w.Write8(cpu.r[0] + i, (uint8_t) cpu.r[2]);
+	w.Return(cpu, 0);
+	return true;
+}
+// ROM 0x001e2c58 realloc
+// ROM 0x003ae4f8 realloc__FPvUi
+// (ReallocPtr: a new block of the ARM heap, the old one's bytes copied, the
+// old one given back; nought, a block afresh)
+GLUE(Glue_realloc)
+{
+	uint32_t old = cpu.r[0], size = cpu.r[1];
+	uint32_t fresh = HeapAlloc(size, false);
+	if (fresh != 0 && old != 0)
+	{
+		uint32_t had = gARMHeap.BlockSize(old);
+		for (uint32_t i = 0; i < had && i < size; i++)
+		{
+			uint8_t b = 0;
+			w.Read8(old + i, &b);
+			w.Write8(fresh + i, b);
+		}
+		gARMHeap.Free(old);
+	}
+	w.Return(cpu, fresh);
+	return true;
+}
+// ROM 0x0025bba0 __GetErrNo__Fv
+// errno's address: the ROM's is gErrNo in supervisor mode, else a word of
+// the task's globals.  DEVIATION: a word of the ARM heap, one for all the
+// ARM code (each call runs on the calling task)
+GLUE(Glue_GetErrNo)
+{
+	static uint32_t sErrNo = 0;
+	if (sErrNo == 0)
+		sErrNo = HeapAlloc(4, true);
+	w.Return(cpu, sErrNo);
+	return true;
+}
+// ROM 0x002ba230 __vec_new__FPviT2T1
+// an array of count (r1) objects of a size (r2), made (malloc'ed when r0 is
+// nought, answering nought when that fails) and each constructed by the
+// function at r3, in order
+GLUE(Glue_vec_new)
+{
+	uint32_t block = cpu.r[0], count = cpu.r[1], size = cpu.r[2], ctor = cpu.r[3];
+	if (block == 0)
+	{
+		block = HeapAlloc(size * count, false);
+		if (block == 0)
+		{
+			w.Return(cpu, 0);
+			return true;
+		}
+	}
+	for (int32_t i = 0; i < (int32_t) count; i++)
+	{
+		uint32_t a = block + (uint32_t) i * size;
+		ARMCall(ctor, &a, 1);
+	}
+	w.Return(cpu, block);
+	return true;
+}
+// ROM 0x002ba2a0 __vec_delete__FPviT2T1N22
+// an array's objects destroyed by the function at r3 (with nought, the last
+// first), count -1 meaning the block's size over the object's; then the
+// block deleted if the fifth argument says so
+GLUE(Glue_vec_delete)
+{
+	uint32_t block = cpu.r[0], size = cpu.r[2], dtor = cpu.r[3];
+	int32_t count = (int32_t) cpu.r[1];
+	uint32_t deleteIt = w.Arg(cpu, 4);
+	if (block == 0)
+	{
+		w.Return(cpu, 0);
+		return true;
+	}
+	if (count == -1)
+		count = size != 0 ? (int32_t) (gARMHeap.BlockSize(block) / size) : 0;
+	uint32_t a = block + (uint32_t) (count - 1) * size;
+	for (int32_t i = 0; i < count; i++, a -= size)
+	{
+		uint32_t args[2] = { a, 0 };
+		ARMCall(dtor, args, 2);
+	}
+	if (deleteIt != 0)
+		gARMHeap.Free(block);
+	w.Return(cpu, 0);
+	return true;
+}
+// a RefVar in the ARM world (at self, or made when self is nought) holding a ref
+static uint32_t
+NewARMRefVar(TNativeWorld& w, uint32_t self, uint32_t ref, bool onNoStack)
+{
+	if (self == 0)
+		self = HeapAlloc(4, false);
+	if (self != 0)
+	{
+		uint32_t handle = w.NewRefHandle(ref);
+		w.Write32(self, handle);
+		if (onNoStack)
+			w.Write32(handle + 4, 0);
+	}
+	return self;
+}
+// ROM 0x00079dac __ct__6RefVarFRC6RefVar
+GLUE(Glue_RefVar_copy)			{ w.Return(cpu, NewARMRefVar(w, cpu.r[0], RefOfArg(w, cpu.r[1]), false)); return true; }
+// ROM 0x00079fb0 __ct__9RefStructFCl
+GLUE(Glue_RefStruct_ctorRef)	{ w.Return(cpu, NewARMRefVar(w, cpu.r[0], cpu.r[1], true)); return true; }
+// ROM 0x00079e34 __ct__9RefStructFRC6RefVar
+// ROM 0x00079dec __ct__9RefStructFRC9RefStruct
+GLUE(Glue_RefStruct_copy)		{ w.Return(cpu, NewARMRefVar(w, cpu.r[0], RefOfArg(w, cpu.r[1]), true)); return true; }
+// ROM 0x0031f1c4 __ct__10TObjectPtrFRC9RefStruct
+// a RefStruct of the object, locked; of nil, kNSErrFramesObjectPtrOfNil
+GLUE(Glue_TObjectPtr_ctor)
+{
+	uint32_t ref = RefOfArg(w, cpu.r[1]);
+	uint32_t self = NewARMRefVar(w, cpu.r[0], ref, true);
+	if (self == 0)
+	{
+		w.Return(cpu, 0);
+		return true;
+	}
+	if (ref == NILREF)
+		Throw(exFrames, (void*) kNSErrFramesObjectPtrOfNil, nil);
+	LockRef(w.ToHost(ref));
+	w.Return(cpu, self);
+	return true;
+}
+
 static void
 InitGlue(void)
 {
@@ -2944,6 +3282,70 @@ InitGlue(void)
 	}
 	static const struct { const char* name; GlueFn fn; } kGlue[] =
 	{
+		{ "NSSend__FRC6RefVarN21", Glue_SendN<kGlueSend, 1> },
+		{ "NSSend__FRC6RefVarN61", Glue_SendN<kGlueSend, 5> },
+		{ "NSSend__FRC6RefVarN71", Glue_SendN<kGlueSend, 6> },
+		{ "NSSendProto__FRC6RefVarT1", Glue_SendN<kGlueSendProto, 0> },
+		{ "NSSendProto__FRC6RefVarN21", Glue_SendN<kGlueSendProto, 1> },
+		{ "NSSendProto__FRC6RefVarN31", Glue_SendN<kGlueSendProto, 2> },
+		{ "NSSendProto__FRC6RefVarN41", Glue_SendN<kGlueSendProto, 3> },
+		{ "NSSendProto__FRC6RefVarN51", Glue_SendN<kGlueSendProto, 4> },
+		{ "NSSendProto__FRC6RefVarN61", Glue_SendN<kGlueSendProto, 5> },
+		{ "NSSendProto__FRC6RefVarN71", Glue_SendN<kGlueSendProto, 6> },
+		{ "NSSendIfDefined__FRC6RefVarT1", Glue_SendN<kGlueSendIfDefined, 0> },
+		{ "NSSendIfDefined__FRC6RefVarN21", Glue_SendN<kGlueSendIfDefined, 1> },
+		{ "NSSendIfDefined__FRC6RefVarN31", Glue_SendN<kGlueSendIfDefined, 2> },
+		{ "NSSendIfDefined__FRC6RefVarN41", Glue_SendN<kGlueSendIfDefined, 3> },
+		{ "NSSendIfDefined__FRC6RefVarN51", Glue_SendN<kGlueSendIfDefined, 4> },
+		{ "NSSendIfDefined__FRC6RefVarN61", Glue_SendN<kGlueSendIfDefined, 5> },
+		{ "NSSendIfDefined__FRC6RefVarN71", Glue_SendN<kGlueSendIfDefined, 6> },
+		{ "NSSendProtoIfDefined__FRC6RefVarT1", Glue_SendN<kGlueSendProtoIfDefined, 0> },
+		{ "NSSendProtoIfDefined__FRC6RefVarN21", Glue_SendN<kGlueSendProtoIfDefined, 1> },
+		{ "NSSendProtoIfDefined__FRC6RefVarN31", Glue_SendN<kGlueSendProtoIfDefined, 2> },
+		{ "NSSendProtoIfDefined__FRC6RefVarN41", Glue_SendN<kGlueSendProtoIfDefined, 3> },
+		{ "NSSendProtoIfDefined__FRC6RefVarN51", Glue_SendN<kGlueSendProtoIfDefined, 4> },
+		{ "NSSendProtoIfDefined__FRC6RefVarN61", Glue_SendN<kGlueSendProtoIfDefined, 5> },
+		{ "NSSendProtoIfDefined__FRC6RefVarN71", Glue_SendN<kGlueSendProtoIfDefined, 6> },
+		{ "NSSendWithArgArray__FRC6RefVarN21", Glue_SendArray<kGlueSend> },
+		{ "NSSendProtoWithArgArray__FRC6RefVarN21", Glue_SendArray<kGlueSendProto> },
+		{ "NSSendIfDefinedWithArgArray__FRC6RefVarN21", Glue_SendArray<kGlueSendIfDefined> },
+		{ "NSSendProtoIfDefinedWithArgArray__FRC6RefVarN21", Glue_SendArray<kGlueSendProtoIfDefined> },
+		{ "NSCallGlobalFn__FRC6RefVarN41", Glue_CallGlobalFnN<4> },
+		{ "NSCallGlobalFn__FRC6RefVarN51", Glue_CallGlobalFnN<5> },
+		{ "NSCallGlobalFn__FRC6RefVarN61", Glue_CallGlobalFnN<6> },
+		{ "NSCallGlobalFnWithArgArray__FRC6RefVarT1", Glue_CallGlobalFnArray },
+		{ "NSSendRootMessage__FRC6RefVar", Glue_RootMessageN<0> },
+		{ "NSSendRootMessage__FRC6RefVarT1", Glue_RootMessageN<1> },
+		{ "NSSendRootMessage__FRC6RefVarN21", Glue_RootMessageN<2> },
+		{ "NSSendRootMessage__FRC6RefVarN31", Glue_RootMessageN<3> },
+		{ "NSSendRootMessage__FRC6RefVarN41", Glue_RootMessageN<4> },
+		{ "NSSendRootMessage__FRC6RefVarN51", Glue_RootMessageN<5> },
+		{ "NSSendRootMessage__FRC6RefVarN61", Glue_RootMessageN<6> },
+		{ "NSSendRootMessageWithArgArray__FRC6RefVarT1", Glue_RootMessageArray },
+		{ "IsInt__FRC6RefVar", Glue_IsIntArg },
+		{ "IsChar__FRC6RefVar", Glue_IsCharArg },
+		{ "IsPtr__FRC6RefVar", Glue_IsPtrArg },
+		{ "IsMagicPtr__FRC6RefVar", Glue_IsMagicPtrArg },
+		{ "IsRealPtr__FRC6RefVar", Glue_IsRealPtrArg },
+		{ "ReplaceObject__FRC6RefVarT1", Glue_ReplaceObjectArg },
+		{ "MAKEIMMED__FUlT1", Glue_MAKEIMMED },
+		{ "MAKECHAR__Fc", Glue_MAKECHARc },
+		{ "MAKECHAR__FUs", Glue_MAKECHARus },
+		{ "MakeChar__FUc", Glue_MAKECHARc },
+		{ "SymbolHash__Fl", Glue_SymbolHash },
+		{ "MinMax_noninline__FlN21", Glue_MinMax },
+		{ "UMinMax_noninline__FUlN21", Glue_UMinMax },
+		{ "SetMemory__FPvlc", Glue_SetMemory },
+		{ "realloc", Glue_realloc },
+		{ "realloc__FPvUi", Glue_realloc },
+		{ "__GetErrNo__Fv", Glue_GetErrNo },
+		{ "__vec_new__FPviT2T1", Glue_vec_new },
+		{ "__vec_delete__FPviT2T1N22", Glue_vec_delete },
+		{ "__ct__6RefVarFRC6RefVar", Glue_RefVar_copy },
+		{ "__ct__9RefStructFCl", Glue_RefStruct_ctorRef },
+		{ "__ct__9RefStructFRC6RefVar", Glue_RefStruct_copy },
+		{ "__ct__9RefStructFRC9RefStruct", Glue_RefStruct_copy },
+		{ "__ct__10TObjectPtrFRC9RefStruct", Glue_TObjectPtr_ctor },
 		{ "AllocateRefHandle__Fl", Glue_AllocateRefHandle },
 		{ "DisposeRefHandle__FP9RefHandle", Glue_DisposeRefHandle },
 		{ "GetArraySlotRef__FlT1", Glue_GetArraySlotRef },

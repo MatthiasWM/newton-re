@@ -343,6 +343,34 @@ TestSends()
 	SetFrameSlot(child, SYMBOL("x"), RefVar(MAKEINT(100)));
 	EXPECT(RINT(NSSend(child, RefVar(SYMBOL("m")), RefVar(MAKEINT(5)))) == 105);
 	EXPECT(ISNIL(NSSendIfDefined(child, RefVar(SYMBOL("nothing")))));
+	// the fixed-argument forms of every arity: a method of six arguments
+	// answering their sum, {sum6: func(a, b, c, d, e, f) a + ... + f}
+	{
+		Asm sum;
+		sum.op(kBCGetVar, 3);
+		for (int i = 4; i <= 8; i++)
+			sum.op(kBCGetVar, i).freq(kFFAdd);
+		sum.simple(kBCReturn);
+		RefVar sum6(sum.function(6, 0));
+		SetFrameSlot(frame, SYMBOL("sum6"), sum6);
+		RefVar s(SYMBOL("sum6")), none(SYMBOL("nothing"));
+		RefVar n1(MAKEINT(1)), n2(MAKEINT(2)), n3(MAKEINT(3)), n4(MAKEINT(4)), n5(MAKEINT(5)), n6(MAKEINT(6));
+		EXPECT(RINT(NSSend(frame, s, n1, n2, n3, n4, n5, n6)) == 21);
+		EXPECT(RINT(NSSendIfDefined(frame, s, n1, n2, n3, n4, n5, n6)) == 21);
+		EXPECT(ISNIL(NSSendIfDefined(frame, none, n1, n2, n3, n4, n5, n6)));
+		EXPECT(RINT(NSSendProto(child, s, n1, n2, n3, n4, n5, n6)) == 21);
+		EXPECT(RINT(NSSendProtoIfDefined(child, s, n1, n2, n3, n4, n5, n6)) == 21);
+		EXPECT(ISNIL(NSSendProtoIfDefined(child, none, n1, n2)));
+		RefVar args(MakeArray(6));
+		for (int i = 0; i < 6; i++)
+			SetArraySlot(args, i, RefVar(MAKEINT(i + 1)));
+		EXPECT(RINT(NSSendProtoWithArgArray(child, s, args)) == 21);
+		EXPECT(RINT(NSSendIfDefinedWithArgArray(frame, s, args)) == 21);
+		EXPECT(ISNIL(NSSendProtoIfDefinedWithArgArray(child, none, args)));
+		SetFrameSlot(gFunctionFrame, SYMBOL("testSum6"), sum6);
+		EXPECT(RINT(NSCallGlobalFn(RefVar(SYMBOL("testSum6")), n1, n2, n3, n4, n5, n6)) == 21);
+		EXPECT_STACKS_CLEAN();
+	}
 	THROWS(NSSend(child, RefVar(SYMBOL("nothing"))), "evt.ex.fr.intrp");
 	EXPECT(gThrown != nil);
 	EXPECT_STACKS_CLEAN();
