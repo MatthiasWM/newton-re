@@ -4,7 +4,8 @@
 	Contains:	The event classes (AEvents.h: TAEvent, TAESystemEvent,
 				TPowerEvent, TAEventComparer) and the handlers (AEventHandler.h:
 				TAEventHandler, TAEIdleTimer, TAEHandlerComparer,
-				TAEHandlerIterator, TSystemEventHandler) of a TAppWorld.
+				TAEHandlerIterator, TSystemEventHandler) of a TAppWorld, and
+				the empty TIdleTimer (IdleTimer.h).
 
 				A handler is installed in its world for one (class, id) of
 				event; the world keeps the handlers of one kind chained
@@ -25,6 +26,7 @@
 #include "TimerQueue.h"
 #include "NewtonMemory.h"
 #include "UCErrors.h"
+#include "IdleTimer.h"
 
 
 /* -------------------------------------------------------------------------------
@@ -417,11 +419,80 @@ TAEventHandler::ResetIdle(ULong amount, TimeUnits units)
 }
 
 
+// ROM 0x00025cd0 ResetIdle__14TAEventHandlerFUl9TimeUnitsP6TUPort
+// Nothing (a bare return in the ROM: the public jump table's, for an older
+// interface whose idle timer sent to a port - IdleTimer.h).
+void
+TAEventHandler::ResetIdle(ULong /*amount*/, TimeUnits /*units*/, TUPort* /*port*/)
+{
+}
+
+
 // ROM 0x00025a18 GetNextHandler__14TAEventHandlerFv
 TAEventHandler*
 TAEventHandler::GetNextHandler()
 {
 	return fNext;
+}
+
+
+/* -------------------------------------------------------------------------------
+	TIdleTimer
+	Every function a bare return in the ROM (IdleTimer.h).
+------------------------------------------------------------------------------- */
+
+// ROM 0x00025460 __ct__10TIdleTimerFv
+TIdleTimer::TIdleTimer()
+{
+}
+
+
+// ROM 0x00025464 Init__10TIdleTimerFUl9TimeUnitsN21
+void
+TIdleTimer::Init(ULong /*amount*/, TimeUnits /*units*/, ULong /*refCon*/, ULong /*start*/)
+{
+}
+
+
+// ROM 0x00025aec Start__10TIdleTimerFv
+void
+TIdleTimer::Start()
+{
+}
+
+
+// ROM 0x00025cd8 Start__10TIdleTimerFP6TUPort
+void
+TIdleTimer::Start(TUPort* /*port*/)
+{
+}
+
+
+// ROM 0x00025ccc Stop__10TIdleTimerFv
+void
+TIdleTimer::Stop()
+{
+}
+
+
+// ROM 0x00025888 Reset__10TIdleTimerFv
+void
+TIdleTimer::Reset()
+{
+}
+
+
+// ROM 0x000256b4 Reset__10TIdleTimerFUl9TimeUnits
+void
+TIdleTimer::Reset(ULong /*amount*/, TimeUnits /*units*/)
+{
+}
+
+
+// ROM 0x00025cd4 Reset__10TIdleTimerFUl9TimeUnitsP6TUPort
+void
+TIdleTimer::Reset(ULong /*amount*/, TimeUnits /*units*/, TUPort* /*port*/)
+{
 }
 
 
