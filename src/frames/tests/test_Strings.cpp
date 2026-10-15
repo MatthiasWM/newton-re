@@ -19,6 +19,7 @@
 #include "HostOrder.h"
 #include "NSErrors.h"
 #include "memory/host/KernelHeap.h"
+#include "UnicodeTables.h"
 #include "host/RomBugs.h"
 
 ULong	StringRightTrim(RefArg str);		// frames/StringNatives.cpp
@@ -920,6 +921,37 @@ TestStringHelpers()
 }
 
 
+// ShutDownUnicode, which nothing in the ROM calls: the encodings' maps
+// freed.  The ROM leaves the converters pointing at them and the tables
+// marked in (ROM BUG); the fix takes them out.  Each side is followed by
+// the encodings put back.
+static void
+TestShutDownUnicode()
+{
+	SetRomBugFixed(false);
+	void* fromMap = gUnicode[kMacRomanEncoding].fFromMap;
+	void* toMap = gUnicode[kMacRomanEncoding].fToMap;
+	EXPECT(fromMap != nil && toMap != nil);
+	ShutDownUnicode();
+	// the freed maps still installed (not read: they are freed)
+	EXPECT(gUnicodeInited && gUnicode[kMacRomanEncoding].fFromMap == fromMap && gUnicode[kMacRomanEncoding].fToMap == toMap);
+	InstallBuiltInEncodings();
+	EXPECT(gUnicode[kMacRomanEncoding].fToUnicode != nil);
+
+	SetRomBugFixed(true);
+	ShutDownUnicode();
+	EXPECT(!gUnicodeInited && gUnicode[kMacRomanEncoding].fFromMap == nil && gUnicode[kMacRomanEncoding].fToUnicode == nil);
+	ShutDownUnicode();												// a second time: nothing
+	EXPECT(!gUnicodeInited);
+	InstallBuiltInEncodings();
+	gUnicodeInited = true;
+	unsigned char mac[2] = { 0x8e, 0 };
+	UniChar uni[2];
+	ConvertToUnicode(mac, uni, kMacRomanEncoding, 1);
+	EXPECT(uni[0] == 0xe9);
+}
+
+
 static void
 TestMath()
 {
@@ -1009,6 +1041,7 @@ main()
 #endif
 		TestMath();
 		TestStringHelpers();
+		TestShutDownUnicode();			// (last: it takes the encodings out)
 	}
 	newton_catch_all
 	{

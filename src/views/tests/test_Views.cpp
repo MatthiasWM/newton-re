@@ -181,6 +181,7 @@ TestStructure()
 	EXPECT(a->fViewFormat == vfFillBlack);
 	EXPECT(BoundsAre(a, 10, 10, 60, 40));
 	EXPECT(a->HasVisRgn() && a->Clipper() != nil && !EmptyRgn(a->Clipper()->fFullRgn));
+	EXPECT(GetLastClipper(root->fChildren) == 1);					// (nothing in the ROM calls it) every one has a clipper: the count
 	EXPECT(NOTNIL(Eval("GetRoot().viewChildren")) && RINT(Eval("Length(GetRoot().viewChildren)")) == 1);
 	EXPECT(a->fId > root->fId);
 	EXPECT(GetView(RefVar(Eval("ctxA"))) == a && root->FindID(a->fId) == a);
@@ -202,6 +203,7 @@ TestStructure()
 	EXPECT(a->fChildren->Count() == 1);
 	TView* a1 = a->fChildren->At(0);
 	EXPECT(BoundsAre(a1, 15, 15, 35, 25) && a1->fParent == a && !a1->HasVisRgn());
+	EXPECT(GetLastClipper(a->fChildren) == 0);						// the first has none
 	EXPECT(RINT(Eval("Length(ctxA:ChildViewFrames())")) == 1);
 	EXPECT(GetView(RefVar(Eval("ctxA:ChildViewFrames()[0]"))) == a1);
 	EXPECT(EQRef(Eval("ctxA:ChildViewFrames()[0]:Parent()"), Eval("ctxA")));
@@ -733,6 +735,21 @@ TestPolygonView()
 	EXPECT(Pixel(10, 70) == 1 && Pixel(10, 80) == 1);
 	EXPECT(Pixel(25, 70) == 1 || Pixel(24, 70) == 1 || Pixel(26, 70) == 1);
 	EXPECT(Pixel(15, 65) == 0 && Pixel(41, 60) == 0);
+	// HitsOldHilitedInk (nothing in the ROM calls it): selected ink under
+	// the point.  The ROM answers true for any selected polygon view
+	// (ROM BUG); the fix asks for ink and the point inside.
+	Point inside = MakePoint(20, 65);
+	Point outside = MakePoint(150, 140);
+	EXPECT(!HitsOldHilitedInk(p, inside));							// nothing selected
+	Eval("ctxG.hilites := ['all]");
+	SetRomBugFixed(false);
+	EXPECT(HitsOldHilitedInk(p, inside) && HitsOldHilitedInk(p, outside));
+	SetRomBugFixed(true);
+	EXPECT(!HitsOldHilitedInk(p, inside));							// no ink
+	Eval("ctxG.ink := \"x\"");
+	EXPECT(HitsOldHilitedInk(p, inside) && !HitsOldHilitedInk(p, outside));
+	EXPECT(!HitsOldHilitedInk(gRootView, inside));					// not a polygon view
+	Eval("RemoveSlot(ctxG, 'hilites); RemoveSlot(ctxG, 'ink)");
 	Eval("ctxG:Close()");
 
 	// an oval: verb 0 fills its box with a frame, the points unused
@@ -4940,6 +4957,21 @@ TestInkOnThePage()
 	CommandSetFrameParameter(cmd, bundle);
 	gApplication->DispatchCommand(cmd);
 	EXPECT(IsFrame(RefVar(Eval("ctxIV.added"))));
+
+	// a polygon's points as a stroke (nothing in the ROM calls it)
+	Eval("ctxIV.added := nil");
+	PolyHandle poly = OpenPoly();
+	MoveTo(10, 20);
+	LineTo(30, 40);
+	LineTo(50, 20);
+	ClosePoly();
+	EXPECT(editor->HandleInk((Handle) poly) == 1);
+	KillPoly(poly);
+	added = Eval("ctxIV.added");
+	EXPECT(IsFrame(added) && IsRawInk(RefVar(GetFrameSlot(added, RSSYMink))));
+	EXPECT(FromObject(RefVar(GetFrameSlot(added, RSSYMviewbounds)), where));
+	EXPECT(where.left <= 10 && where.right >= 50 && where.top <= 20 && where.bottom >= 40);
+	EXPECT(!editor->BoundsOverlapsGraphics(where));					// the ROM's answers no
 
 	// a view that takes only numbers says so; one that takes letters does not
 	TView* numbers = ViewOf("ctxNum := AddView(GetRoot(), {viewClass: 74, viewFlags: 1 + 0x2000, viewBounds: {left: 0, top: 0, right: 10, bottom: 10}})");

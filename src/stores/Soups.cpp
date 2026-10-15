@@ -358,6 +358,14 @@ GetRandomSignature(void)
 }
 
 
+// ROM 0x0035570c AdjustSoupsSignatures__Fv
+// Empty in the ROM (a bare return), and nothing calls it.
+void
+AdjustSoupsSignatures(void)
+{
+}
+
+
 // ROM 0x0035262c GetStoreVersion__FP6TStorePl
 // The version in a store's root data (an empty root: this ROM's).
 NewtonErr

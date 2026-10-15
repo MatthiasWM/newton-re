@@ -1355,6 +1355,7 @@ main()
 		TestIndexKeysSurviveTheStore();
 		TestCopyEntries();
 		TestPasswords();
+		AdjustSoupsSignatures();				// the ROM's is empty (and nothing calls it): it must only return
 	}
 	newton_catch_all
 	{

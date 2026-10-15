@@ -218,6 +218,8 @@ main(int argc, char** argv)
 	EXPECT(orientation == 0);
 	SetOrientation(1);
 	EXPECT(screen->bounds.right == 64 && screen->bounds.bottom == 48 && screenWidth == 64 && screenHeight == 48);
+	SetScreenSize(10, 20);											// the ROM's is empty: nothing changes
+	EXPECT(screen->bounds.right == 64 && screen->bounds.bottom == 48 && screenWidth == 64 && screenHeight == 48);
 	TestBlitAgainstReference();
 	TestBusyBoxEightBits();
 	if (failures == 0)
