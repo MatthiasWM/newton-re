@@ -75,24 +75,24 @@ public:
 	static TWRecognizer*	New(const char* implementation);	// ROM 0x00388bd0 New__12TWRecognizerSFPc
 	void				Delete(void);							// ROM 0x00388bfc Delete__12TWRecognizerFv
 
-	VIRTUAL void		Initialize(void) ENDVIRTUAL;										// ROM 0x00388c18
+	VIRTUAL void		Initialize(void) ENDVIRTUAL;										// ROM 0x00388c18 Initialize__12TWRecognizerFv
 	// A stroke offered to the engine: it decides whether the stroke
 	// joins the word being built or starts a new one.
-	VIRTUAL void		Group(TStrokeUnit* stroke) ENDVIRTUAL;								// ROM 0x00388c24
-	VIRTUAL long		Classify(TWRecUnit* unit) ENDVIRTUAL;								// ROM 0x00388c30
-	VIRTUAL long		Reclassify(TWRecUnit* unit) ENDVIRTUAL;								// ROM 0x00388c3c
-	VIRTUAL long		FindBaseline(TStroke** strokes, Point* out) ENDVIRTUAL;				// ROM 0x00388c48
-	VIRTUAL void		GroupInkStroke(TStrokeUnit* stroke, ULong a, ULong b, Boolean flag) ENDVIRTUAL;	// ROM 0x00388c54
-	VIRTUAL long		AreaInfoGetSize(void) ENDVIRTUAL;									// ROM 0x00388c60
-	VIRTUAL void		AreaInfoFillDefaults(Handle info) ENDVIRTUAL;						// ROM 0x00388c6c
-	VIRTUAL void		AreaInfoConfigure(Handle info, RefArg config) ENDVIRTUAL;			// ROM 0x00388c78
-	VIRTUAL void		AreaInfoFreeDependents(Handle info) ENDVIRTUAL;						// ROM 0x00388c84
-	VIRTUAL void		AreaInfoSetParameters(Handle info) ENDVIRTUAL;						// ROM 0x00388c90
-	VIRTUAL void		UnitInfoFreePtr(char* info) ENDVIRTUAL;								// ROM 0x00388c9c
-	VIRTUAL Boolean		VerifyWordSymbols(UniChar* word) ENDVIRTUAL;							// ROM 0x00388ca8
-	VIRTUAL long		UnitConfidence(TWRecUnit* unit) ENDVIRTUAL;							// ROM 0x00388cb4
-	VIRTUAL void		Sleep(void) ENDVIRTUAL;												// ROM 0x00388cc0
-	VIRTUAL void		WakeUp(void) ENDVIRTUAL;											// ROM 0x00388ccc
+	VIRTUAL void		Group(TStrokeUnit* stroke) ENDVIRTUAL;								// ROM 0x00388c24 Group__12TWRecognizerFP11TStrokeUnit
+	VIRTUAL long		Classify(TWRecUnit* unit) ENDVIRTUAL;								// ROM 0x00388c30 Classify__12TWRecognizerFP9TWRecUnit
+	VIRTUAL long		Reclassify(TWRecUnit* unit) ENDVIRTUAL;								// ROM 0x00388c3c Reclassify__12TWRecognizerFP9TWRecUnit
+	VIRTUAL long		FindBaseline(TStroke** strokes, Point* out) ENDVIRTUAL;				// ROM 0x00388c48 FindBaseline__12TWRecognizerFPP7TStrokeP5Point
+	VIRTUAL void		GroupInkStroke(TStrokeUnit* stroke, ULong a, ULong b, Boolean flag) ENDVIRTUAL;	// ROM 0x00388c54 GroupInkStroke__12TWRecognizerFP11TStrokeUnitUlT2Uc
+	VIRTUAL long		AreaInfoGetSize(void) ENDVIRTUAL;									// ROM 0x00388c60 AreaInfoGetSize__12TWRecognizerFv
+	VIRTUAL void		AreaInfoFillDefaults(Handle info) ENDVIRTUAL;						// ROM 0x00388c6c AreaInfoFillDefaults__12TWRecognizerFPPc
+	VIRTUAL void		AreaInfoConfigure(Handle info, RefArg config) ENDVIRTUAL;			// ROM 0x00388c78 AreaInfoConfigure__12TWRecognizerFPPcRC6RefVar
+	VIRTUAL void		AreaInfoFreeDependents(Handle info) ENDVIRTUAL;						// ROM 0x00388c84 AreaInfoFreeDependents__12TWRecognizerFPPc
+	VIRTUAL void		AreaInfoSetParameters(Handle info) ENDVIRTUAL;						// ROM 0x00388c90 AreaInfoSetParameters__12TWRecognizerFPPc
+	VIRTUAL void		UnitInfoFreePtr(char* info) ENDVIRTUAL;								// ROM 0x00388c9c UnitInfoFreePtr__12TWRecognizerFPc
+	VIRTUAL Boolean		VerifyWordSymbols(UniChar* word) ENDVIRTUAL;							// ROM 0x00388ca8 VerifyWordSymbols__12TWRecognizerFPUs
+	VIRTUAL long		UnitConfidence(TWRecUnit* unit) ENDVIRTUAL;							// ROM 0x00388cb4 UnitConfidence__12TWRecognizerFP9TWRecUnit
+	VIRTUAL void		Sleep(void) ENDVIRTUAL;												// ROM 0x00388cc0 Sleep__12TWRecognizerFv
+	VIRTUAL void		WakeUp(void) ENDVIRTUAL;											// ROM 0x00388ccc WakeUp__12TWRecognizerFv
 
 	// What the engine calls back into, which is where the grouping is
 	// kept.  These are the protocol's own, not dispatched: an engine

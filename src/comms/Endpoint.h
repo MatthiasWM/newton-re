@@ -108,45 +108,45 @@ public:
 	NONVIRTUAL	void		SetClientHandler(ULong clientHandler);
 
 	// EventHandler interface
-	VIRTUAL		Boolean		HandleEvent(ULong msgType, TAEvent* event, ULong msgSize) ENDVIRTUAL;
-	VIRTUAL		Boolean		HandleComplete(TUMsgToken* msgToken, ULong* msgSize, TAEvent* event) ENDVIRTUAL;
+	VIRTUAL		Boolean		HandleEvent(ULong msgType, TAEvent* event, ULong msgSize) ENDVIRTUAL;	// ROM 0x00382a54 HandleEvent__9TEndpointFUlP7TAEventT1
+	VIRTUAL		Boolean		HandleComplete(TUMsgToken* msgToken, ULong* msgSize, TAEvent* event) ENDVIRTUAL;	// ROM 0x00382a60 HandleComplete__9TEndpointFP10TUMsgTokenPUlP7TAEvent
 
 	// For handing endpoints around
-	VIRTUAL		NewtonErr	AddToAppWorld(void) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	RemoveFromAppWorld(void) ENDVIRTUAL;
+	VIRTUAL		NewtonErr	AddToAppWorld(void) ENDVIRTUAL;	// ROM 0x00382a6c AddToAppWorld__9TEndpointFv
+	VIRTUAL		NewtonErr	RemoveFromAppWorld(void) ENDVIRTUAL;	// ROM 0x00382a78 RemoveFromAppWorld__9TEndpointFv
 
 	// Client interface
-	VIRTUAL		NewtonErr	Open(ULong clientHandler = 0) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	Close(void) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	Abort(void) ENDVIRTUAL;
+	VIRTUAL		NewtonErr	Open(ULong clientHandler = 0) ENDVIRTUAL;	// ROM 0x00382a84 Open__9TEndpointFUl
+	VIRTUAL		NewtonErr	Close(void) ENDVIRTUAL;	// ROM 0x00382a90 Close__9TEndpointFv
+	VIRTUAL		NewtonErr	Abort(void) ENDVIRTUAL;	// ROM 0x00382a9c Abort__9TEndpointFv
 
 	NONVIRTUAL	NewtonErr	GetInfo(TCMOTransportInfo* info);
 	NONVIRTUAL	Long		GetState(void)			{ return fState; }
 	NONVIRTUAL	Boolean		IsSync(void)			{ return fSync; }
 
-	VIRTUAL		Boolean		SetSync(Boolean sync) ENDVIRTUAL;
+	VIRTUAL		Boolean		SetSync(Boolean sync) ENDVIRTUAL;	// ROM 0x00382aa8 SetSync__9TEndpointFUc
 
-	VIRTUAL		NewtonErr	GetProtAddr(TOptionArray* bndAddr, TOptionArray* peerAddr, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	OptMgmt(ULong arrayOpCode, TOptionArray* options, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
+	VIRTUAL		NewtonErr	GetProtAddr(TOptionArray* bndAddr, TOptionArray* peerAddr, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382ab4 GetProtAddr__9TEndpointFP12TOptionArrayT1Ul
+	VIRTUAL		NewtonErr	OptMgmt(ULong arrayOpCode, TOptionArray* options, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382ac0 OptMgmt__9TEndpointFUlP12TOptionArrayT1
 
-	VIRTUAL		NewtonErr	Bind(TOptionArray* addr = nil, Long* qlen = nil, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	UnBind(TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
+	VIRTUAL		NewtonErr	Bind(TOptionArray* addr = nil, Long* qlen = nil, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382acc Bind__9TEndpointFP12TOptionArrayPlUl
+	VIRTUAL		NewtonErr	UnBind(TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382ad8 UnBind__9TEndpointFUl
 
 	VIRTUAL		NewtonErr	Listen(TOptionArray* addr = nil, TOptionArray* opt = nil, CBufferSegment* data = nil,
-							Long* seq = nil, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
+							Long* seq = nil, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382ae4 Listen__9TEndpointFP12TOptionArrayT1P14CBufferSegmentPlUl
 	VIRTUAL		NewtonErr	Accept(TEndpoint* resfd, TOptionArray* addr = nil, TOptionArray* opt = nil,
-							CBufferSegment* data = nil, Long seq = 0, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
+							CBufferSegment* data = nil, Long seq = 0, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382af0 Accept__9TEndpointFP9TEndpointP12TOptionArrayT2P14CBufferSegmentlUl
 	VIRTUAL		NewtonErr	Connect(TOptionArray* addr = nil, TOptionArray* opt = nil, CBufferSegment* data = nil,
-							Long* seq = nil, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	Disconnect(CBufferSegment* data = nil, Long reason = 0, Long seq = 0) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	Release(TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
+							Long* seq = nil, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382afc Connect__9TEndpointFP12TOptionArrayT1P14CBufferSegmentPlUl
+	VIRTUAL		NewtonErr	Disconnect(CBufferSegment* data = nil, Long reason = 0, Long seq = 0) ENDVIRTUAL;	// ROM 0x00382b08 Disconnect__9TEndpointFP14CBufferSegmentlT2
+	VIRTUAL		NewtonErr	Release(TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382b14 Release__9TEndpointFUl
 
-	VIRTUAL		NewtonErr	Snd(UByte* buf, Size& nBytes, ULong flags, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	Rcv(UByte* buf, Size& nBytes, Size thresh, ULong* flags, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	Snd(CBufferSegment* buf, ULong flags, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	Rcv(CBufferSegment* buf, Size thresh, ULong* flags, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
+	VIRTUAL		NewtonErr	Snd(UByte* buf, Size& nBytes, ULong flags, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382b20 Snd__9TEndpointFPUcRlUlT3
+	VIRTUAL		NewtonErr	Rcv(UByte* buf, Size& nBytes, Size thresh, ULong* flags, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382b2c Rcv__9TEndpointFPUcRllPUlUl
+	VIRTUAL		NewtonErr	Snd(CBufferSegment* buf, ULong flags, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382b38 Snd__9TEndpointFP14CBufferSegmentUlT2
+	VIRTUAL		NewtonErr	Rcv(CBufferSegment* buf, Size thresh, ULong* flags, TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382b44 Rcv__9TEndpointFP14CBufferSegmentlPUlUl
 
-	VIRTUAL		NewtonErr	WaitForEvent(TTimeout timeOut = kNoTimeout) ENDVIRTUAL;
+	VIRTUAL		NewtonErr	WaitForEvent(TTimeout timeOut = kNoTimeout) ENDVIRTUAL;	// ROM 0x00382b50 WaitForEvent__9TEndpointFUl
 
 	// convenience functions
 	NONVIRTUAL	NewtonErr	EasyOpen(ULong clientHandler = 0);
@@ -154,30 +154,30 @@ public:
 	NONVIRTUAL	NewtonErr	EasyClose(void);
 
 	// 2.0
-	VIRTUAL		NewtonErr	nBind(TOptionArray* opt = nil, TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;
+	VIRTUAL		NewtonErr	nBind(TOptionArray* opt = nil, TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;	// ROM 0x00382b5c nBind__9TEndpointFP12TOptionArrayUlUc
 	VIRTUAL		NewtonErr	nListen(TOptionArray* opt = nil, CBufferSegment* data = nil, Long* seq = nil,
-							TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;
+							TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;	// ROM 0x00382b68 nListen__9TEndpointFP12TOptionArrayP14CBufferSegmentPlUlUc
 	VIRTUAL		NewtonErr	nAccept(TEndpoint* resfd, TOptionArray* opt = nil, CBufferSegment* data = nil,
-							Long seq = 0, TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;
+							Long seq = 0, TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;	// ROM 0x00382b74 nAccept__9TEndpointFP9TEndpointP12TOptionArrayP14CBufferSegmentlUlUc
 	VIRTUAL		NewtonErr	nConnect(TOptionArray* opt = nil, CBufferSegment* data = nil, Long* seq = nil,
-							TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	nRelease(TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;
+							TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;	// ROM 0x00382b80 nConnect__9TEndpointFP12TOptionArrayP14CBufferSegmentPlUlUc
+	VIRTUAL		NewtonErr	nRelease(TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;	// ROM 0x00382b8c nRelease__9TEndpointFUlUc
 	VIRTUAL		NewtonErr	nDisconnect(CBufferSegment* data = nil, Long reason = 0, Long seq = 0,
-							TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	nUnBind(TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;
+							TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;	// ROM 0x00382b98 nDisconnect__9TEndpointFP14CBufferSegmentlT2UlUc
+	VIRTUAL		NewtonErr	nUnBind(TTimeout timeOut = kNoTimeout, Boolean sync = true) ENDVIRTUAL;	// ROM 0x00382ba4 nUnBind__9TEndpointFUlUc
 	VIRTUAL		NewtonErr	nOptMgmt(ULong arrayOpCode, TOptionArray* options, TTimeout timeOut = kNoTimeout,
-							Boolean sync = true) ENDVIRTUAL;
+							Boolean sync = true) ENDVIRTUAL;	// ROM 0x00382bb0 nOptMgmt__9TEndpointFUlP12TOptionArrayT1Uc
 	VIRTUAL		NewtonErr	nSnd(UByte* buf, Size* count, ULong flags, TTimeout timeOut = kNoTimeout,
-							Boolean sync = true, TOptionArray* opt = nil) ENDVIRTUAL;
+							Boolean sync = true, TOptionArray* opt = nil) ENDVIRTUAL;	// ROM 0x00382bbc nSnd__9TEndpointFPUcPlUlT3UcP12TOptionArray
 	VIRTUAL		NewtonErr	nRcv(UByte* buf, Size* count, Size thresh, ULong* flags, TTimeout timeOut = kNoTimeout,
-							Boolean sync = true, TOptionArray* opt = nil) ENDVIRTUAL;
+							Boolean sync = true, TOptionArray* opt = nil) ENDVIRTUAL;	// ROM 0x00382bc8 nRcv__9TEndpointFPUcPllPUlUlUcP12TOptionArray
 	VIRTUAL		NewtonErr	nSnd(CBufferSegment* buf, ULong flags, TTimeout timeOut = kNoTimeout,
-							Boolean sync = true, TOptionArray* opt = nil) ENDVIRTUAL;
+							Boolean sync = true, TOptionArray* opt = nil) ENDVIRTUAL;	// ROM 0x00382bd4 nSnd__9TEndpointFP14CBufferSegmentUlT2UcP12TOptionArray
 	VIRTUAL		NewtonErr	nRcv(CBufferSegment* buf, Size thresh, ULong* flags, TTimeout timeOut = kNoTimeout,
-							Boolean sync = true, TOptionArray* opt = nil) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	nAbort(Boolean sync = true) ENDVIRTUAL;
-	VIRTUAL		NewtonErr	Timeout(ULong refCon) ENDVIRTUAL;
-	VIRTUAL		Boolean		IsPending(ULong which) ENDVIRTUAL;
+							Boolean sync = true, TOptionArray* opt = nil) ENDVIRTUAL;	// ROM 0x00382be0 nRcv__9TEndpointFP14CBufferSegmentlPUlUlUcP12TOptionArray
+	VIRTUAL		NewtonErr	nAbort(Boolean sync = true) ENDVIRTUAL;	// ROM 0x00382bec nAbort__9TEndpointFUc
+	VIRTUAL		NewtonErr	Timeout(ULong refCon) ENDVIRTUAL;	// ROM 0x00382bf8 Timeout__9TEndpointFUl
+	VIRTUAL		Boolean		IsPending(ULong which) ENDVIRTUAL;	// ROM 0x00382c04 IsPending__9TEndpointFUl
 
 	NONVIRTUAL	Boolean		UseForks(Boolean justDoIt);
 

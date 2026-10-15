@@ -334,6 +334,13 @@ TCMService::Delete()
 	GlueDelete();
 }
 
+// The interface's two methods are dispatch stubs through the
+// implementation's table (slots 4 and 5); here they are the virtual
+// functions TCMService declares (src/ddk/CMService.h, generated, so cited
+// here rather than at the declarations):
+// ROM 0x003829e0 Start__10TCMServiceFP12TOptionArrayUlP12TServiceInfo
+// ROM 0x003829ec DoneStarting__10TCMServiceFP7TAEventUlP12TServiceInfo
+
 
 // ---------------------------------------------------------------------------
 //	TAsyncServiceMessage: a service's asynchronous RPC, whose reply comes

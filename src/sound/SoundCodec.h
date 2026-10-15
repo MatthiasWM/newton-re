@@ -87,13 +87,13 @@ public:
 	static TSoundCodec*	New(const char* implementation);		// ROM 0x00388da8 New__11TSoundCodecSFPc
 	void			Delete();								// ROM 0x00388dd4 Delete__11TSoundCodecFv
 
-	VIRTUAL NewtonErr	Init(CodecBlock* block) ENDVIRTUAL;						// ROM 0x0037f688
-	VIRTUAL NewtonErr	Reset(CodecBlock* block) ENDVIRTUAL;					// ROM 0x0037f694
-	VIRTUAL NewtonErr	Produce(void* dst, ULong* dstSize, ULong* codedSize, CodecBlock* block) ENDVIRTUAL;			// ROM 0x0037f6a0
-	VIRTUAL NewtonErr	Consume(const void* src, ULong* srcSize, ULong* codedSize, const CodecBlock* block) ENDVIRTUAL;	// ROM 0x0037f6ac
-	VIRTUAL void		Start() ENDVIRTUAL;										// ROM 0x0037f6b8
-	VIRTUAL void		Stop(int reason) ENDVIRTUAL;							// ROM 0x0037f6c4
-	VIRTUAL Boolean		BufferCompleted() ENDVIRTUAL;							// ROM 0x0037f6d0
+	VIRTUAL NewtonErr	Init(CodecBlock* block) ENDVIRTUAL;						// ROM 0x00388df0 Init__11TSoundCodecFP10CodecBlock
+	VIRTUAL NewtonErr	Reset(CodecBlock* block) ENDVIRTUAL;					// ROM 0x00388dfc Reset__11TSoundCodecFP10CodecBlock
+	VIRTUAL NewtonErr	Produce(void* dst, ULong* dstSize, ULong* codedSize, CodecBlock* block) ENDVIRTUAL;			// ROM 0x00388e08 Produce__11TSoundCodecFPvPUlT2P10CodecBlock
+	VIRTUAL NewtonErr	Consume(const void* src, ULong* srcSize, ULong* codedSize, const CodecBlock* block) ENDVIRTUAL;	// ROM 0x00388e14 Consume__11TSoundCodecFPCvPUlT2PC10CodecBlock
+	VIRTUAL void		Start() ENDVIRTUAL;										// ROM 0x00388e20 Start__11TSoundCodecFv
+	VIRTUAL void		Stop(int reason) ENDVIRTUAL;							// ROM 0x00388e2c Stop__11TSoundCodecFi
+	VIRTUAL Boolean		BufferCompleted() ENDVIRTUAL;							// ROM 0x00388e38 BufferCompleted__11TSoundCodecFv
 };
 
 

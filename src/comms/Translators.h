@@ -114,6 +114,7 @@ PROTOCOL PFrameSink : public TProtocol
 public:
 	static PFrameSink*	New(char* implementation);
 	void			Delete();
+	// ROM 0x00389fc8 Translate__10PFrameSinkFPvP12PipeCallBack
 	VIRTUAL void*	Translate(void* context, PipeCallBack* callback) ENDVIRTUAL;	// ==> what was made
 };
 
@@ -122,6 +123,7 @@ PROTOCOL PFrameSource : public TProtocol
 public:
 	static PFrameSource*	New(char* implementation);
 	void			Delete();
+	// ROM 0x00389f60 Translate__12PFrameSourceFPvP12PipeCallBack
 	VIRTUAL Ref		Translate(void* context, PipeCallBack* callback) ENDVIRTUAL;	// ==> the value
 };
 

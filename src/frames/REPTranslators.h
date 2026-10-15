@@ -48,9 +48,12 @@ public:
 	static PInTranslator*	New(const char* implementation);
 	void			Delete();
 
-	VIRTUAL long	Init(void* context) ENDVIRTUAL;
+	VIRTUAL long	Init(void* context) ENDVIRTUAL;	// ROM 0x00389dec Init__13PInTranslatorFPv
+	// ROM 0x00389df8 Idle__13PInTranslatorFv
 	VIRTUAL long	Idle() ENDVIRTUAL;					// ==> when to idle again, 0 for never
+	// ROM 0x00389e04 FrameAvailable__13PInTranslatorFv
 	VIRTUAL Boolean	FrameAvailable() ENDVIRTUAL;		// a form has been read
+	// ROM 0x00389e10 ProduceFrame__13PInTranslatorFi
 	VIRTUAL Ref		ProduceFrame(int level) ENDVIRTUAL;	// the form, compiled
 };
 
@@ -65,17 +68,19 @@ public:
 	static POutTranslator*	New(const char* implementation);
 	void			Delete();
 
-	VIRTUAL long	Init(void* context) ENDVIRTUAL;
-	VIRTUAL long	Idle() ENDVIRTUAL;
+	VIRTUAL long	Init(void* context) ENDVIRTUAL;	// ROM 0x00389e7c Init__14POutTranslatorFPv
+	VIRTUAL long	Idle() ENDVIRTUAL;	// ROM 0x00389e88 Idle__14POutTranslatorFv
+	// ROM 0x00389e94 ConsumeFrame__14POutTranslatorFRC6RefVariT2
 	VIRTUAL void	ConsumeFrame(RefArg obj, int depth, long indent) ENDVIRTUAL;	// print an object
-	VIRTUAL void	Flush() ENDVIRTUAL;
-	VIRTUAL void	Prompt(int level) ENDVIRTUAL;
+	VIRTUAL void	Flush() ENDVIRTUAL;	// ROM 0x00389ea0 Flush__14POutTranslatorFv
+	VIRTUAL void	Prompt(int level) ENDVIRTUAL;	// ROM 0x00389eac Prompt__14POutTranslatorFi
+	// ROM 0x00389eb8 Print__14POutTranslatorFPCce
 	VIRTUAL long	Print(const char* format, ...) ENDVIRTUAL;	// ==> characters printed
-	VIRTUAL int		Putc(int c) ENDVIRTUAL;
-	VIRTUAL void	EnterBreakLoop(int level) ENDVIRTUAL;
-	VIRTUAL void	ExitBreakLoop() ENDVIRTUAL;
-	VIRTUAL void	StackTrace(void* interpreter) ENDVIRTUAL;
-	VIRTUAL void	ExceptionNotify(Exception* exception) ENDVIRTUAL;
+	VIRTUAL int		Putc(int c) ENDVIRTUAL;	// ROM 0x00389ec4 Putc__14POutTranslatorFi
+	VIRTUAL void	EnterBreakLoop(int level) ENDVIRTUAL;	// ROM 0x00389ed0 EnterBreakLoop__14POutTranslatorFi
+	VIRTUAL void	ExitBreakLoop() ENDVIRTUAL;	// ROM 0x00389edc ExitBreakLoop__14POutTranslatorFv
+	VIRTUAL void	StackTrace(void* interpreter) ENDVIRTUAL;	// ROM 0x00389ee8 StackTrace__14POutTranslatorFPv
+	VIRTUAL void	ExceptionNotify(Exception* exception) ENDVIRTUAL;	// ROM 0x00389ef4 ExceptionNotify__14POutTranslatorFP9Exception
 };
 
 

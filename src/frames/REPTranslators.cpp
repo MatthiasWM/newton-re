@@ -43,6 +43,7 @@ extern const ExceptionName exCompiler;					// "evt.ex.fr.comp"
 	The interfaces' glue
 ------------------------------------------------------------------------------- */
 
+// ROM 0x00389da4 New__13PInTranslatorSFPc
 PInTranslator*
 PInTranslator::New(const char* implementation)
 {
@@ -50,6 +51,7 @@ PInTranslator::New(const char* implementation)
 	return translator != nil ? (PInTranslator*) translator->GlueNew() : nil;
 }
 
+// ROM 0x00389dd0 Delete__13PInTranslatorFv
 void
 PInTranslator::Delete()
 {
@@ -57,6 +59,7 @@ PInTranslator::Delete()
 }
 
 
+// ROM 0x00389e34 New__14POutTranslatorSFPc
 POutTranslator*
 POutTranslator::New(const char* implementation)
 {
@@ -64,6 +67,7 @@ POutTranslator::New(const char* implementation)
 	return translator != nil ? (POutTranslator*) translator->GlueNew() : nil;
 }
 
+// ROM 0x00389e60 Delete__14POutTranslatorFv
 void
 POutTranslator::Delete()
 {
@@ -241,8 +245,8 @@ REPFormat(char* buffer, long size, const char* format, va_list args)
 	PNullInTranslator
 ------------------------------------------------------------------------------- */
 
-PROTOCOL_IMPL_SOURCE_MACRO(PNullInTranslator)
-PROTOCOL_CLASSINFO(PNullInTranslator, "PInTranslator", "", 0, 0, nil)
+PROTOCOL_IMPL_SOURCE_MACRO(PNullInTranslator)	// ROM 0x001470d0 Sizeof__17PNullInTranslatorSFv
+PROTOCOL_CLASSINFO(PNullInTranslator, "PInTranslator", "", 0, 0, nil)	// ROM 0x003843dc ClassInfo__17PNullInTranslatorSFv
 
 // ROM 0x001470d8 New__17PNullInTranslatorFv
 PNullInTranslator*	PNullInTranslator::New()				{ return this; }
@@ -262,8 +266,8 @@ Ref					PNullInTranslator::ProduceFrame(int)	{ return NILREF; }
 	PNullOutTranslator
 ------------------------------------------------------------------------------- */
 
-PROTOCOL_IMPL_SOURCE_MACRO(PNullOutTranslator)
-PROTOCOL_CLASSINFO(PNullOutTranslator, "POutTranslator", "", 0, 0, nil)
+PROTOCOL_IMPL_SOURCE_MACRO(PNullOutTranslator)	// ROM 0x00147100 Sizeof__18PNullOutTranslatorSFv
+PROTOCOL_CLASSINFO(PNullOutTranslator, "POutTranslator", "", 0, 0, nil)	// ROM 0x0038446c ClassInfo__18PNullOutTranslatorSFv
 
 Boolean* gBreakLoopDone = nil;		// 0x0c10226c  the break loop's "done" flag, when one is running
 
@@ -308,8 +312,8 @@ void				PNullOutTranslator::ExceptionNotify(Exception*)	{ }
 	PStdioInTranslator
 ------------------------------------------------------------------------------- */
 
-PROTOCOL_IMPL_SOURCE_MACRO(PStdioInTranslator)
-PROTOCOL_CLASSINFO(PStdioInTranslator, "PInTranslator", "", 0, 0, nil)
+PROTOCOL_IMPL_SOURCE_MACRO(PStdioInTranslator)	// ROM 0x001f9744 Sizeof__18PStdioInTranslatorSFv
+PROTOCOL_CLASSINFO(PStdioInTranslator, "PInTranslator", "", 0, 0, nil)	// ROM 0x00384518 ClassInfo__18PStdioInTranslatorSFv
 
 // ROM 0x001f974c New__18PStdioInTranslatorFv
 PStdioInTranslator*
@@ -373,8 +377,8 @@ PStdioInTranslator::ProduceFrame(int /*level*/)
 	PStdioOutTranslator
 ------------------------------------------------------------------------------- */
 
-PROTOCOL_IMPL_SOURCE_MACRO(PStdioOutTranslator)
-PROTOCOL_CLASSINFO(PStdioOutTranslator, "POutTranslator", "", 0, 0, nil)
+PROTOCOL_IMPL_SOURCE_MACRO(PStdioOutTranslator)	// ROM 0x001f9868 Sizeof__19PStdioOutTranslatorSFv
+PROTOCOL_CLASSINFO(PStdioOutTranslator, "POutTranslator", "", 0, 0, nil)	// ROM 0x003845a8 ClassInfo__19PStdioOutTranslatorSFv
 
 // ROM 0x001f9870 New__19PStdioOutTranslatorFv
 PStdioOutTranslator*	PStdioOutTranslator::New()			{ fFile = nil; return this; }
