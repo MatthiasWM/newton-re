@@ -22,12 +22,12 @@
 
 	DEVIATION: the host keeps no caches (the glyph widths are worked out
 	afresh by each pass), so the cache fields stay nought.  NOT YET
-	RECONSTRUCTED: TextArrow
-	(0x2000) and text at an angle (the options' +0x0c) in DoPointToChar.
+	RECONSTRUCTED: text at an angle (the options' +0x0c) in DoPointToChar.
 	The drawing (DrText.cpp: each style run composed into a slab and
 	stretched onto the port), the fitted length (0x100), the bounds
-	(0x200: CalcTextBounds), CharToPoint (0x800) and PointToChar
-	(0x1000) are here, over the host's layout (TextLayout.h) worked out
+	(0x200: CalcTextBounds), CharToPoint (0x800), PointToChar (0x1000)
+	and TextArrow (0x2000: where an arrow key takes the caret, which only
+	the QuickDraw library's protocol asks) are here, over the host's layout (TextLayout.h) worked out
 	afresh for each question.
 
 	Reconstructed from the MP2x00 US ROM (0x0035a60c, 0x0035b07c,
@@ -138,6 +138,8 @@ void			CalcTextBounds(TextObjectRef text, void* result, Fixed hScale, Fixed vSca
 void			CalcTextAdvance(TextObjectRef text, FPoint* advance, long count);	// ROM 0x0035b220 CalcTextAdvance__FlP6FPointT1 - the first `count` characters' advance
 void			DoCharToPoint(TextObjectRef text, Fixed hScale, Fixed vScale);	// ROM 0x0035e13c DoCharToPoint__FlN21
 void			DoPointToChar(TextObjectRef text, Fixed hScale, Fixed vScale);	// ROM 0x00359d80 DoPointToChar__FlN21
+long			TextArrowOffset(TextObjectRef text, long offset, Boolean forward);	// ROM 0x00359f70 TextArrowOffset__FlT1Uc - where the right (forward) or left arrow takes the caret
+void			DoTextArrow(TextObjectRef text, Fixed hScale, Fixed vScale);	// ROM 0x00359fb8 DoTextArrow__FlN21
 
 // The QuickDraw library's protocol face of them (the TQDLibraryDriver
 // dispatch; the ROM's forward to the functions above).
@@ -147,6 +149,7 @@ public:
 	static void		GetTextObjField(TextObjectRef text, int field, void* result);	// ROM 0x00195cb0 GetTextObjField__16TQDLibraryDriverFliPv
 	static void		CharToPoint(TextObjectRef text, long offset, FPoint* point);	// ROM 0x00195cbc CharToPoint__16TQDLibraryDriverFlT1P6FPoint
 	static long		PointToChar(TextObjectRef text, FPoint point);			// ROM 0x00195cc0 PointToChar__16TQDLibraryDriverFl6FPoint
+	static long		TextArrowOffset(TextObjectRef text, long offset, Boolean forward);	// ROM 0x00195cc4 TextArrowOffset__16TQDLibraryDriverFlT1Uc
 };
 void			DoPutText(TextObjectRef text, Fixed hScale, Fixed vScale);	// (PicRecord.cpp) the recording
 
