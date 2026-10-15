@@ -107,6 +107,33 @@ alert gone and the entry still readable.
 - `OSErrorAlert` and `OSWarningAlert` are empty in this ROM
   (`kError_Call_Not_Implemented`).
 
+## The PIN pad (`alert/PinPad.h`)
+
+`TDrawInterface` is a protocol for drawing straight onto the screen and
+reading the pen with nothing else running, and `TPinPad` (0x00189f78-
+0x0018a424, class info 0x00388704, 0xb8 bytes) the ROM's implementation,
+in this library because its text is the alerts' (`TAlertGlyph`). `Init`
+puts the box the right way round, cuts it to the screen, starts polling
+the tablet directly (`SetTabletPolling`, the former state kept), blocks the
+LCD's activity, holds the screen's drawing over the box (`StartDrawing`)
+and opens a port of its own clipped to it, with the system font, 9 point,
+bold as the style and its family's `boldData` strikes for the glyphs; it
+answers what `SetTabletPolling` leaves in `r0`, 0. `DrawPict` and
+`DrawText` draw (`DrawPicture`; `DrawTextOnce` at the point, in the
+style and `DefineStyle`'s transfer mode) and blit what changed to the
+screen; `GetTextWidth` adds up the alert font's advances of the strike
+`TAlertGlyph` finds for the style's size (a 16.16 size: the smallest
+strike, as for the alerts); `DefineStyle` takes a font spec and the
+strikes of its face (plain, bold, italic, both); `GetPoint` polls the pen
+as `AlertGetPoint` does; `Delete` erases the box, shows it, puts the port
+and the polling back and lets the LCD and the screen go. ROM bug, fixed
+by default: `Delete` leaves the style's ref handle (and a pattern its
+font spec made) behind. Nothing in the ROM makes one - `InitGraf`
+registers it for code outside the ROM (on the host the boot registers it
+after `InitAlertManager`, `RegisterPinPad`, the alert library being above
+QuickDraw's). Ctest `alert.PinPad` (a host display: the box, the text
+drawn and shown, a polled point, everything put back).
+
 ## Not yet
 
 - The low-battery and bad-adapter alerts, which the NewtonScript side

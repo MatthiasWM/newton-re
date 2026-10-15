@@ -318,6 +318,14 @@ TBCGetTabletPolling(void)
 }
 
 
+// ROM 0x0025073c GetTabletPolling__Fv
+Boolean
+GetTabletPolling(void)
+{
+	return TBCGetTabletPolling();
+}
+
+
 // ROM 0x00250288 TBCPollTablet__FPlT1PUlPUc
 // The last sample in polling mode: x and y in Fixed, the pressure, whether
 // the pen is up.  ==> 0, or kTabletNoNewSample when nothing came since.
