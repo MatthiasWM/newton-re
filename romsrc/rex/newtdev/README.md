@@ -17,7 +17,17 @@ the same bytes) with
 and `romsrc.py package pack romsrc/rex/newtdev X.pkg --newtonscript ...`
 builds the package file alone.
 
-It is Apple's as it is: unchanged.  Its two native modules (NTK native
+## What was changed, and why
+
+DEVIATION: no AppleTalk panel in the Prefs list.  Its install script
+(`part7/functions/obj_100c95d_0_.devInstallScript.ns`) registered one
+(`RegPrefs('AppleTalk, ...)`: "Connect using" a card), but the host has
+no AppleTalk (`docs/next-steps.md`, declined), so the call is taken out
+under a `// DEVIATION` comment; the link registry it sets up beside it is
+left as it was.  The Prefs list's developer tools are the host's own
+Developer panel's (`docs/host-settings.md`, "The Developer panel").
+
+Otherwise it is Apple's as it is.  Its two native modules (NTK native
 code: `part1/` and `part6/`'s `resources/nativeModule/*.s`) are ARM source
 whose `.rword` lines are the words the package's relocation chunk names;
 the builder makes the chunk from them.

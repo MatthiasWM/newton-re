@@ -171,6 +171,14 @@ add_custom_command(
             -P ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/HostSettings.ns ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
     VERBATIM)
+# host/HostDeveloper.ns, the Developer preferences panel, compiled in the same way
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostDeveloperSource.cpp
+    COMMAND ${CMAKE_COMMAND} -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/HostDeveloper.ns
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/HostDeveloperSource.cpp -DNAME=gHostDeveloperSource
+            -P ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/HostDeveloper.ns ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
+    VERBATIM)
 # host/HostWordEngines.ns, the host's engines in the Handwriting Recognition
 # slip (recognition/WordEngines.h), compiled in the same way
 add_custom_command(
@@ -181,7 +189,8 @@ add_custom_command(
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/HostWordEngines.ns ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
     VERBATIM)
 add_executable(newton newton.cpp HostRestart.cpp HostKeyboard.cpp HostPackages.cpp HostOrientation.cpp HostSettings.cpp HostFontProvider.cpp
-               ${CMAKE_CURRENT_BINARY_DIR}/HostSettingsSource.cpp HostWordEngines.cpp
+               ${CMAKE_CURRENT_BINARY_DIR}/HostSettingsSource.cpp HostDeveloper.cpp
+               ${CMAKE_CURRENT_BINARY_DIR}/HostDeveloperSource.cpp HostWordEngines.cpp
                ${CMAKE_CURRENT_BINARY_DIR}/HostWordEnginesSource.cpp HostHeapCheck.cpp)
 target_link_libraries(newton PRIVATE newt host_views host_window hal_host_sound hal_timers hal_host_serial)
 target_compile_definitions(newton PRIVATE "NEWTON_DEFAULT_OBJECTS=\"${NEWTON_OBJECTS_FILE}\"")
@@ -1043,6 +1052,15 @@ set_tests_properties(host.NewtonRotation PROPERTIES TIMEOUT 180
                      PASS_REGULAR_EXPRESSION "held 1: orientation 1, root 480 x 320.*held 0: orientation [02], root 320 x 480.*held 2: orientation 3, root 480 x 320.*held 3: orientation [02], root 320 x 480.*rotation: done"
                      FAIL_REGULAR_EXPRESSION "waited in vain")
 
+# the Developer preferences panel (HostDeveloper.h, demo/developer.ns): Prefs
+# lists Developer and not Newton Devices' AppleTalk; the panel's checkbox
+# starts and stops the NewtonScript profiler, Write profile writes its report
+add_test(NAME host.NewtonDeveloperPanel COMMAND newton --display 320x480 --headless 200 --erase
+         --store ${CMAKE_CURRENT_BINARY_DIR}/developer.store
+         --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/developer.ns WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+set_tests_properties(host.NewtonDeveloperPanel PROPERTIES TIMEOUT 300
+                     PASS_REGULAR_EXPRESSION "has Developer, has no AppleTalk.*profiling on.*the profile written to .*developer.store.nsprofile.txt.*profiling off.*developer: done"
+                     FAIL_REGULAR_EXPRESSION "waited in vain|fell over|!!! Exception")
 # the Host preferences panel (HostSettings.h, demo/hostsettings.ns): .set
 # turns beaming over the network on from Prefs with no restart and keeps it,
 # .kept boots the same store with it on and turns it off.  (Docking on a

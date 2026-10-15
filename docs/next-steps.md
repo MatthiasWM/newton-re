@@ -296,10 +296,11 @@ Where the binaries-to-text work left off (`docs/rom-free/README.md`,
 
 Gone through on 2026-10-15; the NTK Inspector, the replay metrics and
 the NewtonScript profiler are done (`docs/work-log.md`, 2026-10-15).
-Left of those two: nothing on the Host panel switches profiling
-(`NEWTON_NS_PROFILE`, the `HostNSProfile*` natives); on the T-Deck the
-report goes to the console only; the replay metrics' word journals are
-synthetic (above, "How well the recognisers read synthetic writing").
+Prefs' Developer page switches the profiler and writes its report
+(`docs/host-settings.md`, "The Developer panel"; Newton Devices'
+AppleTalk panel is gone from the list).  Left: on the T-Deck the report
+goes to the console only; the replay metrics' word journals are synthetic
+(above, "How well the recognisers read synthetic writing").
 
 Not worth doing on the host (reasons in that page): the Hammer and
 GeoPort debug links and ARM's RDP (no Hammer, no armsd, no debug card;

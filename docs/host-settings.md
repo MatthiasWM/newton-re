@@ -154,3 +154,31 @@ The magic-pointer numbers of the ROM's protos come from
   how): a store calibrated at 320 x 480 (x scale 8192) started at 4x
   (404 x 540) logs the reset and reads 16384 kept and in use, and keeps it
   at the next start (2026-10-03).
+
+## The Developer panel
+
+Beside the Host panel, Prefs has a **Developer** page
+(`src/host/HostDeveloper.ns`, `host/HostDeveloper.h`, evaluated at boot
+by `HostInstallDeveloper` - on the desktops and the T-Deck Pro), for the
+tools that look into the OS as it runs; Newton Devices' AppleTalk panel,
+which the host had nothing behind, is gone from the list
+(`romsrc/rex/newtdev/README.md`).  For now:
+
+- **Profile NewtonScript**: the NewtonScript profiler
+  (`frames/FunctionProfiler.h`, `docs/frames/README.md` "Profiling
+  NewtonScript") on and off - the checkbox shows whether it runs, so a
+  profile `NEWTON_NS_PROFILE` started at boot shows ticked;
+- **Write profile**: its report written to the file
+  `HostDeveloperReportPath()` names - `<store>.nsprofile.txt` beside the
+  store file, `newton-nsprofile.txt` in the working directory with no
+  store, the console on the T-Deck Pro - and a notice saying where
+  (`tools/host/nsprofile.py` reads it);
+- **Clear**: its counts cleared.
+
+Nothing on the page is kept: each tool starts off at every boot.  A new
+developer tool goes here (a control in `HostDeveloper.ns`'s panel, a
+native in `HostDeveloper.cpp` if it needs the host), not on the Host
+page, which is the machine's settings.  ctest `host.NewtonDeveloperPanel`
+(`src/host/demo/developer.ns`) opens Prefs, checks Developer is there and
+AppleTalk is not, starts the profiler from the checkbox, writes the
+profile and stops it.

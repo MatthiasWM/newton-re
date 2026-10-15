@@ -283,6 +283,11 @@ it); a Release build for the tablet is stripped.
 
 ## The Host preferences panel
 
+(Prefs' **Developer** page beside it - the NewtonScript profiler's
+switch and report, `src/host/HostDeveloper.ns`, ctest
+`host.NewtonDeveloperPanel` - is `docs/host-settings.md`'s "The Developer
+panel"; developer tools go there.)
+
 `docs/host-settings.md`: Prefs' **Host** page (`src/host/HostSettings.ns`,
 `HostSettings.cpp`) - the host's settings switched while newton runs and
 kept in the System soup: beaming over the network (`HostIRChipSetPeer`), and

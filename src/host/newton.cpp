@@ -193,6 +193,7 @@
 #include "HostPackages.h"
 #include "HostOrientation.h"
 #include "HostSettings.h"
+#include "HostDeveloper.h"
 #include "HostMapping.h"
 #include "ROMImport.h"
 #include "memory/host/KernelHeap.h"
@@ -688,7 +689,8 @@ NewtonPreMain(void)
 	HostInstallPrinter();
 	HostInstallPowerGlobals();			// (power/host/HostPowerSwitch.h: HostPowerSwitch(), HostWakeAfter(ms), ...)
 	HostInstallFonts();					// (the host's fonts, offered when asked for: before the Host panel, which may turn them on)
-	HostInstallSettings();				// (the Host preferences panel, after Network Printers: the Prefs list's last)
+	HostInstallSettings();				// (the Host preferences panel, after Network Printers)
+	HostInstallDeveloper();				// (the Developer preferences panel, after it: the Prefs list's last)
 	HostInstallWordEngines();			// (the host's handwriting engines in the Handwriting Recognition slip)
 	InstallJournalHostNatives();		// (testing/Journal.h: JournalReplayWords, for the recognisers' replay metrics)
 	// the boot sound (TNotebook::InitToolbox), which may still be playing,
@@ -1287,6 +1289,7 @@ main(int argc, char** argv)
 	HostUseRealClock(true);
 	HostRestartReceive();		// (a restarted newton: the reboot reason, the window's place)
 	HostSettingsSetFile(storeFile);			// (the Host panel's settings for the next start: the screen size)
+	HostDeveloperSetReportFile(storeFile);	// (the Developer panel's profile written beside the store)
 	if (gWindowed)
 	{
 		HostSettingsReadStartup();

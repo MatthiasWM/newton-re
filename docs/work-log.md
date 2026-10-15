@@ -9,6 +9,18 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-15: A Developer page in Prefs, and no AppleTalk
+
+The owner asked for Newton Devices' AppleTalk panel to go from the Prefs
+list (the host has no AppleTalk) and for a Developer page for tools like
+the NewtonScript profiler.  The AppleTalk `RegPrefs` is taken out of
+Newton Devices' install script (DEVIATION, `romsrc/rex/newtdev/README.md`);
+`src/host/HostDeveloper.ns` is a Prefs page beside the Host one, on every
+host: "Profile NewtonScript" on and off, "Write profile" (to
+`<store>.nsprofile.txt`, a notice saying where; the console on the
+T-Deck Pro) and "Clear" (`docs/host-settings.md`, "The Developer panel";
+ctest `host.NewtonDeveloperPanel`).
+
 ## 2026-10-15: The public API's runtime and fixed-argument forms
 
 The uncited "runtime and overloads" category (65 functions) turned out to

@@ -1,0 +1,91 @@
+// The host's Developer preferences panel (host/HostDeveloper.h): the tools
+// for looking into the OS as it runs, beside the Host panel's settings of
+// the machine.  This file is compiled into newton (HostDeveloperSource.cpp,
+// made by src/cmake/EmbedText.cmake) and evaluated at boot by
+// HostInstallDeveloper; it answers the frame kept in the global
+// HostDeveloper:host, whose Start registers the panel.
+//
+// Its tools:
+//   - the NewtonScript profiler (frames/FunctionProfiler.h): on and off, its
+//     counts cleared, and its report written - to the file
+//     HostDeveloperReportPath() names (beside the store, on a desktop), or
+//     to the console where there is none (the T-Deck Pro's).
+// Nothing here is kept: each tool starts off at every boot.
+{
+	kAppSymbol: '|HostDeveloper:host|,
+	lastWritten: nil,			// where the profile last went (a path, or 'console)
+
+	// the panel's icon, a pair of angle brackets (a 16x12 'bits frame, as the
+	// ROM's own panels' icons are)
+	MakeIcon: func()
+	begin
+		local rows := [0x0000, 0x1008, 0x2004, 0x4002, 0x8001, 0x4002,
+					   0x2004, 0x1008, 0x0000, 0x0000, 0x0000, 0x0000];
+		local b := MakeBinary(16 + 4 * Length(rows), 'bits);
+		for i := 0 to 15 do StuffByte(b, i, 0);
+		StuffByte(b, 5, 4);								// rowBytes
+		StuffByte(b, 13, Length(rows));					// bounds.bottom
+		StuffByte(b, 15, 16);							// bounds.right
+		foreach i, r in rows do begin
+			StuffByte(b, 16 + 4 * i, r div 256);
+			StuffByte(b, 17 + 4 * i, r mod 256);
+			StuffByte(b, 18 + 4 * i, 0);
+			StuffByte(b, 19 + 4 * i, 0);
+		end;
+		{bits: b, bounds: {left: 0, top: 0, right: 16, bottom: Length(rows)}};
+	end,
+
+	// the profile written: to the report file (a notice saying where), or to
+	// the console
+	WriteProfile: func()
+	begin
+		local path := HostDeveloperReportPath();
+		local written := HostNSProfileReport(path);
+		if written then lastWritten := if path then path else 'console;
+		GetRoot():Notify(3, "Developer",
+			if not written then "The profile could not be written."
+			else if path then "The NewtonScript profile is in " & path & "."
+			else "The NewtonScript profile went to the console.");
+	end,
+
+	// The preferences panel: a line of text, then each tool's controls
+	panel: {
+		_proto: @385,								// protoPrefsRollItem
+		overview: "Developer",
+		icon: nil,
+		height: 112,
+		viewBounds: {left: 0, top: 0, right: 0, bottom: 112},
+		stepChildren: [
+			{_proto: @218, viewBounds: {left: 10, top: 20, right: -10, bottom: 36},		// protoStaticText
+			 viewJustify: 48, text: "Looking into the OS as it runs:"},
+			{_proto: @164,												// protoCheckbox
+			 viewBounds: {left: 10, top: 42, right: -10, bottom: 60},
+			 viewJustify: 48,
+			 text: "Profile NewtonScript",
+			 buttonValue: true,
+			 viewValue: nil,
+			 profilerSwitch: true,
+			 // (whether the profiler runs now, each time the panel opens:
+			 //  NEWTON_NS_PROFILE starts it at boot)
+			 viewSetupFormScript: func() begin
+				viewValue := HostNSProfileRunning();
+				inherited:?viewSetupFormScript();
+			 end,
+			 valueChanged: func() if viewValue then HostNSProfileStart() else HostNSProfileStop()},
+			{_proto: @226,												// protoTextButton
+			 viewBounds: {left: 30, top: 64, right: 140, bottom: 80},
+			 text: "Write profile",
+			 buttonClickScript: func() GetGlobalVar('|HostDeveloper:host|):WriteProfile()},
+			{_proto: @226,
+			 viewBounds: {left: 148, top: 64, right: 220, bottom: 80},
+			 text: "Clear",
+			 buttonClickScript: func() HostNSProfileReset()},
+		],
+	},
+
+	Start: func()
+	begin
+		panel.icon := :MakeIcon();
+		RegPrefs(kAppSymbol, panel);
+	end,
+}
