@@ -245,6 +245,15 @@ Scenario(const char* compander)
 	ULong unknown = 0;
 	EXPECT(CreateLargeObject(&unknown, store, 100, (char*) "TNobodysCompander", nil, 0) == kError_Bad_Parameters);
 
+	// deleted by its address: unmapped, and its objects gone; an address
+	// nothing is mapped at is refused
+	ULong byAddress = 0;
+	EXPECT(CreateLargeObject(&byAddress, store, 2000, (char*) compander, nil, 0) == noErr);
+	EXPECT(MapLargeObject(&address, store, byAddress, false) == noErr);
+	EXPECT(DeleteLargeObject(address) == noErr && StoreToVAddr(&at, store, byAddress) != noErr);
+	EXPECT(store->GetObjectSize(byAddress, &gone) != noErr);
+	EXPECT(DeleteLargeObject(address) != noErr);
+
 	store->Delete();
 }
 

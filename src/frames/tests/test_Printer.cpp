@@ -266,6 +266,12 @@ TestStrings()
 	str = SPrintObject(RefVar(MakeString("copy")));
 	EXPECT(IsString(str) && Ustrcmp(GetCString(str), (const UniChar*) u"copy") == 0);
 	EXPECT(!IsRichString(str) && GetStringFormat(str) == 0);
+	// the same from the characters: the low two bits of the last UniChar
+	UniChar plain[] = { 'a', 'b', 0 };
+	UniChar rich[] = { 'a', 0xf700, 0x0002 };
+	EXPECT(GetCStringFormat(plain, sizeof(plain)) == 0 && !IsRichCString(plain, sizeof(plain)));
+	EXPECT(GetCStringFormat(rich, sizeof(rich)) == 2 && IsRichCString(rich, sizeof(rich)));
+	EXPECT(!IsRichCString(rich, 4));								// ends at the 0xf700
 	// the natives
 	str = NSCallGlobalFn(RefVar(SYMBOL("SPrintObject")), RefVar(MAKEINT(7)));
 	EXPECT(IsString(str) && Ustrcmp(GetCString(str), (const UniChar*) u"7") == 0);

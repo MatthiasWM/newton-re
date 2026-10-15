@@ -811,6 +811,15 @@ ForwardReference(Ref r)
 }
 
 
+// ROM 0x0031dabc UnsafeArrayLength__FPc
+// (size - 12) / 4, the division rounding towards nought.
+long
+UnsafeArrayLength(char* obj)
+{
+	return ObjArrayLength((ObjHeader*) obj);
+}
+
+
 // ROM 0x0031dad4 ResolveMagicPtr__Fl
 // A magic pointer names a table (value >> 12) and an entry in it: table 0 is
 // the ROM's (its entries are refs to resolve again), table 1 the global

@@ -84,7 +84,7 @@ inline Ref*		ObjSlots(ObjHeader* o)				{ return (Ref*) ((char*) o + sizeof(ObjHe
 inline Ref&		ObjClass(ObjHeader* o)				{ return ObjSlots(o)[0]; }
 inline Ref*		ObjArraySlots(ObjHeader* o)			{ return ObjSlots(o) + 1; }
 inline char*	ObjData(ObjHeader* o)				{ return (char*) o + kObjBodySize; }
-inline long		ObjArrayLength(const ObjHeader* o)	{ return ((long) ObjSize(o) - kObjBodySize) / (long) sizeof(Ref); }	// UnsafeArrayLength (0x002f87b8)
+inline long		ObjArrayLength(const ObjHeader* o)	{ return ((long) ObjSize(o) - kObjBodySize) / (long) sizeof(Ref); }	// as UnsafeArrayLength
 inline long		ObjBinaryLength(const ObjHeader* o)	{ return (long) ObjSize(o) - kObjBodySize; }
 inline ULong	ArrayObjSize(long length)			{ return (ULong) (kObjBodySize + length * (long) sizeof(Ref)); }
 inline ULong	BinaryObjSize(long length)			{ return (ULong) (kObjBodySize + length); }
@@ -305,6 +305,11 @@ ObjHeader*	NoFaultObjectPtr(Ref obj);				// a fault block itself, not the entry 
 ObjHeader*	FaultCheckObjectPtr(Ref obj);			// nil for a fault block whose entry is not in memory
 ObjHeader*	NoTouchObjectPtr(Ref obj, int* isLargeObject);
 ObjHeader*	ResolveMagicPtr(Ref r);
+// An array object's slots, from its header alone - no check that it is an
+// array (or a slotted object at all); a binary answers its length over
+// four.  Nothing in the ROM calls it: the ROM inlines the sum (as
+// ObjArrayLength does here).
+long		UnsafeArrayLength(char* obj);				// ROM 0x0031dabc UnsafeArrayLength__FPc
 Ref			ForwardReference(Ref r);
 Boolean		IsFaultBlock(Ref r);
 Ref			FollowFaultBlock(RefArg faultBlock);

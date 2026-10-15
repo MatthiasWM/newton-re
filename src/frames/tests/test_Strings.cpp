@@ -893,6 +893,33 @@ TestThirtyBitIntegers()
 }
 
 
+// the three helpers nothing in the ROM calls
+static void
+TestStringHelpers()
+{
+	unsigned char pstr[256];
+	CToPString((unsigned char*) "hello", pstr);
+	EXPECT(pstr[0] == 5 && memcmp(pstr + 1, "hello", 5) == 0);
+	CToPString((unsigned char*) "", pstr);
+	EXPECT(pstr[0] == 0);
+	char longString[300];
+	memset(longString, 'x', 299);
+	longString[299] = 0;
+	pstr[255] = 0;
+	CToPString((unsigned char*) longString, pstr);
+	EXPECT(pstr[0] == 255 && pstr[255] == 'x');						// cut at 255
+
+	UniChar text[] = { 'a', 'b', 'c', 'd' };
+	UniChar* p = MakeStringPtr(text, 3);
+	EXPECT(p != nil && GetPtrSize((Ptr) p) == 6 && p[0] == 'a' && p[2] == 'c');	// no terminator
+	DisposPtr((Ptr) p);
+	Handle h = MakeStringHandle(text, 3);
+	EXPECT(h != nil && GetHandleSize(h) == 8);
+	EXPECT(h != nil && Ustrcmp((const UniChar*) *h, (const UniChar*) u"abc") == 0);
+	DisposHandle(h);
+}
+
+
 static void
 TestMath()
 {
@@ -981,6 +1008,7 @@ main()
 		TestThirtyBitIntegers();
 #endif
 		TestMath();
+		TestStringHelpers();
 	}
 	newton_catch_all
 	{

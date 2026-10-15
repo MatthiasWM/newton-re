@@ -127,6 +127,54 @@ FStrEqual(RefArg /*rcvr*/, RefArg a, RefArg b)
 }
 
 
+// ROM 0x001feee0 CToPString__FPUcT1
+// The C string as a Pascal string: its length byte, then at most 255 of
+// its characters.  Nothing in the ROM calls it.
+void
+CToPString(unsigned char* cstr, unsigned char* pstr)
+{
+	unsigned char* out = pstr + 1;
+	long count = 0;
+	while (*cstr != 0 && count < 255)
+	{
+		*out++ = *cstr++;
+		count++;
+	}
+	pstr[0] = (unsigned char) count;
+}
+
+
+// ROM 0x001fef18 MakeStringPtr__FPUsUl
+// The characters copied into a new pointer - without a terminator: the
+// ROM allocates exactly length characters.  Nil when there is no memory.
+// Nothing in the ROM calls it.
+UniChar*
+MakeStringPtr(UniChar* str, ULong length)
+{
+	ULong size = length * sizeof(UniChar);
+	UniChar* p = (UniChar*) NewPtr(size);
+	if (p != nil)
+		BlockMove(str, p, size);
+	return p;
+}
+
+
+// ROM 0x001fef54 MakeStringHandle__FPUsUl
+// The characters copied into a new handle, terminated.  Nil when there is
+// no memory.  Nothing in the ROM calls it.
+Handle
+MakeStringHandle(UniChar* str, ULong length)
+{
+	Handle h = NewHandle(sizeof(UniChar) + length * sizeof(UniChar));
+	if (h != nil)
+	{
+		BlockMove(str, *h, length * sizeof(UniChar));
+		((UniChar*) *h)[length] = 0;
+	}
+	return h;
+}
+
+
 // ROM 0x001fc8d4 FStrExactCompare__FRC6RefVarN21
 // ==> < 0, 0, > 0 as a compares to b, cases counting.
 Ref

@@ -1508,6 +1508,22 @@ DeleteLargeObject(TStore* store, PSSId id)
 }
 
 
+// ROM 0x00103b8c DeleteLargeObject__FUl
+// A mapped object, by its address: unmapped, then its store objects
+// deleted as a package's are (DeallocatePackage - not through its store's
+// own protocol, as the TStore* one does).  Nothing in the ROM calls it.
+NewtonErr
+DeleteLargeObject(ULong address)
+{
+	TStore* store;
+	ULong id;
+	NewtonErr err = UnmapLargeObject(&store, &id, address);
+	if (err == noErr)
+		err = DeallocatePackage(store, id);
+	return err;
+}
+
+
 // ROM 0x00103adc LODeleteByProtocol__FP6TStoreUl
 // The object deleted by its own store, or the default way.  (GetLOAllocator's
 // answer is not looked at: an unknown compander deletes the default way.)

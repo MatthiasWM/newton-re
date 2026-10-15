@@ -79,6 +79,18 @@ CMPExportListNameComparer::TestItem(const void* criteria) const
 }
 
 
+// ROM 0x000d1794 TestItem__27CMPExportListSourceComparerCFPCv
+// The same part or not: less than when not, so that it is good only for an
+// equality search.  Nothing in the ROM makes one.
+CompareResult
+CMPExportListSourceComparer::TestItem(const void* criteria) const
+{
+	if (((const MPExportItem*) fItem)->fSource != ((const MPExportItem*) criteria)->fSource)
+		return kItemLessThanCriteria;
+	return kItemEqualCriteria;
+}
+
+
 // ROM 0x000cf878 TestItem__27CMPImportListSourceComparerCFPCv
 // By the part's address.
 CompareResult

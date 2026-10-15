@@ -246,6 +246,7 @@ long		GetPagesSize(TStore* store, PSSId chunkArrayId);				// ROM 0x00102370 GetP
 
 // Deleting
 NewtonErr	DeleteLargeObject(TStore* store, PSSId id);					// ROM 0x00103b3c DeleteLargeObject__FP6TStoreUl
+NewtonErr	DeleteLargeObject(ULong address);								// ROM 0x00103b8c DeleteLargeObject__FUl - a mapped one, by its address: unmapped and deallocated as a package (nothing in the ROM calls it)
 NewtonErr	LODeleteByProtocol(TStore* store, PSSId id);					// ROM 0x00103adc LODeleteByProtocol__FP6TStoreUl
 NewtonErr	LODefaultDelete(TStore* store, PSSId id);						// ROM 0x0010231c LODefaultDelete__FP6TStoreUl - DeallocatePackage
 
