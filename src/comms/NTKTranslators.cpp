@@ -66,8 +66,8 @@ DeleteNTKPipe(TTaskSafeRingPipe* pipe)
 	PNTKInTranslator
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(PNTKInTranslator)
-PROTOCOL_CLASSINFO(PNTKInTranslator, "PInTranslator", "", 0, 0, nil)
+PROTOCOL_IMPL_SOURCE_MACRO(PNTKInTranslator)	// ROM 0x00129ef4 Sizeof__16PNTKInTranslatorSFv
+PROTOCOL_CLASSINFO(PNTKInTranslator, "PInTranslator", "", 0, 0, nil)	// ROM 0x003858c0 ClassInfo__16PNTKInTranslatorSFv
 
 // ROM 0x00129efc New__16PNTKInTranslatorFv
 PNTKInTranslator*
@@ -224,8 +224,8 @@ CreateNTKInTranslator(PInTranslator** translator, char* name, TTaskSafeRingBuffe
 	PNTKOutTranslator
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(PNTKOutTranslator)
-PROTOCOL_CLASSINFO(PNTKOutTranslator, "POutTranslator", "", 0, 0, nil)
+PROTOCOL_IMPL_SOURCE_MACRO(PNTKOutTranslator)	// ROM 0x0012a218 Sizeof__17PNTKOutTranslatorSFv
+PROTOCOL_CLASSINFO(PNTKOutTranslator, "POutTranslator", "", 0, 0, nil)	// ROM 0x0038594c ClassInfo__17PNTKOutTranslatorSFv
 
 // ROM 0x0012a220 New__17PNTKOutTranslatorFv
 PNTKOutTranslator*
@@ -533,8 +533,8 @@ CreateNTKOutTranslator(POutTranslator** translator, char* name, TTaskSafeRingBuf
 	PSerialInTranslator
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(PSerialInTranslator)
-PROTOCOL_CLASSINFO(PSerialInTranslator, "PInTranslator", "", 0, 0, nil)
+PROTOCOL_IMPL_SOURCE_MACRO(PSerialInTranslator)	// ROM 0x001dd574 Sizeof__19PSerialInTranslatorSFv
+PROTOCOL_CLASSINFO(PSerialInTranslator, "PInTranslator", "", 0, 0, nil)	// ROM 0x003859f8 ClassInfo__19PSerialInTranslatorSFv
 
 // ROM 0x001dd57c New__19PSerialInTranslatorFv
 PSerialInTranslator*
@@ -645,8 +645,8 @@ CreateSerialInTranslator(PInTranslator** translator, TTaskSafeRingBuffer* buffer
 	PSerialOutTranslator
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(PSerialOutTranslator)
-PROTOCOL_CLASSINFO(PSerialOutTranslator, "POutTranslator", "", 0, 0, nil)
+PROTOCOL_IMPL_SOURCE_MACRO(PSerialOutTranslator)	// ROM 0x001de770 Sizeof__20PSerialOutTranslatorSFv
+PROTOCOL_CLASSINFO(PSerialOutTranslator, "POutTranslator", "", 0, 0, nil)	// ROM 0x00385a88 ClassInfo__20PSerialOutTranslatorSFv
 
 // ROM 0x001de778 New__20PSerialOutTranslatorFv
 PSerialOutTranslator*

@@ -781,7 +781,7 @@ TPackageIterator::Store(TStore* store, PSSId indexId, TCallbackCompressor* compr
 	T h e   d e c o m p r e s s o r s
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(TSimpleStoreDecompressor)
+PROTOCOL_IMPL_SOURCE_MACRO(TSimpleStoreDecompressor)	// ROM 0x001fa9b0 Sizeof__24TSimpleStoreDecompressorSFv
 
 // ROM 0x001facf0 New__24TSimpleStoreDecompressorFv
 TSimpleStoreDecompressor*
@@ -823,7 +823,7 @@ TSimpleStoreDecompressor::Read(ULong pageId, char* buffer, long count, ULong bas
 }
 
 
-PROTOCOL_IMPL_SOURCE_MACRO(TSimpleRelocStoreDecompressor)
+PROTOCOL_IMPL_SOURCE_MACRO(TSimpleRelocStoreDecompressor)	// ROM 0x001f9f04 Sizeof__29TSimpleRelocStoreDecompressorSFv
 
 // ROM 0x001f9f0c New__29TSimpleRelocStoreDecompressorFv
 TSimpleRelocStoreDecompressor*
@@ -867,7 +867,7 @@ TSimpleRelocStoreDecompressor::Read(ULong pageId, char* buffer, long /*count*/, 
 }
 
 
-PROTOCOL_IMPL_SOURCE_MACRO(TLZStoreDecompressor)
+PROTOCOL_IMPL_SOURCE_MACRO(TLZStoreDecompressor)	// ROM 0x001f9d1c Sizeof__20TLZStoreDecompressorSFv
 
 // ROM 0x001f9d24 New__20TLZStoreDecompressorFv
 TLZStoreDecompressor*
@@ -926,7 +926,7 @@ TLZStoreDecompressor::Read(ULong pageId, char* buffer, long /*count*/, ULong bas
 }
 
 
-PROTOCOL_IMPL_SOURCE_MACRO(TLZRelocStoreDecompressor)
+PROTOCOL_IMPL_SOURCE_MACRO(TLZRelocStoreDecompressor)	// ROM 0x001f9d34 Sizeof__25TLZRelocStoreDecompressorSFv
 
 // ROM 0x001f9d3c New__25TLZRelocStoreDecompressorFv
 TLZRelocStoreDecompressor*
@@ -987,7 +987,7 @@ TLZRelocStoreDecompressor::Read(ULong pageId, char* buffer, long /*count*/, ULon
 }
 
 
-PROTOCOL_IMPL_SOURCE_MACRO(TZippyStoreDecompressor)
+PROTOCOL_IMPL_SOURCE_MACRO(TZippyStoreDecompressor)	// ROM 0x001facb0 Sizeof__23TZippyStoreDecompressorSFv
 
 // ROM 0x001facb8 New__23TZippyStoreDecompressorFv
 TZippyStoreDecompressor*
@@ -1044,7 +1044,7 @@ TZippyStoreDecompressor::Read(ULong pageId, char* buffer, long /*count*/, ULong 
 }
 
 
-PROTOCOL_IMPL_SOURCE_MACRO(TZippyRelocStoreDecompressor)
+PROTOCOL_IMPL_SOURCE_MACRO(TZippyRelocStoreDecompressor)	// ROM 0x001faab8 Sizeof__28TZippyRelocStoreDecompressorSFv
 
 // ROM 0x001faac0 New__28TZippyRelocStoreDecompressorFv
 TZippyRelocStoreDecompressor*
@@ -1110,7 +1110,7 @@ TZippyRelocStoreDecompressor::Read(ULong pageId, char* buffer, long /*count*/, U
 	T S t o r e C o m p a n d e r W r a p p e r
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(TStoreCompanderWrapper)
+PROTOCOL_IMPL_SOURCE_MACRO(TStoreCompanderWrapper)	// ROM 0x001fa5c4 Sizeof__22TStoreCompanderWrapperSFv
 
 // ROM 0x001fa5cc New__22TStoreCompanderWrapperFv
 TStoreCompanderWrapper*
@@ -1212,7 +1212,7 @@ TStoreCompanderWrapper::IsReadOnly()
 	T L O P a c k a g e S t o r e
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(TLOPackageStore)
+PROTOCOL_IMPL_SOURCE_MACRO(TLOPackageStore)	// ROM 0x00102f60 Sizeof__15TLOPackageStoreSFv
 
 // ROM 0x00102f68 New__15TLOPackageStoreFv
 TLOPackageStore*

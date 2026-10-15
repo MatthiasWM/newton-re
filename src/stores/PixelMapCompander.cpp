@@ -72,7 +72,7 @@ Measure(long count, long rowBytes, long rowWords, long* xorWords, long* tailByte
 }
 
 
-PROTOCOL_IMPL_SOURCE_MACRO(TPixelMapCompander)
+PROTOCOL_IMPL_SOURCE_MACRO(TPixelMapCompander)	// ROM 0x0018a95c Sizeof__18TPixelMapCompanderSFv
 
 
 // ROM 0x0018a984 New__18TPixelMapCompanderFv

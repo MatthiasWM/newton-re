@@ -513,7 +513,7 @@ TSniffIRTool::NotifyUser()
 	IRSniffService ('snif')
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(IRSniffService)
+PROTOCOL_IMPL_SOURCE_MACRO(IRSniffService)	// ROM 0x000e9034 Sizeof__14IRSniffServiceSFv
 PROTOCOL_CLASSINFO(IRSniffService, "TCMService", "serv\0snif\0\0", 0x20000, 0, nil)	// ROM 0x00382efc ClassInfo__14IRSniffServiceSFv
 
 // ROM 0x000e903c New__14IRSniffServiceFv

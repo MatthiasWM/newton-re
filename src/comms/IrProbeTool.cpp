@@ -738,7 +738,7 @@ TIrProbeTool::NextState(ULong event)
 	IRProbeService ('pkir')
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(IRProbeService)
+PROTOCOL_IMPL_SOURCE_MACRO(IRProbeService)	// ROM 0x000e89d8 Sizeof__14IRProbeServiceSFv
 PROTOCOL_CLASSINFO(IRProbeService, "TCMService", "serv\0pkir\0\0", 0x20000, 0, nil)	// ROM 0x00382f88 ClassInfo__14IRProbeServiceSFv
 
 // ROM 0x000e89e0 New__14IRProbeServiceFv

@@ -157,7 +157,7 @@ TStoreDecompressor::Delete()
 //	TSimpleStoreCompander - the blocks kept uncompressed.
 // ---------------------------------------------------------------------------
 
-PROTOCOL_IMPL_SOURCE_MACRO(TSimpleStoreCompander)
+PROTOCOL_IMPL_SOURCE_MACRO(TSimpleStoreCompander)	// ROM 0x001fa384 Sizeof__21TSimpleStoreCompanderSFv
 
 
 // ROM 0x001fa3fc New__21TSimpleStoreCompanderFv
@@ -259,7 +259,7 @@ TSimpleStoreCompander::IsReadOnly()
 //	TLZStoreCompander - the blocks LZ-compressed.
 // ---------------------------------------------------------------------------
 
-PROTOCOL_IMPL_SOURCE_MACRO(TLZStoreCompander)
+PROTOCOL_IMPL_SOURCE_MACRO(TLZStoreCompander)	// ROM 0x001fa034 Sizeof__17TLZStoreCompanderSFv
 
 
 // ROM 0x001fa03c New__17TLZStoreCompanderFv
