@@ -5,6 +5,7 @@
 set(NEWTON_SOURCES
     alert/AlertDialog.cpp
     alert/AlertManager.cpp
+    alert/PinPad.cpp
     armcpu/ARMCPU.cpp
     armcpu/ARMCardHandler.cpp
     armcpu/ARMKernelGlue.cpp
@@ -109,6 +110,7 @@ set(NEWTON_SOURCES
     frames/FramesPart.cpp
     frames/FunctionProfiler.cpp
     frames/GC.cpp
+    frames/GCSafeList.cpp
     frames/HostOrder.cpp
     frames/Interpreter.cpp
     frames/Lexer.cpp
@@ -227,6 +229,7 @@ set(NEWTON_SOURCES
     os600/kernel/Task.cpp
     os600/kernel/TaskSwitch.cpp
     os600/kernel/TimerEngine.cpp
+    os600/kernel/UCTTable.cpp
     os600/kernel/host/TaskRuntime.cpp
     os600/user/BuildEnvironments.cpp
     os600/user/ExceptionNames.cpp
@@ -271,6 +274,7 @@ set(NEWTON_SOURCES
     packages/StorePackageNatives.cpp
     packages/StorePackages.cpp
     packages/Units.cpp
+    packages/ValidatePackage.cpp
     pcmcia/ATASimple.cpp
     pcmcia/CHMemModem.cpp
     pcmcia/CISTables.cpp
@@ -331,6 +335,7 @@ set(NEWTON_SOURCES
     qd/PixelConvert.cpp
     qd/Polygons.cpp
     qd/Ports.cpp
+    qd/QDLibrary.cpp
     qd/QDTables.cpp
     qd/RectNatives.cpp
     qd/Rects.cpp
@@ -435,6 +440,7 @@ set(NEWTON_SOURCES
     recognition/Recognizer.cpp
     recognition/Render.cpp
     recognition/RenderTables.cpp
+    recognition/ReplayMetrics.cpp
     recognition/RosCITables.cpp
     recognition/RosEngine.cpp
     recognition/RosList.cpp
@@ -473,12 +479,14 @@ set(NEWTON_SOURCES
     recognition/WordList.cpp
     recognition/WordRecog.cpp
     recognition/WordRecognizer.cpp
+    recognition/WordReplay.cpp
     recognition/WordSegment.cpp
     recognition/WordSegmentTables.cpp
     recognition/WordTails.cpp
     recognition/WordUnit.cpp
     recognition/Words.cpp
     recognition/XrAnswers.cpp
+    recognition/XrDiacriticsTables.cpp
     recognition/XrDomains.cpp
     recognition/XrLex.cpp
     recognition/XrMatrix.cpp
@@ -640,6 +648,7 @@ set(NEWTON_SOURCES
     views/Keyboard.cpp
     views/KeyboardView.cpp
     views/ListView.cpp
+    views/MathViews.cpp
     views/MeetingView.cpp
     views/ModalDialogs.cpp
     views/MonthView.cpp
@@ -684,6 +693,7 @@ set(NEWTON_GROUP_COUNT 51)
 set(NEWTON_GROUP_0_SOURCES
     alert/AlertDialog.cpp
     alert/AlertManager.cpp
+    alert/PinPad.cpp
 )
 set(NEWTON_GROUP_0_INCLUDES
     alert
@@ -1108,6 +1118,7 @@ set(NEWTON_GROUP_11_SOURCES
     frames/FramesPart.cpp
     frames/FunctionProfiler.cpp
     frames/GC.cpp
+    frames/GCSafeList.cpp
     frames/HostOrder.cpp
     frames/Interpreter.cpp
     frames/Lexer.cpp
@@ -1619,6 +1630,7 @@ set(NEWTON_GROUP_29_SOURCES
     os600/kernel/Task.cpp
     os600/kernel/TaskSwitch.cpp
     os600/kernel/TimerEngine.cpp
+    os600/kernel/UCTTable.cpp
     os600/kernel/host/TaskRuntime.cpp
 )
 set(NEWTON_GROUP_29_INCLUDES
@@ -1730,6 +1742,7 @@ set(NEWTON_GROUP_32_SOURCES
     packages/PartPipe.cpp
     packages/ProtocolStandIns.cpp
     packages/ROMClassInfo.cpp
+    packages/ValidatePackage.cpp
 )
 set(NEWTON_GROUP_32_INCLUDES
     packages
@@ -1978,6 +1991,7 @@ set(NEWTON_GROUP_39_SOURCES
     qd/PixelConvert.cpp
     qd/Polygons.cpp
     qd/Ports.cpp
+    qd/QDLibrary.cpp
     qd/QDTables.cpp
     qd/RectNatives.cpp
     qd/Rects.cpp
@@ -2102,6 +2116,7 @@ set(NEWTON_GROUP_40_SOURCES
     recognition/Recognizer.cpp
     recognition/Render.cpp
     recognition/RenderTables.cpp
+    recognition/ReplayMetrics.cpp
     recognition/RosCITables.cpp
     recognition/RosEngine.cpp
     recognition/RosList.cpp
@@ -2141,12 +2156,14 @@ set(NEWTON_GROUP_40_SOURCES
     recognition/WordList.cpp
     recognition/WordRecog.cpp
     recognition/WordRecognizer.cpp
+    recognition/WordReplay.cpp
     recognition/WordSegment.cpp
     recognition/WordSegmentTables.cpp
     recognition/WordTails.cpp
     recognition/WordUnit.cpp
     recognition/Words.cpp
     recognition/XrAnswers.cpp
+    recognition/XrDiacriticsTables.cpp
     recognition/XrDomains.cpp
     recognition/XrLex.cpp
     recognition/XrMatrix.cpp
@@ -2613,6 +2630,7 @@ set(NEWTON_GROUP_50_SOURCES
     views/Keyboard.cpp
     views/KeyboardView.cpp
     views/ListView.cpp
+    views/MathViews.cpp
     views/MeetingView.cpp
     views/ModalDialogs.cpp
     views/MonthView.cpp
