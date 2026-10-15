@@ -263,6 +263,9 @@ TNewtWorld::MainConstructor()
 	// and a package's protocol parts that have no host stand-in
 	// (armcpu/ARMProtocols.h, armcpu/ARMCardHandler.h)
 	InstallARMProtocols();
+	// (GetNewtTaskPort and GetNewtRootView, as ARM code asks for them)
+	gARMNewtTaskPort = GetNewtTaskPort;
+	gARMNewtRootView = GetNewtRootView;
 	InstallARMCardHandlers();
 	InstallARMPSSManager();
 	InstallARMStores();
@@ -478,6 +481,24 @@ TNewtWorld::AEDispatch(ULong msgType, TUMsgToken* token, ULong* size, TAEvent* e
 // ROM 0x0030c0e0 __ct__17TNewtEventHandlerFv
 TNewtEventHandler::TNewtEventHandler()
 { }
+
+
+// ROM 0x0030bb84 GetNewtTaskPort__Fv
+// The newt world's port, for packages' native code (public API).
+TUPort*
+GetNewtTaskPort(void)
+{
+	return gNewtPort;
+}
+
+
+// ROM 0x0030bb94 GetNewtRootView__Fv
+// The root view, likewise.
+TRootView*
+GetNewtRootView(void)
+{
+	return gRootView;
+}
 
 
 // ROM 0x0030bba4 AECompletionProc__17TNewtEventHandlerFP10TUMsgTokenPUlP7TAEvent

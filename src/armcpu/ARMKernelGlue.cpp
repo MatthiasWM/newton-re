@@ -1013,6 +1013,41 @@ static bool	Glue_rand(void*, ARMTrapContext& c)		{ gRandSeed = gRandSeed * 11035
 static bool	Glue_srand(void*, ARMTrapContext& c)	{ gRandSeed = c.Arg(0); c.Return(0); return true; }
 
 
+// the newt world's, as the newt library tells (ARMProtocols.h)
+TUPort*		(*gARMNewtTaskPort)(void) = nil;
+TRootView*	(*gARMNewtRootView)(void) = nil;
+
+// ROM 0x0030bb84 GetNewtTaskPort__Fv
+// gNewtPort, as a TUPort of the ARM code's (8 bytes: its id, then 0, as
+// TUPort's constructor makes one) - a mirror of the host port, made once
+static bool
+Glue_GetNewtTaskPort(void*, ARMTrapContext& c)
+{
+	TUPort* port = gARMNewtTaskPort != nil ? gARMNewtTaskPort() : nil;
+	uint32_t arm = 0;
+	if (port != nil)
+	{
+		arm = ARMMirrorFor(port, 8, 'uprt');
+		c.Write32(arm, (uint32_t) port->fId);
+		c.Write32(arm + 4, 0);
+	}
+	c.Return(arm);
+	return true;
+}
+
+// ROM 0x0030bb94 GetNewtRootView__Fv
+// gRootView.  DEVIATION: an address standing for the host's root view (a
+// mirror of no use but to be handed back: a host TView's fields are not in
+// the ROM's layout), as the ARM code has no host pointer.
+static bool
+Glue_GetNewtRootView(void*, ARMTrapContext& c)
+{
+	TRootView* root = gARMNewtRootView != nil ? gARMNewtRootView() : nil;
+	c.Return(root != nil ? ARMMirrorFor(root, 8, 'view') : 0);
+	return true;
+}
+
+
 void
 InstallARMKernelGlue(void)
 {
@@ -1037,6 +1072,8 @@ InstallARMKernelGlue(void)
 	ARMRegisterGlue("SetCollectorPort__14TUAsyncMessageFUl", Glue_TUAsyncMessage_SetCollectorPort);
 	ARMRegisterGlue("SetUserRefCon__14TUSharedMemMsgFUl", Glue_TUSharedMemMsg_SetUserRefCon);
 	ARMRegisterGlue("__ct__6TUPortFUl", Glue_TUPort_ct);
+	ARMRegisterGlue("GetNewtTaskPort__Fv", Glue_GetNewtTaskPort);
+	ARMRegisterGlue("GetNewtRootView__Fv", Glue_GetNewtRootView);
 	ARMRegisterGlue("SendGoo__6TUPortFUlT1PvN31UcT1P5TTime", Glue_TUPort_SendGoo);
 	ARMRegisterGlue("SendRPCGoo__6TUPortFUlT1PUlPvN31UcT4N21P5TTime", Glue_TUPort_SendRPCGoo);
 	ARMRegisterGlue("ReplyRPC__10TUMsgTokenFPvUll", Glue_TUMsgToken_ReplyRPC);

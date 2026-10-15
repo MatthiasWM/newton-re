@@ -65,6 +65,7 @@ Boolean	WRecVerifyWordSymbols(UniChar* word);				// ROM 0x001444c8 WRecVerifyWor
 
 
 Boolean	HasSpaces(const UniChar* word);				// ROM 0x00256460 HasSpaces__FPUs
+Boolean	HasDigits(const UniChar* word);			// ROM 0x00256498 HasDigits__FPUs - an ASCII digit anywhere in it
 Boolean	HasChars(const UniChar* word);				// ROM 0x002564d4 HasChars__FPUs - a Roman letter anywhere in it
 Boolean	IsPunctSymbol(const UniChar* word, long index);	// ROM 0x00256524 IsPunctSymbol__FPUsl
 void	StripRecognitionWord(UniChar* word);		// ROM 0x0008eb8c StripRecognitionWord__FPUs - the punctuation taken off both ends

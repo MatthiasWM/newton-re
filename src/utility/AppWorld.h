@@ -119,7 +119,7 @@ public:
 	long				Init(TObjectId portId);
 
 	TUPort*				GetPort()			{ return fPort; }
-	long				GetError()			{ return fError; }
+	long				GetError()			{ return fError; }	// ROM 0x00031b68 GetError__14TAppWorldStateFv (the public jump table's copy)
 
 	void				NestedEventLoop();
 	void				TerminateNestedEventLoop();

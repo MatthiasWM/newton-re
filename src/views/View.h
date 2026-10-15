@@ -67,6 +67,7 @@ class TView;
 class TRootView;
 class TViewList;
 class TDragInfo;				// DragDrop.h
+class TCommand;					// (only TView's empty command overloads name it)
 class TStrokePublic;			// recognition/Stroke.h
 class TUnitPublic;				// recognition/UnitPublic.h
 struct StyleRecord;
@@ -273,6 +274,12 @@ public:
 	virtual Boolean	DragFeedback(const TDragInfo& dragInfo, const Point& pt, Boolean show);	// ROM 0x0009e6f4 DragFeedback__5TViewFRC9TDragInfoRC6TPointUc (viewDragFeedbackScript)
 	virtual Ref		GetSupportedDropTypes(const Point& pt);
 	virtual TView*	FindDropView(const TDragInfo& dragInfo, const Point& pt);
+
+	// the public jump table's command overloads of an older interface (a
+	// command object, not a frame): a bare return each in the ROM, called
+	// by nothing - not virtual (the vtable has the RefArg forms)
+	void			DoCommand(TCommand* cmd);							// ROM 0x00034484 DoCommand__5TViewFP8TCommand
+	void			RealDoCommand(TCommand* cmd);						// ROM 0x00034488 RealDoCommand__5TViewFP8TCommand
 
 	// making and structure
 	static Ref		BuildContext(RefArg templ, Boolean forceVisible);		// ROM 0x0025e56c BuildContext__5TViewFRC6RefVarUc  (the view is unused: a static here)

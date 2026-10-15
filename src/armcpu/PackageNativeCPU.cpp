@@ -27,6 +27,8 @@
 #include "HostOrder.h"
 #include "ByteOrder.h"
 #include "utility/Unicode.h"
+#include "utility/CRC16.h"
+#include "ROMConstants.h"
 #include "NewtonGestalt.h"
 #include "NewtonMemory.h"
 #include <stdio.h>
@@ -2410,12 +2412,14 @@ GLUE(Glue_SetLexScope)
 }
 GLUE(Glue_FindImplementor)		{ w.Return(cpu, w.ToARM(FindImplementor(RefVar(w.ArgRef(cpu.r[0])), RefVar(w.ArgRef(cpu.r[1]))))); return true; }
 GLUE(Glue_FindProtoImplementor)	{ w.Return(cpu, w.ToARM(FindProtoImplementor(RefVar(w.ArgRef(cpu.r[0])), RefVar(w.ArgRef(cpu.r[1]))))); return true; }
+// ROM 0x00300e40 SetVariableOrGlobal__FRC6RefVarN21iT4
+// (the public form: its two ints unread, flags 7 - frames/VariableLookup.cpp)
 GLUE(Glue_SetVariableOrGlobal)
 {
 	RefVar context(w.ArgRef(cpu.r[0]));
 	RefVar name(w.ArgRef(cpu.r[1]));
 	RefVar value(w.ArgRef(cpu.r[2]));
-	w.Return(cpu, SetVariableOrGlobal(context, name, value, (int32_t) cpu.r[3]) ? 1 : 0);
+	w.Return(cpu, SetVariableOrGlobal(context, name, value, (int) cpu.r[3], (int) w.Arg(cpu, 4)) ? 1 : 0);
 	return true;
 }
 GLUE(Glue_ForEachLoopReset)		{ w.Return(cpu, ForEachLoopReset(RefVar(w.ArgRef(cpu.r[0])), RefVar(w.ArgRef(cpu.r[1]))) ? 1 : 0); return true; }
@@ -2511,6 +2515,8 @@ GLUE(Glue_SetClass)				{ FSetClass(RefVar(NILREF), RefVar(w.ArgRef(cpu.r[0])), R
 GLUE(Glue_AllocateBinary)		{ w.Return(cpu, w.ToARM(AllocateBinary(RefVar(w.ArgRef(cpu.r[0])), (int32_t) cpu.r[1]))); return true; }
 GLUE(Glue_FrameHasPath)			{ w.Return(cpu, FrameHasPath(RefVar(w.ArgRef(cpu.r[0])), RefVar(w.ArgRef(cpu.r[1]))) ? 1 : 0); return true; }
 GLUE(Glue_SetFramePath)			{ SetFramePath(RefVar(w.ArgRef(cpu.r[0])), RefVar(w.ArgRef(cpu.r[1])), RefVar(w.ArgRef(cpu.r[2]))); w.Return(cpu, 0); return true; }
+// ROM 0x00319828 RCHAR__Fl
+// (the out-of-line copy of the inline: a character's value, else _RCHARError)
 GLUE(Glue_RCHAR)				{ w.Return(cpu, (uint32_t) RCHAR(w.ToHost(cpu.r[0]))); return true; }
 
 // the C library, over the ARM world's memory
@@ -3268,6 +3274,222 @@ GLUE(Glue_TObjectPtr_ctor)
 	return true;
 }
 
+/*------------------------------------------------------------------------------
+	T h e   p u b l i c   A P I   t h e   R O M   d o e s   n o t   c a l l
+	(uncited-categories.tsv's category of that name: each reconstructed in
+	its area, answered here for a package's code)
+------------------------------------------------------------------------------*/
+
+// ROM 0x00025460 __ct__10TIdleTimerFv
+// ROM 0x00025464 Init__10TIdleTimerFUl9TimeUnitsN21
+// ROM 0x00025aec Start__10TIdleTimerFv
+// ROM 0x00025cd8 Start__10TIdleTimerFP6TUPort
+// ROM 0x00025ccc Stop__10TIdleTimerFv
+// ROM 0x00025888 Reset__10TIdleTimerFv
+// ROM 0x000256b4 Reset__10TIdleTimerFUl9TimeUnits
+// ROM 0x00025cd4 Reset__10TIdleTimerFUl9TimeUnitsP6TUPort
+// ROM 0x00025cd0 ResetIdle__14TAEventHandlerFUl9TimeUnitsP6TUPort
+// ROM 0x00034484 DoCommand__5TViewFP8TCommand
+// ROM 0x00034488 RealDoCommand__5TViewFP8TCommand
+// ROM 0x000ac670 CallService__21TEndpointEventHandlerFUlP14TUAsyncMessageP7TAEventlT3T4T1Uc
+// ROM 0x000ac674 CallServiceBlocking__21TEndpointEventHandlerFUlP7TAEventlT2T3T1
+// ROM 0x000acc28 GetPrivatePortId__21TEndpointEventHandlerFv
+// ROM 0x000acc2c GetSyncPortId__21TEndpointEventHandlerFv
+// a bare return (mov pc, lr): r0 left as the caller passed it - the object,
+// which is what the caller finds as a result (utility/IdleTimer.h, views/
+// View.h, comms/Endpoint.h); TIdleTimer's constructor does not allocate
+GLUE(Glue_BareReturn)			{ w.Return(cpu, cpu.r[0]); return true; }
+
+// ROM 0x00133c7c __nw__FUiPv
+// placement new: the address it was given
+GLUE(Glue_newPlacement)			{ w.Return(cpu, cpu.r[1]); return true; }
+
+// ROM 0x00031b68 GetError__14TAppWorldStateFv
+// the world state's first word, fError (utility/AppWorld.h)
+GLUE(Glue_TAppWorldState_GetError)
+{
+	uint32_t err = 0;
+	w.Read32(cpu.r[0], &err);
+	w.Return(cpu, err);
+	return true;
+}
+
+// ROM 0x0031c7b4 RefToUniChar__FRC6RefVar
+// a character's value (RCHAR of the RefVar's ref): else _RCHARError
+GLUE(Glue_RefToUniChar)
+{
+	uint32_t ref = RefOfArg(w, cpu.r[0]);
+	uint32_t c;
+	if ((ref & 3) == 2 && ((ref >> 2) & 3) == 1)
+		c = ref >> 4;
+	else
+		c = (uint32_t) _RCHARError(w.ToHost(ref));
+	w.Return(cpu, c & 0xffff);
+	return true;
+}
+
+// ROM 0x0031c848 FrameHasSlot__FRC6RefVarT1
+// (FrameHasSlotRef of the two refs, made a byte Boolean)
+GLUE(Glue_FrameHasSlotArg)		{ w.Return(cpu, FrameHasSlotRef(w.ToHost(RefOfArg(w, cpu.r[0])), w.ToHost(RefOfArg(w, cpu.r[1]))) != 0 ? 1 : 0); return true; }
+// ROM 0x0031c8f0 IsSubclass__FRC6RefVarT1
+GLUE(Glue_IsSubclassArg)		{ w.Return(cpu, IsSubclassRef(w.ToHost(RefOfArg(w, cpu.r[0])), w.ToHost(RefOfArg(w, cpu.r[1]))) != 0 ? 1 : 0); return true; }
+
+// ROM 0x0031c574 ROMSoupBounds__FPPcT1
+// where the ROM's objects start (r0) and their size (r1) - the ROM's own
+// addresses, at which the ARM world has the ROM (frames/Objects.cpp's
+// ROMSoupBounds answers the host's area)
+GLUE(Glue_ROMSoupBounds)
+{
+	w.Write32(cpu.r[0], kROMSoupBase);
+	w.Write32(cpu.r[1], kROMSoupSize);
+	w.Return(cpu, 0);
+	return true;
+}
+
+// ROM 0x00256498 HasDigits__FPUs
+// an ASCII digit anywhere in the UniChars (recognition/Words.cpp's)
+GLUE(Glue_HasDigits)
+{
+	uint16_t c;
+	for (uint32_t a = cpu.r[0]; w.Read16(a, &c) && c != 0; a += 2)
+		if (c >= '0' && c <= '9')
+		{
+			w.Return(cpu, 1);
+			return true;
+		}
+	w.Return(cpu, 0);
+	return true;
+}
+
+// ROM 0x00049d28 ComputeCRC__6TCRC16FR11CBufferList
+// the ARM code's buffer list (r1) from its start - its own Seek (vtable
+// +0x38) and Get (+0x10) called - into the TCRC16 at r0 (its fCRC +4), as
+// utility/CRC16.cpp's
+GLUE(Glue_TCRC16_ComputeCRCList)
+{
+	uint32_t self = cpu.r[0], list = cpu.r[1], vtable = 0;
+	w.Read32(list, &vtable);
+	uint32_t seek[3] = { list, 0, (uint32_t) -1 };		// Seek(0, kSeekFromBeginning)
+	ARMCall(vtable + 0x38, seek, 3);
+	for (;;)
+	{
+		w.Read32(list, &vtable);
+		uint32_t get[1] = { list };
+		int32_t c = (int32_t) ARMCall(vtable + 0x10, get, 1);
+		if (c == -1)
+			break;
+		uint32_t crc = 0;
+		w.Read32(self + 4, &crc);
+		uint32_t index = (crc & 0xff) ^ (uint32_t) c;
+		crc = (uint32_t) (kCrc16HTbl[(index & 0xf0) >> 4] ^ kCrc16LTbl[index & 0xf]) ^ (crc >> 8);
+		w.Write32(self + 4, crc);
+	}
+	w.Return(cpu, 0);
+	return true;
+}
+
+// TUCTTable over ARM memory, in the ROM's layouts (os600/kernel/UCTTable.h):
+// the table's queues at +0x14, 8 bytes each (fHead, fTail); a task's fState
+// +0x6c, fContainer +0x90, its queue links +0x94/+0x98 and its key +0x9c.
+// (No FIQs to mask in the ARM world.)
+enum { kUCTQueues = 0x14, kTaskState = 0x6c, kTaskContainer = 0x90, kTaskNext = 0x94, kTaskPrev = 0x98, kTaskKey = 0x9c };
+const uint32_t kInUCTTable = 0x4000;
+static uint32_t	UCTQueue(uint32_t table, uint32_t key)	{ return table + kUCTQueues + ((key >> 4) & 0x1f) * 8; }
+static uint32_t	R32(TNativeWorld& w, uint32_t a)		{ uint32_t v = 0; w.Read32(a, &v); return v; }
+
+// TTaskQueue::RemoveFromQueue (ROM 0x00359b5c), over ARM words
+static bool
+UCTRemoveFromQueue(TNativeWorld& w, uint32_t queue, uint32_t task)
+{
+	if (task == 0 || (R32(w, task + kTaskState) & kInUCTTable) == 0)
+		return false;
+	uint32_t next = R32(w, task + kTaskNext), prev = R32(w, task + kTaskPrev);
+	if (R32(w, queue) == task)
+	{
+		if (R32(w, queue + 4) == task)
+		{
+			w.Write32(queue, 0);
+			w.Write32(queue + 4, 0);
+		}
+		else
+		{
+			w.Write32(queue, next);
+			w.Write32(next + kTaskPrev, 0);
+		}
+	}
+	else
+	{
+		w.Write32(prev + kTaskNext, next);
+		if (R32(w, queue + 4) == task)
+			w.Write32(queue + 4, prev);
+		else
+			w.Write32(next + kTaskPrev, prev);
+	}
+	w.Write32(task + kTaskPrev, 0);
+	w.Write32(task + kTaskNext, 0);
+	w.Write32(task + kTaskState, R32(w, task + kTaskState) & ~kInUCTTable);
+	w.Write32(task + kTaskContainer, 0);
+	return true;
+}
+
+// ROM 0x00256300 Add__9TUCTTableFP5TTaskUl
+// the task filed by its key (TTaskQueue::Add, ROM 0x00359aac: the queue
+// itself the first task's fPrev, as the ROM has it)
+GLUE(Glue_TUCTTable_Add)
+{
+	uint32_t table = cpu.r[0], task = cpu.r[1], key = cpu.r[2];
+	uint32_t queue = UCTQueue(table, key);
+	w.Write32(task + kTaskKey, key);
+	w.Write32(task + kTaskNext, 0);
+	uint32_t tail = R32(w, queue + 4);
+	if (R32(w, queue) == 0)
+	{
+		w.Write32(queue, task);
+		w.Write32(task + kTaskPrev, queue);
+	}
+	else
+	{
+		w.Write32(tail + kTaskNext, task);
+		w.Write32(task + kTaskPrev, tail);
+	}
+	w.Write32(queue + 4, task);
+	w.Write32(task + kTaskState, R32(w, task + kTaskState) | kInUCTTable);
+	w.Write32(task + kTaskContainer, table);
+	w.Return(cpu, 0);
+	return true;
+}
+
+// ROM 0x00256348 Remove__9TUCTTableFUl
+// the first task filed by the key (TTaskQueue::FindAndRemove, ROM 0x00359a30)
+GLUE(Glue_TUCTTable_RemoveKey)
+{
+	uint32_t queue = UCTQueue(cpu.r[0], cpu.r[1]);
+	for (uint32_t task = R32(w, queue); task != 0; task = R32(w, task + kTaskNext))
+		if (R32(w, task + kTaskKey) == cpu.r[1])
+		{
+			UCTRemoveFromQueue(w, queue, task);
+			w.Return(cpu, task);
+			return true;
+		}
+	w.Return(cpu, 0);
+	return true;
+}
+
+// ROM 0x0025638c Remove__9TUCTTableFP5TTask
+// the task out of its key's queue, if it is in the table (==> the table)
+GLUE(Glue_TUCTTable_RemoveTask)
+{
+	uint32_t table = cpu.r[0], task = cpu.r[1];
+	if ((R32(w, task + kTaskState) & kInUCTTable) != 0)
+		UCTRemoveFromQueue(w, UCTQueue(table, R32(w, task + kTaskKey)), task);
+	w.Return(cpu, table);
+	return true;
+}
+
+// ROM 0x002563d8 HeldBy__9TUCTTableFP5TTaskUl
+GLUE(Glue_TUCTTable_HeldBy)		{ w.Return(cpu, R32(w, cpu.r[1] + kTaskKey) == cpu.r[2] ? 1 : 0); return true; }
+
+
 static void
 InitGlue(void)
 {
@@ -3346,6 +3568,34 @@ InitGlue(void)
 		{ "__ct__9RefStructFRC6RefVar", Glue_RefStruct_copy },
 		{ "__ct__9RefStructFRC9RefStruct", Glue_RefStruct_copy },
 		{ "__ct__10TObjectPtrFRC9RefStruct", Glue_TObjectPtr_ctor },
+		// the public API the ROM does not call
+		{ "__ct__10TIdleTimerFv", Glue_BareReturn },
+		{ "Init__10TIdleTimerFUl9TimeUnitsN21", Glue_BareReturn },
+		{ "Start__10TIdleTimerFv", Glue_BareReturn },
+		{ "Start__10TIdleTimerFP6TUPort", Glue_BareReturn },
+		{ "Stop__10TIdleTimerFv", Glue_BareReturn },
+		{ "Reset__10TIdleTimerFv", Glue_BareReturn },
+		{ "Reset__10TIdleTimerFUl9TimeUnits", Glue_BareReturn },
+		{ "Reset__10TIdleTimerFUl9TimeUnitsP6TUPort", Glue_BareReturn },
+		{ "ResetIdle__14TAEventHandlerFUl9TimeUnitsP6TUPort", Glue_BareReturn },
+		{ "DoCommand__5TViewFP8TCommand", Glue_BareReturn },
+		{ "RealDoCommand__5TViewFP8TCommand", Glue_BareReturn },
+		{ "CallService__21TEndpointEventHandlerFUlP14TUAsyncMessageP7TAEventlT3T4T1Uc", Glue_BareReturn },
+		{ "CallServiceBlocking__21TEndpointEventHandlerFUlP7TAEventlT2T3T1", Glue_BareReturn },
+		{ "GetPrivatePortId__21TEndpointEventHandlerFv", Glue_BareReturn },
+		{ "GetSyncPortId__21TEndpointEventHandlerFv", Glue_BareReturn },
+		{ "__nw__FUiPv", Glue_newPlacement },
+		{ "GetError__14TAppWorldStateFv", Glue_TAppWorldState_GetError },
+		{ "RefToUniChar__FRC6RefVar", Glue_RefToUniChar },
+		{ "FrameHasSlot__FRC6RefVarT1", Glue_FrameHasSlotArg },
+		{ "IsSubclass__FRC6RefVarT1", Glue_IsSubclassArg },
+		{ "ROMSoupBounds__FPPcT1", Glue_ROMSoupBounds },
+		{ "HasDigits__FPUs", Glue_HasDigits },
+		{ "ComputeCRC__6TCRC16FR11CBufferList", Glue_TCRC16_ComputeCRCList },
+		{ "Add__9TUCTTableFP5TTaskUl", Glue_TUCTTable_Add },
+		{ "Remove__9TUCTTableFUl", Glue_TUCTTable_RemoveKey },
+		{ "Remove__9TUCTTableFP5TTask", Glue_TUCTTable_RemoveTask },
+		{ "HeldBy__9TUCTTableFP5TTaskUl", Glue_TUCTTable_HeldBy },
 		{ "AllocateRefHandle__Fl", Glue_AllocateRefHandle },
 		{ "DisposeRefHandle__FP9RefHandle", Glue_DisposeRefHandle },
 		{ "GetArraySlotRef__FlT1", Glue_GetArraySlotRef },

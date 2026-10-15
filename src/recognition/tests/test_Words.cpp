@@ -75,6 +75,15 @@ main()
 	EXPECT(!HasSpaces(word) && HasChars(word));
 	Uni(word, "1234");
 	EXPECT(!HasChars(word));					// only the two ASCII ranges count as letters
+	EXPECT(HasDigits(word));
+	Uni(word, "route 9");
+	EXPECT(HasDigits(word));
+	Uni(word, "nine/");							// '/' and ':' either side of the digits
+	EXPECT(!HasDigits(word));
+	Uni(word, ":");
+	EXPECT(!HasDigits(word));
+	Uni(word, "");
+	EXPECT(!HasDigits(word));
 
 	// the punctuation the recogniser strips, in order, with the s rule
 	Uni(word, "!\"'(),.:;?");

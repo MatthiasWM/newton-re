@@ -1285,6 +1285,13 @@ Each step comes with its host tests.
      alert until it is back (`docs/alert/README.md`, ctest
      `host.NewtonCardAlert`); `ReinsertCard`'s own way in - a fault on the
      card's memory - holds nobody on the host (no fault monitor).
+     `gCardReinsertionTracker` (ROM 0x0c106820) is a 0x10-byte struct
+     (`PSSManager.h`): the "came back" flag, and the store, package id and
+     offset of the package page the ROM domain manager was faulting in when
+     the card came back - which the host, without that manager, never
+     notes; `GetCardReinsertionInfo` (public API) finds that page's part
+     (always false on the host; ctest `stores.CardReinsertion` fills the
+     tracker in by hand over a fixture package mapped as a large object).
    - **5f. The host's hand.** DONE (2026-09-30; ctest `host.NewtonCard`):
      `newton --card file` (a blank 4 MB card made when there is none),
      `HostCreateCard(path, mb)`, `HostInsertCard(socket, path)` and

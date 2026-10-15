@@ -79,6 +79,15 @@ PATCHES = {
         ("\t\t\tNewtonErr\tDoneStarting(TAEvent* event, ULong size, TServiceInfo* serviceInfo);",
          "\t\t\tVIRTUAL NewtonErr\tDoneStarting(TAEvent* event, ULong size, TServiceInfo* serviceInfo) ENDVIRTUAL;"),
     ],
+    # AEventHandler.h: the ROM's public jump table has a third ResetIdle, with
+    # a port (ResetIdle__14TAEventHandlerFUl9TimeUnitsP6TUPort, ROM 0x00025cd0,
+    # an empty body - left from an idle timer that sent to a port), which the
+    # DDK's class does not declare; utility/AEventHandler.cpp reconstructs it
+    "AEventHandler.h": [
+        ("\t\tNewtonErr\t\tResetIdle(TTimeout idle);\t\t\t\t\t// stop the timer if running, and setup new values, start again",
+         "\t\tNewtonErr\t\tResetIdle(TTimeout idle);\t\t\t\t\t// stop the timer if running, and setup new values, start again\n"
+         "\t\tvoid\t\t\tResetIdle(ULong amount, TimeUnits units, TUPort* port);\t// nothing (the ROM's empty body: reconstruction)"),
+    ],
     # UserSemaphore.h: GetRefCon takes void**, fSem is a ULong* -> needs a cast in C++
     "UserSemaphore.h": [
         ("TULockingSemaphore(TObjectId id = 0) : TUSemaphoreGroup(id) { GetRefCon(&fSem); }",

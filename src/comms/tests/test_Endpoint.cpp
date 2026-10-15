@@ -85,6 +85,17 @@ Scenario(void)
 	EXPECT(ep->UnBind() == noErr && ep->GetState() == kUnbnd);
 	EXPECT(ep->Close() == noErr && ep->GetState() == kUninit);
 	ep->Delete();
+
+	// the event handler's calls of an older interface, bare returns:
+	// nothing about the handler changes
+	TEndpointEventHandler handler(nil, true);
+	TObjectId portId = handler.GetServicePortId();
+	TAEvent request, reply;
+	handler.CallService(0, nil, &request, sizeof(request), &reply, sizeof(reply), 0, true);
+	handler.CallServiceBlocking(0, &request, sizeof(request), &reply, sizeof(reply), 0);
+	handler.GetPrivatePortId();
+	handler.GetSyncPortId();
+	EXPECT(handler.GetServicePortId() == portId && !handler.fBlocked && !handler.fAborted && handler.fHandleAborts);
 }
 
 

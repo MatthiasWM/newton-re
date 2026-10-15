@@ -588,6 +588,7 @@ int main()
 	EXPECT(gKeyboardFromGestalt);						// (TRootView::Constructor asked the keyboard gestalt)
 	EXPECT(gNewtIsAliveAndWell && gApplication != nil && gApplication->ClassID() == clARMNotebook && gRootView != nil);
 	EXPECT(gNewtPort != nil && gRecognition.fLevel == 2 && gRecognition.fRecognizers != nil);
+	EXPECT(GetNewtTaskPort() == gNewtPort && GetNewtRootView() == gRootView);
 	EXPECT(gScriptErr == 0);
 	EXPECT(gClicksSeen == 1 && gTapsSeen == 1);
 	EXPECT(gPauseOk);

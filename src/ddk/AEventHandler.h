@@ -128,6 +128,7 @@ class TAEventHandler : public SingleObject
 		NewtonErr		ResetIdle(void);							// stop the timer if running, start again, using original delay value
 		NewtonErr		ResetIdle(ULong amount, TimeUnits units);	// stop the timer if running, and setup new values, start again
 		NewtonErr		ResetIdle(TTimeout idle);					// stop the timer if running, and setup new values, start again
+		void			ResetIdle(ULong amount, TimeUnits units, TUPort* port);	// nothing (the ROM's empty body: reconstruction)
 
 	private:
 

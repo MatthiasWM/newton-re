@@ -22,6 +22,7 @@ add_library(os600_kernel STATIC
     TimerEngine.cpp
     Task.cpp
     TaskSwitch.cpp
+    UCTTable.cpp
     host/TaskRuntime.cpp
 )
 target_link_libraries(os600_kernel PUBLIC newton_config hal_host toolbox os600_user memory)

@@ -13,6 +13,13 @@ target_link_libraries(test_DES PRIVATE utility armcpu)
 target_compile_definitions(test_DES PRIVATE "NEWTON_ROM_BIN=\"${NEWTON_ROM_BIN}\"")
 add_test(NAME utility.DES COMMAND test_DES)
 
+# the public jump table's functions nothing in the ROM calls: the idle
+# timer's bare returns, a handler's ResetIdle with a port, a world state's
+# GetError
+add_executable(test_PublicAPI test_PublicAPI.cpp)
+target_link_libraries(test_PublicAPI PRIVATE utility)
+add_test(NAME utility.PublicAPI COMMAND test_PublicAPI)
+
 add_executable(test_CRC16 test_CRC16.cpp)
 target_link_libraries(test_CRC16 PRIVATE utility)
 add_test(NAME utility.CRC16 COMMAND test_CRC16)

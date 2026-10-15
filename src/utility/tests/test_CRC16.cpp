@@ -4,6 +4,9 @@
 // canonical test string "123456789" has published CRCs for both.
 
 #include "CRC16.h"
+#include "BufferList.h"
+#include "NewtErrors.h"
+#include "memory/host/KernelHeap.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -69,9 +72,39 @@ TestIrDA()
 }
 
 
+// ComputeCRC(CBufferList&): the whole list from its start, however far it
+// had been read, across its segments' joins
+static void
+TestARCBufferList()
+{
+	static UByte a[] = "1234", b[] = "56789";
+	CBufferSegment* sa = new CBufferSegment;
+	CBufferSegment* sb = new CBufferSegment;
+	EXPECT(sa->Init(a, 4) == noErr && sb->Init(b, 5) == noErr);
+	CBufferList* list = CBufferList::New();
+	EXPECT(list->Init(true) == noErr && list->Insert(sa) == noErr && list->Insert(sb) == noErr);
+	list->Seek(6, kSeekFromBeginning);
+	TCRC16 crc;
+	crc.Reset();
+	crc.ComputeCRC(*list);
+	EXPECT(crc.Value() == 0xBB3D);
+	EXPECT(list->AtEOF() && list->Get() == -1);
+	// it accumulates, as the other forms do: the list once more
+	crc.ComputeCRC(*list);
+	TCRC16 twice;
+	twice.Reset();
+	twice.ComputeCRC((UByte*) kCheck, 9);
+	twice.ComputeCRC((UByte*) kCheck, 9);
+	EXPECT(crc.Value() == twice.Value());
+	list->Delete();
+}
+
+
 int main()
 {
+	InitHostStandaloneHeap();		// (a buffer list's segments are in a CList)
 	TestARC();
+	TestARCBufferList();
 	TestIrDA();
 	if (failures == 0)
 		printf("test_CRC16: all passed\n");

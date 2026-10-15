@@ -682,6 +682,17 @@ FindImplementor(RefArg receiver, RefArg name)
 	Assignment
 ------------------------------------------------------------------------------- */
 
+// ROM 0x00300e40 SetVariableOrGlobal__FRC6RefVarN21iT4
+// The public jump table's form (nothing in the ROM calls it): the two ints
+// are not looked at - the variable is set with kSetVarLookupLocals,
+// kSetVarSetGlobal and kSetVarSetInContext (7), never made a new global.
+Boolean
+SetVariableOrGlobal(RefArg context, RefArg name, RefArg value, int, int)
+{
+	return SetVariableOrGlobal(context, name, value, kSetVarLookupLocals | kSetVarSetGlobal | kSetVarSetInContext);
+}
+
+
 // ROM 0x00300e48 SetVariableOrGlobal__FRC6RefVarN21l
 // Set the variable name seen from context (as XGetVariable finds it: with
 // kSetVarLookupLocals through the locals first, then the receiver's

@@ -690,6 +690,42 @@ TEndpointEventHandler::TerminateEventLoop()
 }
 
 
+// ROM 0x000ac670 CallService__21TEndpointEventHandlerFUlP14TUAsyncMessageP7TAEventlT3T4T1Uc
+// Nothing: a bare return in the ROM - the public jump table's, of an older
+// interface (the call the endpoints make is the nine-argument one above).
+void
+TEndpointEventHandler::CallService(ULong /*msgType*/, TUAsyncMessage* /*asyncMsg*/, TAEvent* /*request*/, long /*requestSize*/,
+								   TAEvent* /*reply*/, long /*replySize*/, ULong /*timeout*/, Boolean /*sync*/)
+{
+}
+
+
+// ROM 0x000ac674 CallServiceBlocking__21TEndpointEventHandlerFUlP7TAEventlT2T3T1
+// Nothing, likewise.
+void
+TEndpointEventHandler::CallServiceBlocking(ULong /*msgType*/, TAEvent* /*request*/, long /*requestSize*/,
+										   TAEvent* /*reply*/, long /*replySize*/, ULong /*timeout*/)
+{
+}
+
+
+// ROM 0x000acc28 GetPrivatePortId__21TEndpointEventHandlerFv
+// Nothing, likewise (no port id: the ROM's caller found the handler's
+// address where it looked for one).
+void
+TEndpointEventHandler::GetPrivatePortId()
+{
+}
+
+
+// ROM 0x000acc2c GetSyncPortId__21TEndpointEventHandlerFv
+// Nothing, likewise.
+void
+TEndpointEventHandler::GetSyncPortId()
+{
+}
+
+
 // ROM 0x000acc38 __ct__14TEndpointTimerFP21TEndpointEventHandlerP11TTimerQueueUl
 TEndpointTimer::TEndpointTimer(TEndpointEventHandler* handler, TTimerQueue* queue, ULong refCon)
 	: TTimerElement(queue, refCon)

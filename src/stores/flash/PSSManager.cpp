@@ -31,6 +31,8 @@
 #include "CardSocket.h"
 #include "SystemEvents.h"
 #include "OSErrors.h"
+#include "LargeObjects.h"
+#include "PackageIterator.h"
 
 #include <string.h>
 
@@ -130,8 +132,7 @@ TPSSManager*	gPSSManager = nil;						// ROM 0x0c1016bc gPSSManager
 TUPort*			gPSSPort = nil;							// ROM 0x0c1016d4 gPSSPort
 Boolean			gFormatCardsWhenInserted = false;		// ROM 0x0c1016c0 gFormatCardsWhenInserted
 TStore*			gCardStore = nil;						// ROM 0x0c1016cc gCardStore
-static Boolean	gCardReinsertionTracker = false;		// ROM 0x0c106820 gCardReinsertionTracker
-static ULong	gCardReinsertionTracker2 = 0;			// ROM 0x0c106824 (unnamed)
+CardReinsertionTracker	gCardReinsertionTracker;		// ROM 0x0c106820 gCardReinsertionTracker (PSSManager.h)
 
 
 // ROM 0x00155bc4 Clear__12SPSSSlotInfoFv
@@ -386,8 +387,8 @@ TPSSManager::CardGone(TCardMessage* message)
 	SPSSSlotInfo* slot = &fSlots[socket];
 	if (slot->fState == SPSSSlotInfo::kMounted)
 	{
-		gCardReinsertionTracker = false;
-		gCardReinsertionTracker2 = 0;
+		gCardReinsertionTracker.fReinserted = false;
+		gCardReinsertionTracker.fStore = nil;
 		for (int i = 0; i < 4; i++)
 		{
 			TStore* store = slot->fStores[i].fStore;
@@ -452,7 +453,7 @@ TPSSManager::CardIsSame(TCardMessage* message)
 		case SPSSSlotInfo::kUnmounted:		slot->fState = SPSSSlotInfo::kReady; break;
 		}
 	}
-	gCardReinsertionTracker = true;
+	gCardReinsertionTracker.fReinserted = true;
 	return kCardServerCardBackDone;
 }
 
@@ -803,6 +804,46 @@ TPSSManager::DoReply(TUMsgToken* /*token*/, ULong* /*size*/, TCardMessage* messa
 }
 
 
+// ROM 0x00322848 GetCardReinsertionInfo__FP20TCardReinsertionInfo
+// Where the page the ROM domain manager was faulting in when a card came
+// back lies (gCardReinsertionTracker): the package found where its store
+// maps it, the faulting address the package's address plus the offset, and
+// the last part whose data starts at or below the address - its index,
+// kind, data, size and the address's offset into it.  False when there is
+// nothing noted, the package is not mapped, or its directory will not read.
+// Public API: nothing in the ROM calls it.  On the host nothing is ever
+// noted (CardReinsertionTracker), so it is always false there.
+Boolean
+GetCardReinsertionInfo(TCardReinsertionInfo* info)
+{
+	if (gCardReinsertionTracker.fStore == nil)
+		return false;
+	ULong package;
+	if (StoreToVAddr(&package, gCardReinsertionTracker.fStore, gCardReinsertionTracker.fPackageId) != noErr)
+		return false;
+	ULong address = gCardReinsertionTracker.fOffset + package;
+	TPackageIterator iter((void*) package);
+	if (iter.Init() == noErr)
+	{
+		for (long i = (long) iter.NumberOfParts() - 1; i >= 0; i--)
+		{
+			PartInfo part;
+			iter.GetPartInfo((ULong) i, &part);
+			if (part.data <= address)
+			{
+				info->fPartIndex = (ULong) i;
+				info->fPartKind = part.kind;
+				info->fPartData = part.data;
+				info->fPartSize = part.size;
+				info->fOffset = address - part.data;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+
 // The 'pssm world started as InitPSSManager starts it (ROM 0x001553cc):
 // a heap object that lives as long as the machine.  (host: split out of
 // InitPSSManager, so that a host without the internal flash - a THostStore
@@ -821,7 +862,7 @@ StartPSSManager(void)
 	if (manager == nil)
 		return kError_No_Memory;
 	NewtonErr err = manager->Init('pssm', true, 6000);
-	gCardReinsertionTracker = false;
-	gCardReinsertionTracker2 = 0;
+	gCardReinsertionTracker.fReinserted = false;
+	gCardReinsertionTracker.fStore = nil;
 	return err;
 }

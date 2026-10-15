@@ -512,6 +512,7 @@ Boolean	XFindProtoImplementor(RefArg receiver, RefArg name, RefVar* implementor,
 Ref		FindImplementor(RefArg receiver, RefArg name);
 Ref		FindProtoImplementor(RefArg receiver, RefArg name);
 Boolean	SetVariableOrGlobal(RefArg context, RefArg name, RefArg value, long flags);
+Boolean	SetVariableOrGlobal(RefArg context, RefArg name, RefArg value, int, int);	// the public jump table's: flags 7, the two ints unread
 Boolean	SetVariable(RefArg context, RefArg name, RefArg value);
 // SetVariableOrGlobal's flags
 const long	kSetVarLookupLocals = 1;

@@ -2468,3 +2468,31 @@ of a line is loaded with an unaligned `ldr` from `unicodeSpace + 2`: the
 StrongARM rotates the aligned word so that the halfword wanted lands in
 the low bits - a halfword load on a CPU the compiler would not trust with
 `ldrh`.
+
+## A public API of empty functions
+
+Forty-four functions in the public jump table - the table packages' native
+code is linked against - are called by nothing in the ROM. Fifteen of them
+are a single `mov pc, lr`: the whole of `TIdleTimer` (constructor, Init,
+Start, Stop and three Resets, two of them with a port to send to),
+TAEventHandler's `ResetIdle` with a port, TView's `DoCommand` and
+`RealDoCommand` of a `TCommand*` (the views take commands as frames in
+2.x), and TEndpointEventHandler's eight-argument `CallService`,
+`CallServiceBlocking`, `GetPrivatePortId` and `GetSyncPortId`. They look
+like an older interface kept linkable: a package built against it still
+loads, and every call does nothing. A caller expecting an answer gets back
+whatever was in r0 - its own object - so `GetSyncPortId` "returns" the
+handler's address, and `TIdleTimer`'s constructor, which does not
+allocate, gives `new TIdleTimer` a nil.
+
+The public `SetVariableOrGlobal` with two extra ints is a different kind of
+remnant: it ignores both and calls the four-argument form with flags 7 -
+look through the locals, set an existing global, else make the slot in the
+context - so it can never make a new global, whatever the caller asked.
+`ROMSoupBounds` hands back the ROM objects' start and, in the second
+argument, their *size* (the linker's `gROMSoupDataSize`), where its
+neighbour `HeapBounds` gives an end. And `TUCTTable`, thirty-two task
+queues keyed by a word of the task the kernel's `FindAndRemove` also
+matches, has an `Add`, two `Remove`s and a `HeldBy` but no constructor:
+nothing in the ROM ever makes one. (`docs/armcpu/README.md`, "The public
+API the ROM does not call".)

@@ -624,6 +624,22 @@ ScriptHandled(RefArg cmd, Ref result)
 }
 
 
+// ROM 0x00034484 DoCommand__5TViewFP8TCommand
+// Nothing: a bare return in the ROM (View.h).
+void
+TView::DoCommand(TCommand* /*cmd*/)
+{
+}
+
+
+// ROM 0x00034488 RealDoCommand__5TViewFP8TCommand
+// Nothing, likewise.
+void
+TView::RealDoCommand(TCommand* /*cmd*/)
+{
+}
+
+
 // ROM 0x00268d38 RealDoCommand__5TViewFRC6RefVar
 // The commands a view answers (their ids Commands.h): the scripts -
 // aeClick runs viewClickScript(unit) on a clickable view ('skip: the

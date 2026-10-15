@@ -8,6 +8,7 @@
 */
 
 #include "CRC16.h"
+#include "BufferList.h"
 
 
 // ROM 0x00049cd0 Reset__6TCRC16Fv
@@ -35,6 +36,23 @@ TCRC16::ComputeCRC(UByte* data, ULong count)
 	{
 		ULong index = (fCRC & 0xff) ^ *data++;
 		fCRC = (kCrc16HTbl[index >> 4] ^ kCrc16LTbl[index & 0xf]) ^ (fCRC >> 8);
+	}
+}
+
+
+// ROM 0x00049d28 ComputeCRC__6TCRC16FR11CBufferList
+// The list's bytes from its start (Seek(0, kSeekFromBeginning)) to its end
+// (Get answering -1), the list left at its end.  Public API: nothing in the
+// ROM calls it.
+void
+TCRC16::ComputeCRC(CBufferList& data)
+{
+	data.Seek(0, kSeekFromBeginning);
+	int c;
+	while ((c = data.Get()) != -1)
+	{
+		ULong index = (fCRC & 0xff) ^ (ULong) c;
+		fCRC = (kCrc16HTbl[(index & 0xf0) >> 4] ^ kCrc16LTbl[index & 0xf]) ^ (fCRC >> 8);
 	}
 }
 

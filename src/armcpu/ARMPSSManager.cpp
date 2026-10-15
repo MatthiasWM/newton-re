@@ -491,10 +491,34 @@ static const ARMEventTranslator	gStoreEvents =
 };
 
 
+// ROM 0x00322848 GetCardReinsertionInfo__FP20TCardReinsertionInfo
+// stores/flash/PSSManager.cpp's, its five words (TCardReinsertionInfo)
+// written to the ARM code's.  (On the host nothing is ever noted - no ROM
+// domain manager - so it is false; were it not, the part's data would be a
+// host address, which the ARM code could not read.)
+static bool
+Glue_GetCardReinsertionInfo(void*, ARMTrapContext& c)
+{
+	TCardReinsertionInfo info;
+	Boolean found = GetCardReinsertionInfo(&info);
+	if (found)
+	{
+		c.Write32(c.Arg(0), (uint32_t) info.fPartIndex);
+		c.Write32(c.Arg(0) + 4, (uint32_t) info.fPartKind);
+		c.Write32(c.Arg(0) + 8, (uint32_t) info.fPartData);
+		c.Write32(c.Arg(0) + 12, (uint32_t) info.fPartSize);
+		c.Write32(c.Arg(0) + 16, (uint32_t) info.fOffset);
+	}
+	c.Return(found ? 1 : 0);
+	return true;
+}
+
+
 void
 InstallARMPSSManager(void)
 {
 	gTrace = getenv("NEWTON_TRACE_ARMPROTOCOLS") != nil;
+	ARMRegisterGlue("GetCardReinsertionInfo__FP20TCardReinsertionInfo", Glue_GetCardReinsertionInfo);
 	if (gView != 0)
 		return;
 	gView = ARMMapDevice(0, kViewSize, ViewRead, ViewWrite, nil);
