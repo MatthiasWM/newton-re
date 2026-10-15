@@ -14,6 +14,7 @@ add_library(package_manager STATIC
     PackageLoader.cpp
     ROMClassInfo.cpp
     ProtocolStandIns.cpp
+    ValidatePackage.cpp
 )
 # stores: the ROM domain manager a package on a store is told to (the two
 # static libraries depend on each other)
@@ -22,6 +23,9 @@ target_link_libraries(package_manager PRIVATE stores)
 # pcmcia: the card reinsert alert a package's removal names itself in (the
 # two static libraries depend on each other, as with stores)
 target_link_libraries(package_manager PRIVATE pcmcia)
+# packages: a package on a store is backed up to the validation driver
+# (BackupPackage, StorePackages.cpp; the two depend on each other)
+target_link_libraries(package_manager PRIVATE packages)
 target_include_directories(package_manager PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(packages STATIC
