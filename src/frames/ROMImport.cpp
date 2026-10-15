@@ -93,6 +93,44 @@ InROMObjectArea(Ref r)
 }
 
 
+// The other way: the ROM ref of an imported object - the address the ROM
+// (and romsrc/layout.tsv) has it at, an object an object file moved
+// answered at its old address - or 0 for a ref that is not one.  The host
+// objects lie in the order of their source addresses, so the index is
+// searched by the host pointer as well.  (For naming what the host's
+// profiler saw, FunctionProfiler.cpp: not a hot path.)
+ULong32
+ROMSourceRef(Ref r)
+{
+	if (!ISPTR(r) || !gROMObjectArea.Contains(r))
+		return 0;
+	ObjHeader* o = PTRVALUE(r);
+	long low = 0;
+	long high = gROMObjectArea.fCount - 1;
+	ULong32 ref = 0;
+	while (low <= high)
+	{
+		long mid = (low + high) / 2;
+		ObjHeader* at = gROMObjectArea.fObjects[mid].fObject;
+		if (at == o)
+		{
+			ref = gROMObjectArea.fObjects[mid].fAddress + 1;
+			break;
+		}
+		if (at < o)
+			low = mid + 1;
+		else
+			high = mid - 1;
+	}
+	if (ref == 0)
+		return 0;
+	for (long i = 0; i < gMovedCount; i++)
+		if (GetBigEndianWord(gMoved + i * 8 + 4) == ref)
+			return GetBigEndianWord(gMoved + i * 8);
+	return ref;
+}
+
+
 // A ROM ref as a host ref: a pointer into the ROM's object area becomes
 // a pointer to the imported object (nil when it is not one).
 Ref

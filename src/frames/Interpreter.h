@@ -198,7 +198,70 @@ void		ResetStack(const StackState& state);
 	TInterpreter
 ------------------------------------------------------------------------------- */
 
-enum FramesProfilingKind { kProfileCall = 0, kProfileSend, kProfileReturn, kProfileUnwind };
+/* -------------------------------------------------------------------------------
+	The frames function profiler's hooks
+	The ROM calls a profiler, when one is installed and profiling is on, at
+	each call, send and return of a function, at each function an exception
+	unwinds, and at the start and end of each collection - but has no
+	profiler of its own (hasFramesFunctionProfiling, ConfigFrames.h): a
+	developer's tool installs one through the jump table.  The profiler is
+	called as
+		profiler(caller, fn, depth, generation, kind, data)
+	caller	the function of the state on top of the control stack (for a
+			call or send, the caller's; for a return or unwind, the one
+			returned to - the state is the caller's either way)
+	fn		the function called, or the one returning / unwound
+	depth	the control stack's position (ControlPosition) after the caller's
+			state, so that a call and its return report the same one
+	generation	gCurrentStackPos's high 16 bits (the RefVar stack's
+			generation, which an exception's ClearRefHandles goes by)
+	kind	what happened (below)
+	data	what was installed with the profiler
+	For a collection caller and fn are null references in the ROM (refs to
+	nil here: DEVIATION, a null reference is undefined in C++), depth is 0
+	at the start and 1 at the end.
+	The kinds' values are the ROM's (each read off the disassembly at its
+	call: 0 TopLevelCall/Call, 1 Send, 2 the bytecode return, a native's
+	return, 3 HandleException's unwinding, 4 GC); the names are ours.
+------------------------------------------------------------------------------- */
+
+enum FramesProfilingKind { kProfileCall = 0, kProfileSend, kProfileReturn, kProfileUnwind, kProfileGC };
+
+typedef void (*FramesFunctionProfiler)(RefArg caller, RefArg fn, long depth, long generation, FramesProfilingKind kind, void* data);
+
+// what InstallFramesFunctionProfiler answers: the profiler and data
+// installed before (the ROM returns the pair in memory, through the hidden
+// result pointer in r0; the struct's name is ours)
+struct FramesFunctionProfilerInfo
+{
+	FramesFunctionProfiler	fProfiler;	// +0x00
+	void*					fData;		// +0x04
+};
+
+// gFramesFunctionProfilingEnabled holds this while profiling is on, 0 off
+const ULong	kFramesFunctionProfilingOn = 'ffpe';
+
+extern ULong					gFramesFunctionProfilingEnabled;	// 0x0c10535c
+extern FramesFunctionProfiler	gFramesFunctionProfiler;			// 0x0c105360
+extern void*					gFramesFunctionProfilerData;		// 0x0c105364
+
+Boolean		EnableFramesFunctionProfiling(Boolean enable);		// ==> whether it was on
+FramesFunctionProfilerInfo	InstallFramesFunctionProfiler(FramesFunctionProfiler profiler, void* data);
+
+// whether a hook calls the profiler: the ROM's two tests at every hook, so
+// that with profiling off a call costs a load and a compare
+inline Boolean
+FramesProfiling(void)
+{
+	return gFramesFunctionProfilingEnabled == kFramesFunctionProfilingOn && gFramesFunctionProfiler != nil;
+}
+// the generation argument: gCurrentStackPos >> 16 (an arithmetic shift)
+inline long
+FramesProfilingGeneration(void)
+{
+	return (long) (gCurrentStackPos >> 16);
+}
+
 
 class TInterpreter
 {

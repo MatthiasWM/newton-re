@@ -1849,6 +1849,13 @@ GLUE(Glue_IncrementCurrentStackPos)	{ IncrementCurrentStackPos(); w.Return(cpu, 
 GLUE(Glue_DecrementCurrentStackPos)	{ DecrementCurrentStackPos(); w.Return(cpu, 0); return true; }
 // (the ARM world's handles are the call's own, given back with it)
 GLUE(Glue_ClearRefHandles)		{ w.Return(cpu, 0); return true; }
+// the frames function profiler switched (the host's, if one is installed:
+// frames/FunctionProfiler.h); ==> whether it was on
+GLUE(Glue_EnableFramesFunctionProfiling)
+{
+	w.Return(cpu, EnableFramesFunctionProfiling((Boolean) (cpu.r[0] & 0xff)) ? 1 : 0);
+	return true;
+}
 
 GLUE(Glue_GetGFunctionFrame)	{ w.Return(cpu, w.ToARM(gFunctionFrame)); return true; }
 // the interpreter: Call/Send push a frame for a function (true: a native,
@@ -3015,6 +3022,7 @@ InitGlue(void)
 		{ "IncrementCurrentStackPos__Fv", Glue_IncrementCurrentStackPos },
 		{ "DecrementCurrentStackPos__Fv", Glue_DecrementCurrentStackPos },
 		{ "ClearRefHandles__Fv", Glue_ClearRefHandles },
+		{ "EnableFramesFunctionProfiling__FUc", Glue_EnableFramesFunctionProfiling },
 		{ "NativeEntry__FRC6RefVarlPP9RefHandle", Glue_NativeEntry },
 		{ "GetGFunctionFrame__Fv", Glue_GetGFunctionFrame },
 		{ "Call__12TInterpreterFRC6RefVarl", Glue_Call },

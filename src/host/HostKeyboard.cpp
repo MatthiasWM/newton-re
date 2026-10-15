@@ -18,6 +18,7 @@
 #include "HostPackages.h"
 #include "HostOrientation.h"
 #include "NewtonTime.h"
+#include "FunctionProfiler.h"
 #include <atomic>
 
 // the key queue: a ring, one writer (the window), one reader (the task)
@@ -153,6 +154,7 @@ HostKeyboardToolTask(void)
 			Sleep(10 * kMilliseconds);
 		}
 	}
+	NSProfilerFinish();				// (NEWTON_NS_PROFILE's report, written while a task can still read the heap)
 	HostStopTasks();
 }
 

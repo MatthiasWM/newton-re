@@ -285,6 +285,28 @@ set_tests_properties(host.NewtonReboot PROPERTIES TIMEOUT 240
 add_test(NAME host.NewtonGestalt COMMAND newton --headless 30 --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/gestalt.ns WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 set_tests_properties(host.NewtonGestalt PROPERTIES TIMEOUT 120
     PASS_REGULAR_EXPRESSION "12, -34, TRUE.*replace., TRUE.*56, 78, NIL.*a system selector., NIL.*not a selector., NIL.*not a function., -10006.*empty socket., NIL.*card slot stores., NIL.*gestalt: done")
+# the NewtonScript profiler (frames/FunctionProfiler.h, behind the ROM's frames
+# function profiler hooks): demo/nsprofile.ns runs a recursive function (465
+# calls), a method (200) and the Calculator under it and prints the report;
+# run with NEWTON_NS_PROFILE the whole run is profiled and written to a file
+# at the end, which tools/host/nsprofile.py then checks (the counts, the GC
+# line, a ROM method named)
+add_test(NAME host.NewtonScriptProfile COMMAND newton --headless 120 --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/nsprofile.ns WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+set_tests_properties(host.NewtonScriptProfile PROPERTIES TIMEOUT 240
+    PASS_REGULAR_EXPRESSION "nsprofile: profiling on.*Step total 20100.*nsprofile: report.*NewtonScript profile: .* 465 +[0-9.]+  ns .*vars[.]npFib.*### end.*nsprofile: done"
+    FAIL_REGULAR_EXPRESSION "waited in vain")
+add_test(NAME host.NewtonScriptProfileFile COMMAND newton --headless 120 --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/nsprofile.ns WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+set_tests_properties(host.NewtonScriptProfileFile PROPERTIES TIMEOUT 240
+    ENVIRONMENT NEWTON_NS_PROFILE=${CMAKE_CURRENT_BINARY_DIR}/nsprofile-run.txt
+    FIXTURES_SETUP nsprofile PASS_REGULAR_EXPRESSION "nsprofile: done" FAIL_REGULAR_EXPRESSION "waited in vain")
+if(Python3_EXECUTABLE)
+    add_test(NAME host.NewtonScriptProfileReport
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/host/nsprofile.py ${CMAKE_CURRENT_BINARY_DIR}/nsprofile-run.txt
+                     --romsrc ${CMAKE_SOURCE_DIR}/../romsrc --top 20 --expect vars.npFib=465 --expect vars.npObj.Step=200
+                     --expect "(garbage collection)" --expect calculator.viewSetupFormScript --expect bootruninitscripts=1)
+    set_tests_properties(host.NewtonScriptProfileReport PROPERTIES TIMEOUT 60 FIXTURES_REQUIRED nsprofile
+        PASS_REGULAR_EXPRESSION "nsprofile: checks passed")
+endif()
 # the docker's natives (comms/Docker.h) on the Connection application's
 # protocol frame, with no desktop
 add_test(NAME host.NewtonDocker COMMAND newton --serial-port none --headless 60 --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/docker.ns WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)

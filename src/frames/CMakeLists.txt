@@ -22,6 +22,7 @@ add_library(frames STATIC
     ObjectAreaImport.cpp
     FramesPart.cpp
     Interpreter.cpp
+    FunctionProfiler.cpp
     ScriptBuiltins.cpp
     VariableLookup.cpp
     NativeFunctions.cpp

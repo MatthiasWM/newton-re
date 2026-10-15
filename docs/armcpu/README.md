@@ -120,9 +120,11 @@ host side; an unimplemented one stops the CPU and reports its name.  All
 the entries the fixtures' native code reaches (`gluetable.py --package`
 over inetenbl, modmsup, Mahjongg, newthack and nethopper) and the host has
 a function for are answered, and `test_PackageNativeCPU` checks each by
-name; four are not, for want of one: `Debugger`,
-`EnableFramesFunctionProfiling`, `GetGlobals` (it would hand the ARM code a
-host pointer) and `PublicFiller_236`.
+name; three are not, for want of one: `Debugger`, `GetGlobals` (it would
+hand the ARM code a host pointer) and `PublicFiller_236`.
+(`EnableFramesFunctionProfiling` is answered since the frames function
+profiler's hooks were reconstructed: it switches the host's profiler,
+`docs/frames/README.md` "Profiling NewtonScript".)
 
 - **The heap outlives the call.**  `NewPtr`/`NewPtrClear`, `malloc` and
   `operator new` (`__nw__FUi`, ROM 0x00318ee8: malloc of the size, one byte
