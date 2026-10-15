@@ -9,6 +9,32 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-16: The T-Deck Pro's quick sheet and lock screen
+
+The owner asked for lilyphone1's way of locking the screen on the T-Deck:
+a sheet pulled down from the top of the screen with a lock and the
+radios' power switches, and a full-screen lock with a slider to unlock.
+
+- `host/HostQuickSheet.ns` (embedded, evaluated by `HostInstallQuickSheet`):
+  the sheet - "Lock screen" and a checkbox for each of the 4G module, the
+  GPS (the Host panel's `cellPower`/`gpsPower`) and the LoRa radio
+  (`HostMeshSetPower`), each only where the board can switch it - and the
+  lock screen: the time and date, and a slider drawn by its own
+  viewDrawScript whose knob must be dragged from the left end (the ROM's
+  protoSlider, @212, takes a value from wherever the pen lands, so a tap
+  at the end would unlock).  `HostScreenLocked` tells the host.
+- `tdeck_input.cpp`: a finger landing in the top 14 px held back until it
+  is a pull (40 px down), a tap, or the pen's (sideways, or held still);
+  the keyboard's presses dropped and its light off while locked.
+  `newtonmain.cpp` forwards a pull to the newt world.
+- Desktop: `newton --quick-sheet`, ctest `host.NewtonQuickSheet`
+  (`demo/quicksheet.ns`).  Checked on the board: the sheet lists all three
+  switches, the sheet and the lock screen drawn on the panel (`!shot`).
+- Found on the way: a template opened with `:Open()` and `vVisible` already
+  in its viewFlags is never drawn - `TView::Show` returns at once for a
+  visible view, as the ROM's does (the ROM's floaters' templates leave it
+  out: 580).
+
 ## 2026-10-15: The unreferenced functions
 
 The owner asked for the 28 functions nothing in the ROM refers to (and

@@ -1,0 +1,81 @@
+// The quick sheet and the lock screen (host/HostQuickSheet.h,
+// HostQuickSheet.ns), the T-Deck Pro's, installed here by --quick-sheet:
+// ctest host.NewtonQuickSheet.
+//
+// Setup walked through, then the sheet pulled down (as the board does when
+// a finger is pulled from the screen's top edge) and pulled again, which
+// closes it; pulled once more and its "Lock screen" tapped, the lock screen
+// covers the screen.  A tap at the slider's far end, and the knob dragged
+// half way and let go, leave it locked (the knob back at the left); the
+// knob dragged to the end unlocks it.  Pictures of the sheet and the lock
+// screen: tmp/quicksheet-sheet.pgm, tmp/quicksheet-lock.pgm.
+//
+//   build/host/host/newton --display 320x480 --headless 200 --quick-sheet \
+//       --store build/qs.store --erase --script src/host/demo/quicksheet.ns
+
+HostInclude("common.ns");			// tapAt, waitFor, walkSetup
+HostInclude("walkhelpers.ns");		// findView
+HostInclude("apphelpers.ns");		// tapCentre
+
+qsSheet := func() GetGlobalVar('|QuickSheet:host|);
+
+qsDrag := func(x0, x1, y) begin
+	PenDown(x0, y);
+	for x := x0 to x1 by 8 do PenMove(x, y);
+	PenMove(x1, y);
+	PenUp();
+	IdleStrokes();
+end;
+
+qsSlider := func() call findView with (call qsSheet with ().lockView, func(v) v.lockRole = 'slider and v.viewCObject);
+
+qsLocked := func() begin
+	local sheet := call qsSheet with ();
+	local box := call qsSlider with ():GlobalBox();
+	local y := (box.top + box.bottom) div 2;
+	local knob := box.left + 2 + 22;					// the knob's middle, at the left end
+	// a tap at the far end: not on the knob
+	call tapAt with (box.right - 8, y);
+	call waitFor with ("quicksheet: the tap", func() true, func() begin
+		Print("quicksheet: a tap at the slider's end leaves it " & (if sheet.lockView then "locked" else "unlocked"));
+		// half way and let go
+		call qsDrag with (knob, knob + (box.right - box.left) div 3, y);
+		Print("quicksheet: half way and let go leaves it " & (if sheet.lockView then "locked" else "unlocked")
+			  & ", the knob at " & NumberStr(call qsSlider with ().knobX));
+		// all the way
+		call qsDrag with (knob, box.right + 10, y);
+		call waitFor with ("quicksheet: unlocked", func() not sheet.lockView, func() begin
+			Print("quicksheet: dragged to the end, unlocked");
+			Print("quicksheet: done");
+			HostQuit();
+		end, 20);
+	end, 1);
+end;
+
+qsRun := func() begin
+	local sheet := call qsSheet with ();
+	if not sheet then begin Print("quicksheet: not installed"); HostQuit(); return; end;
+	sheet:Pulled();
+	call waitFor with ("quicksheet: the sheet", func() sheet.sheetView and sheet.sheetView.viewCObject, func() begin
+		RefreshViews();
+		ScreenSnapshot("tmp/quicksheet-sheet.pgm");
+		local lock := call findView with (sheet.sheetView, func(v) v.sheetRole = 'lock and v.viewCObject);
+		Print("quicksheet: the sheet open, " & lock.text);
+		sheet:Pulled();
+		Print("quicksheet: pulled again, " & (if sheet.sheetView then "still open" else "closed"));
+		sheet:Pulled();
+		call waitFor with ("quicksheet: the sheet again", func() sheet.sheetView and sheet.sheetView.viewCObject, func() begin
+			call tapCentre with (call findView with (sheet.sheetView, func(v) v.sheetRole = 'lock and v.viewCObject));
+			call waitFor with ("quicksheet: the lock screen", func() sheet.lockView and sheet.lockView.viewCObject, func() begin
+				RefreshViews();
+				ScreenSnapshot("tmp/quicksheet-lock.pgm");
+				Print("quicksheet: locked, the sheet " & (if sheet.sheetView then "open" else "closed"));
+				sheet:Pulled();
+				Print("quicksheet: pulled while locked, the sheet " & (if sheet.sheetView then "open" else "closed"));
+				call qsLocked with ();
+			end, 20);
+		end, 20);
+	end, 20);
+end;
+
+call walkSetup with ([2, 0, 45, 34, 14, 37], qsRun);	// ("Daniel" in ADB key codes)

@@ -39,6 +39,8 @@ void		HostDevicePanelDump(void);			// what the panel shows, on the console (tool
 // the touch panel and the keyboard (tdeck_input.cpp): read from the start,
 // handed to the window shims below
 void		HostDeviceInputStart(void);
+bool		HostDeviceSheetPulled(void);		// the quick sheet pulled down from the top edge since last asked (once for each pull) ==> whether
+void		HostDeviceSetLocked(bool locked);	// the lock screen up or down: the keyboard left out and its light off meanwhile
 // the internal flash on the board's `store` partition (tdeck_store.cpp):
 // started before the OS boots (==> whether there is one), then opened by
 // the Newton's side - its image, read in place, its size, whether it was

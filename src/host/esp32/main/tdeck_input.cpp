@@ -18,6 +18,19 @@
 				down, its moves the pen's, its lifting the pen up; a finger
 				that stops being reported for kTouchLostMs is lifted.
 
+				The quick sheet (host/HostQuickSheet.h): a finger that
+				lands within kPullZone of the screen's top edge is held
+				back from the Newton until it shows what it is - pulled
+				kPullDistance down, it is the sheet pulled down
+				(HostDeviceSheetPulled, which the Newton's side asks) and
+				nothing of it reaches the Newton; lifted first, it is a
+				tap there; moved sideways, or held without coming down, it
+				is the pen's from where it landed.  While the screen is
+				locked (HostDeviceSetLocked: the lock screen up) the top
+				edge is the pen's like the rest, the keyboard's presses
+				are left out (releases still sent, for keys pressed
+				before) and its light is off.
+
 				Keys: the TCA8418's 4 x 10 matrix with the owner's layout
 				(lilyphone1's peri_keypad.cpp): the letters, Backspace,
 				Enter, space and '$'; the two Shift keys are the Newton's
@@ -32,7 +45,9 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <atomic>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/i2c.h"
@@ -54,6 +69,13 @@
 const long		kPanelWidth = 240;
 const long		kPanelHeight = 320;
 const int64_t	kTouchLostMs = 150;
+const long		kPullZone = 14;			// a finger landing this near the top is held back
+const long		kPullDistance = 40;		// ... and pulled this far down is the sheet
+const long		kPullSideways = 16;		// ... moved this far sideways first: the pen's
+const int64_t	kPullHoldMs = 300;		// ... held this long without coming down: the pen's
+
+static std::atomic<unsigned>	gPulls(0);			// the sheet pulled down, not yet asked for
+static std::atomic<bool>		gLocked(false);		// the lock screen up
 
 // Windows virtual key codes (host/HostKeyboard.cpp maps them to the Newton's)
 enum
@@ -103,9 +125,13 @@ TouchStart(void)
 static void
 TouchPoll(void)
 {
-	static bool down = false;
+	// the finger: up; held back (landed at the top edge); down (the pen's);
+	// the sheet pulled (the rest of it nobody's)
+	enum { kUp, kHeld, kDown, kPulled };
+	static int state = kUp;
 	static long lastX = -1, lastY = -1;
-	static int64_t lastSeen = 0;
+	static long startX = 0, startY = 0;
+	static int64_t lastSeen = 0, startAt = 0;
 	static const uint8_t reg[2] = { 0xD0, 0x00 };
 	uint8_t b[7];
 	int64_t now = esp_timer_get_time();
@@ -136,21 +162,71 @@ TouchPoll(void)
 	if (valid && fingerDown)
 	{
 		lastSeen = now;
-		if (!down)
+		if (state == kUp)
 		{
-			down = true;
-			HostWindowPenDown(x, y);
+			if (y < kPullZone && !gLocked)
+			{
+				state = kHeld;
+				startX = x;
+				startY = y;
+				startAt = now;
+			}
+			else
+			{
+				state = kDown;
+				HostWindowPenDown(x, y);
+			}
 		}
-		else if (x != lastX || y != lastY)
+		else if (state == kHeld)
+		{
+			if (y - startY >= kPullDistance)
+			{
+				state = kPulled;
+				gPulls++;
+			}
+			else if (labs(x - startX) >= kPullSideways || ((now - startAt) / 1000 >= kPullHoldMs && y - startY < 8))
+			{
+				state = kDown;
+				HostWindowPenDown(startX, startY);
+				if (x != startX || y != startY)
+					HostWindowPenMove(x, y);
+			}
+		}
+		else if (state == kDown && (x != lastX || y != lastY))
 			HostWindowPenMove(x, y);
 		lastX = x;
 		lastY = y;
 	}
-	else if (down && ((valid && !fingerDown) || (now - lastSeen) / 1000 >= kTouchLostMs))
+	else if (state != kUp && ((valid && !fingerDown) || (now - lastSeen) / 1000 >= kTouchLostMs))
 	{
-		down = false;
-		HostWindowPenUp();
+		if (state == kHeld)
+		{
+			// (lifted before it showed what it was: a tap where it landed)
+			HostWindowPenDown(startX, startY);
+			HostWindowPenUp();
+		}
+		else if (state == kDown)
+			HostWindowPenUp();
+		state = kUp;
 	}
+}
+
+
+bool
+HostDeviceSheetPulled(void)
+{
+	unsigned pulls = gPulls.load();
+	while (pulls != 0 && !gPulls.compare_exchange_weak(pulls, pulls - 1))
+		;
+	return pulls != 0;
+}
+
+
+void
+HostDeviceSetLocked(bool locked)
+{
+	gLocked = locked;
+	gpio_set_level((gpio_num_t) PIN_KEY_LED, locked ? 0 : 1);
 }
 
 
@@ -243,7 +319,8 @@ KeyEvent(int key, bool press)
 	if (key == kKeyLeftShift || key == kKeyRightShift)
 	{
 		gShift = press;
-		HostWindowKey(kVKShift, press);
+		if (!(press && gLocked))
+			HostWindowKey(kVKShift, press);
 		return;
 	}
 	if (key == kKeySym)
@@ -257,6 +334,11 @@ KeyEvent(int key, bool press)
 		return;
 	}
 	KeySent& sent = gSent[key];
+	if (press && gLocked)
+	{
+		sent.virtualKey = -1;
+		return;
+	}
 	if (!press)
 	{
 		if (sent.virtualKey >= 0)

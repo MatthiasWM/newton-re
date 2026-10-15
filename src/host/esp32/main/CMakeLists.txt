@@ -214,6 +214,16 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
 target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostSettingsSource.cpp ${NEWTON_SRC}/host/HostSettings.cpp)
 set_source_files_properties(${NEWTON_SRC}/host/HostSettings.cpp PROPERTIES COMPILE_OPTIONS "${all_quoted};-iquote${NEWTON_SRC}/host")
 
+# host/HostQuickSheet.ns, the quick sheet pulled down from the top edge and
+# the lock screen (host/HostQuickSheet.cpp; tdeck_input.cpp sees the pull)
+set(INPUT ${NEWTON_SRC}/host/HostQuickSheet.ns)
+set(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostQuickSheetSource.cpp)
+set(NAME gHostQuickSheetSource)
+include(${NEWTON_SRC}/cmake/EmbedText.cmake)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INPUT})
+target_sources(${COMPONENT_LIB} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/HostQuickSheetSource.cpp ${NEWTON_SRC}/host/HostQuickSheet.cpp)
+set_source_files_properties(${NEWTON_SRC}/host/HostQuickSheet.cpp PROPERTIES COMPILE_OPTIONS "${all_quoted};-iquote${NEWTON_SRC}/host")
+
 # host/HostDeveloper.ns, the Developer preferences panel (host/HostDeveloper.cpp:
 # no report file here, so the profile goes to the console)
 set(INPUT ${NEWTON_SRC}/host/HostDeveloper.ns)
