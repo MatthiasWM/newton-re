@@ -403,6 +403,22 @@ HeapBounds(Ptr* start, Ptr* limit)
 }
 
 
+// ROM 0x0031c574 ROMSoupBounds__FPPcT1
+// Where the ROM's objects lie (the ROM's gROMSoupData; on the host the area
+// ROMImport read them into), and - in the second - their size: the ROM
+// stores the linker's gROMSoupDataSize there, a length, not an end as
+// HeapBounds' second is.  Public API: nothing in the ROM calls it.
+void
+ROMSoupBounds(Ptr* start, Ptr* size)
+{
+	char* begin;
+	char* end;
+	ROMObjectAreaBounds(&begin, &end);
+	*start = begin;
+	*size = (Ptr) (uintptr_t) (end - begin);
+}
+
+
 // ROM 0x0031c590 Statistics__FPUlT1
 void
 Statistics(ULong* freeSpace, ULong* largestFreeBlock)

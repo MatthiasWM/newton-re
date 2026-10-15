@@ -42,6 +42,7 @@ long	GetExceptionErr(Exception* exception);	// ROM 0x001466ec GetExceptionErr__F
 long	FramesException(Exception* exception);	// ROM 0x00129490 FramesException__FP9Exception - a ref exception's errorCode (-1: none), any other's data
 Ref		AddressToRef(void* p);				// a pointer as an integer Ref (the ROM's "magic" C objects: views, clippers)
 void*	RefToAddress(Ref r);
+void	ROMSoupBounds(Ptr* start, Ptr* size);	// ROM 0x0031c574 ROMSoupBounds__FPPcT1 - where the ROM's objects start, and their size (not their end)
 Ref		MakeString(const UniChar* str, long length);		// a string of the first length characters (ROM 0x0012ac84)
 void	ArrayGrowAt(RefArg array, long index, long count);	// count empty slots opened at the index (ROM 0x0012a860)
 void	ArrayInsertAt(RefArg array, long index, RefArg element);	// ROM 0x00128ea0 ArrayInsertAt__FRC6RefVarlT1 - one slot opened at the index and the element put in it
