@@ -60,6 +60,10 @@ void	ConvertUnicodeCharacters(const UniChar* src, char* dest, long encoding, lon
 // one character each way (the compiler's)
 UniChar	U_CONST_CHAR(unsigned char c);
 char	A_CONST_CHAR(UniChar c);
+// whether the byte begins a two-byte character of the encoding (6:
+// Shift-JIS; 1-3 never; anything else throws)
+Boolean	IsFirstByteOf2Byte(UChar c, long encoding);		// ROM 0x002575ec IsFirstByteOf2Byte__FUcl
+const long	kShiftJISEncoding = 6;			// (the one two-byte encoding IsFirstByteOf2Byte knows)
 
 // the encoding tables (installed by InitUnicode)
 struct TEncodingMap			// 0x20 bytes, from a mapping binary (GetMappingInfo)
