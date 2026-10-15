@@ -20,6 +20,11 @@
 #include "NewtonTime.h"
 #include "ByteOrder.h"
 #include "host/RomBugs.h"
+#include "TestAgent.h"			// gTestReporterForNewt
+#include "ReplayMetrics.h"		// ExportReporter
+#include "WordReplay.h"		// WordReplayStart, ReplayLabel
+#include "Unicode.h"
+#include <stdio.h>
 #include <string.h>
 
 long					gJournallingState = 0;			// ROM 0x0c100fb8 gJournallingState
@@ -685,6 +690,159 @@ FInsertTabletSample(RefArg /*rcvr*/, RefArg x, RefArg y, RefArg z, RefArg time)
 	ULong t = (ULong) RINT(time);
 	ULong sample = (ULong) (ULong32) ((ULong32) (sx << 21) | (ULong32) ((sy & 0x3fff) << 7) | (ULong32) (sz & 0xf));
 	return MAKEINT(InsertTabletSample(sample, t));
+}
+
+
+/*------------------------------------------------------------------------------
+	The words written (host)
+
+	DEVIATION: the ROM's journal replays strokes only; what said which
+	words they were (Apple's "TAP files" and the test tools that read them)
+	is not in the ROM.  A *word journal* is a stroke file as
+	JournalReplayStrokes plays it, followed - after its last stroke - by a
+	label for each word, big-endian as the rest:
+
+		+0	'WRPL'
+		+4	the number of labels (a long)
+		then each label:
+		+0	the strokes it is written in (a half word)
+		+2	what it is: 'WREC' a word, 'GSHP' a shape (its type number as
+			text), as GatherExpectedMetrics reads them
+		+6	the length of its text in characters (a half word)
+		+8	the text, UTF-16 - "**..." a control string (HandleControlString)
+		then padding to four bytes
+
+	JournalReplayStrokes on the same file plays its strokes and ignores the
+	labels.  tools/recognition/replaymetrics.py makes them.
+------------------------------------------------------------------------------*/
+
+// A word journal's labels: ==> how many were read into labels (at most
+// most), -1 for a file that has none or is short.
+static long
+ReadWordLabels(const UByte* file, ULong size, ReplayLabel* labels, long most)
+{
+	if (size < 0x18)
+		return -1;
+	ULong strokes = GetBigEndianHalf(file + 4);
+	ULong offset = 0x18;
+	for (ULong i = 0; i < strokes; i++)
+	{
+		if (offset + 4 > size)
+			return -1;
+		ULong strokeSize = GetBigEndianWord(file + offset);
+		if (strokeSize < 0x10)
+			return -1;
+		offset += strokeSize;
+	}
+	if (offset + 8 > size || GetBigEndianWord(file + offset) != 'WRPL')
+		return -1;
+	long count = (long) GetBigEndianWord(file + offset + 4);
+	offset += 8;
+	long read = 0;
+	for (long i = 0; i < count && read < most; i++)
+	{
+		if (offset + 8 > size)
+			return -1;
+		ReplayLabel* label = &labels[read++];
+		label->fStrokes = GetBigEndianHalf(file + offset);
+		label->fType = GetBigEndianWord(file + offset + 2);
+		ULong length = GetBigEndianHalf(file + offset + 6);
+		offset += 8;
+		if (offset + length * 2 > size)
+			return -1;
+		ULong kept = (length < kMetricsStringLength - 1) ? length : kMetricsStringLength - 1;
+		for (ULong c = 0; c < kept; c++)
+			label->fText[c] = (UniChar) GetBigEndianHalf(file + offset + c * 2);
+		label->fText[kept] = 0;
+		offset += (length * 2 + 3) & ~3UL;
+	}
+	return read;
+}
+
+
+// A host file's bytes as a binary (nil when it cannot be read).
+static Ref
+ReadHostFile(RefArg name)
+{
+	char path[1024];
+	ConvertFromUnicode((const UniChar*) BinaryData(name), path, kMacRomanEncoding, sizeof(path) - 1);
+	path[sizeof(path) - 1] = 0;
+	FILE* f = fopen(path, "rb");
+	if (f == nil)
+		return NILREF;
+	fseek(f, 0, SEEK_END);
+	long size = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	RefVar bin(AllocateBinary(RefVar(RSSYMfoo), size));
+	long got = (long) fread(BinaryData(bin), 1, (size_t) size, f);
+	fclose(f);
+	return (got == size) ? (Ref) bin : NILREF;
+}
+
+
+// JournalReplayWords(file, dx, dy): a word journal - a binary, or the name
+// of a host file holding one - played as JournalReplayStrokes plays its
+// strokes, with the recognisers' readings measured against its words
+// (recognition/ReplayMetrics.h): the replayed units' recogniser told the
+// words (WordReplayStart, which puts the arbiter in replay mode) and the
+// newt world's test reporter made the stats channel (ExportReporter), so
+// the test agent must be running.  ==> 0, -1 while the journal is busy,
+// -2 for no agent, -3 for a file with no words, or an error.
+static Ref
+FJournalReplayWords(RefArg rcvr, RefArg file, RefArg dx, RefArg dy)
+{
+	if (gJournallingState != 0)
+		return MAKEINT(-1);
+	if (gTestReporterForNewt == nil)
+		return MAKEINT(-2);
+	RefVar strokes(IsString(file) ? ReadHostFile(file) : (Ref) file);
+	if (!IsBinary(strokes))
+		return MAKEINT(-3);
+	const long kMostLabels = 1000;
+	ReplayLabel* labels = (ReplayLabel*) NewPtr(kMostLabels * sizeof(ReplayLabel));
+	if (labels == nil)
+		return MAKEINT(MemError());
+	long count = ReadWordLabels((const UByte*) BinaryData(strokes), Length(strokes), labels, kMostLabels);
+	if (count <= 0)
+	{
+		DisposePtr((Ptr) labels);
+		return MAKEINT(-3);
+	}
+	ExportReporter(gTestReporterForNewt);
+	NewtonErr err = WordReplayStart(labels, count);
+	DisposePtr((Ptr) labels);
+	if (err != noErr)
+		return MAKEINT(err);
+	return FJournalReplayStrokes(rcvr, strokes, dx, dy, RefVar(NILREF));
+}
+
+
+// JournalReplayWordsBusy(): whether the strokes are still playing or the
+// readings of the words still to be measured.
+static Ref
+FJournalReplayWordsBusy(RefArg /*rcvr*/)
+{
+	return (gJournallingState != 0 || IsJournalReplayBusy() || WordReplayBusy()) ? TRUEREF : NILREF;
+}
+
+
+// JournalStopReplayWords(): the measuring over - the arbiter out of
+// replay mode and the areas built afresh.  ==> the replayed units made.
+static Ref
+FJournalStopReplayWords(RefArg /*rcvr*/)
+{
+	long made = WordReplayMade();
+	WordReplayStop();
+	return MAKEINT(made);
+}
+
+
+void
+InstallJournalHostNatives(void)
+{
+	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "JournalReplayWords")), RefVar(MakeCFunction((void*) FJournalReplayWords, 3, nil)));
+	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "JournalReplayWordsBusy")), RefVar(MakeCFunction((void*) FJournalReplayWordsBusy, 0, nil)));
+	SetFrameSlot(RefVar(gFunctionFrame), RefVar(Intern((char*) "JournalStopReplayWords")), RefVar(MakeCFunction((void*) FJournalStopReplayWords, 0, nil)));
 }
 
 

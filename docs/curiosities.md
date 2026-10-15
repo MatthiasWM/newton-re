@@ -2444,3 +2444,27 @@ pops one more.  With a profiler installed, every unhandled exception lost
 its caller's call.  The host installs a profiler of its own, so the bug is
 fixed beside the ROM's code (`docs/frames/README.md`, "Profiling
 NewtonScript").
+
+## The accuracy harness with nothing to drive it
+
+The ROM carries Apple's recognition accuracy harness
+(`recognition/ReplayMetrics.h`, 0x00090284-0x000925c0): the arbiter's
+replay mode, `HandleReplayUnit` in place of the unit handler, and
+`WriteTapStats`/`PrintMetrics` writing a tab-separated line per word -
+whether the recogniser's units cover its strokes, where the right reading
+stood among them, the scores - plus control strings that turn learning on
+and simulate a writer who corrects the recogniser one time in four. But
+nothing in the ROM makes the replayed units it measures, sets the replay
+mode or names the stats channel (`ExportReporter` has no caller): those
+were Apple's test tools, which read "TAP files" of labelled ink. The host
+supplies a stand-in (`recognition/WordReplay.h`) and the harness now
+compares Rosetta, ParaGraph and the host's engines on the same writing
+(`tools/recognition/replaymetrics.py`).
+
+Two small things in it. The smaller ink scales ("**62d") shift the factor
+left by a negative count, which the ARM reads as 255 and so makes every
+smaller scale nought (ROM BUG, fixed). And the space put between the words
+of a line is loaded with an unaligned `ldr` from `unicodeSpace + 2`: the
+StrongARM rotates the aligned word so that the halfword wanted lands in
+the low bits - a halfword load on a CPU the compiler would not trust with
+`ldrh`.

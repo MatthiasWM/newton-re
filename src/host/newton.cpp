@@ -229,6 +229,7 @@
 #include "FunctionProfiler.h"
 #include "Colour.h"
 #include "os600/kernel/host/TaskRuntime.h"
+#include "Journal.h"			// InstallJournalHostNatives
 #include "REPTranslators.h"
 #include "Frames.h"
 #include "ObjectHeap.h"
@@ -689,6 +690,7 @@ NewtonPreMain(void)
 	HostInstallFonts();					// (the host's fonts, offered when asked for: before the Host panel, which may turn them on)
 	HostInstallSettings();				// (the Host preferences panel, after Network Printers: the Prefs list's last)
 	HostInstallWordEngines();			// (the host's handwriting engines in the Handwriting Recognition slip)
+	InstallJournalHostNatives();		// (testing/Journal.h: JournalReplayWords, for the recognisers' replay metrics)
 	// the boot sound (TNotebook::InitToolbox), which may still be playing,
 	// kept out of what is counted as played, which is what the script's
 	// sounds are measured by

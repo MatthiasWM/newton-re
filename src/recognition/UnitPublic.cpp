@@ -169,8 +169,8 @@ TUnitPublic::Stroke(void)
 // The view under the unit with the flags: the one found last is answered
 // when it was found with the same flags; otherwise the view under the
 // centre of the bounds, and failing that the closest within 10 pixels
-// each way.  While the arbiter has an entry waiting on units not yet made
-// (its +0x21) the view under the middle of the root view is taken
+// each way.  While the arbiter replays the journal's units (its +0x21,
+// fReplaying) the view under the middle of the root view is taken
 // instead, with the flags 0x1fffe00 (every view that takes anything).
 TView*
 TUnitPublic::FindView(ULong flags)
@@ -178,7 +178,7 @@ TUnitPublic::FindView(ULong flags)
 	if (fViewHit != nil && fViewHitFlags == flags)
 		return fViewHit;
 	TView* view;
-	if (gArbiter != nil && gArbiter->fWaiting)		// (DEVIATION: the ROM always has an arbiter here; a host test may not)
+	if (gArbiter != nil && gArbiter->fReplaying)		// (DEVIATION: the ROM always has an arbiter here; a host test may not)
 		view = gRootView->FindView(MidPoint(gRootView->viewBounds), 0x1fffe00, nil);
 	else
 	{

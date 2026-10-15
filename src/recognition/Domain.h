@@ -33,7 +33,7 @@ public:
 	virtual				~TDomain();								// ROM 0x0020cd64 __dt__7TDomainFv
 	static TDomain*		Make(TController* controller, ULong type, char* name);	// ROM 0x0020cf88 Make__7TDomainSFP11TControllerUlPc
 	void				IDomain(TController* controller, ULong type, char* name);	// ROM 0x0020d008 IDomain__7TDomainFP11TControllerUlPc
-	static ULong		VUnitInClass(ULong type, ULong classType);	// ROM 0x0020cfc4 VUnitInClass__7TDomainSFUlT1 - whether type is a word type ('WRXR', 'JANK', 'WREC') when classType is 'WORD'
+	static ULong		VUnitInClass(ULong type, ULong classType);	// ROM 0x0020cfc4 VUnitInClass__7TDomainSFUlT1 - whether type is a word type ('XRWR', 'KANJ', 'WREC') when classType is 'WORD'
 
 	virtual void		Dispose(void);							// ROM 0x0020d054 Dispose__7TDomainFv
 	virtual void		Dump(TMsg* msg);						// ROM 0x0020cdc4 Dump__7TDomainFP4TMsg

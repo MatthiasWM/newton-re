@@ -1440,13 +1440,14 @@ set_tests_properties(host.NewtonNumbers PROPERTIES TIMEOUT 180 ENVIRONMENT "NEWT
 # written in one stroke with the cursive letter set; each must reach the
 # reader and be answered (what they read as is recorded in
 # docs/recognition/README.md, "Joined-up writing") - "on", "no", "to"
-# and "nun" first, "mum" as "Mom" - and "mum" and "nun" lose their
-# arbitration to the scrub gesture (their synthetic stems are retraced
-# exactly, a zig-zag TestScrub takes) and go down as ink words: the page
-# reads "on no ~ to ~" (0x1a being the paragraph's ink-word character)
+# and "nun" first, "mum" as "Mom" - and the page reads "on no Mom to nun".
+# (Until TDomain::VUnitInClass took ParaGraph's 'XRWR' as a word - the
+# host had it as 'WRXR' - a cursive area's case counted no words, and
+# "mum" and "nun" lost their arbitration to the scrub gesture TestScrub
+# saw in their retraced stems, going down as ink words.)
 add_test(NAME host.NewtonCursiveJoined COMMAND newton --display 320x480 --headless 120 --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/cursive-joined.ns WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
 set_tests_properties(host.NewtonCursiveJoined PROPERTIES TIMEOUT 240 ENVIRONMENT "NEWTON_TRACE_CURSIVE=1"
-                     PASS_REGULAR_EXPRESSION "answers: \"on\"/.*answers: \"no\"/.*answers: \"Mom\"/.*answers: \"to\"/.*answers: \"nun\"/.*the page reads \"on no . to . / \".*cursive-joined: done"
+                     PASS_REGULAR_EXPRESSION "answers: \"on\"/.*answers: \"no\"/.*answers: \"Mom\"/.*answers: \"to\"/.*answers: \"nun\"/.*the page reads \"on no Mom to nun / \".*cursive-joined: done"
                      FAIL_REGULAR_EXPRESSION "waited in vain")
 
 # the journal (testing/Journal.h): "ton" written while recording, the four
@@ -1464,6 +1465,39 @@ add_test(NAME host.NewtonTestAgent COMMAND newton --display 320x480 --headless 6
 set_tests_properties(host.NewtonTestAgent PROPERTIES TIMEOUT 120
                      PASS_REGULAR_EXPRESSION "queue before activating is empty.*queued \"Test Case MSG: hello from the test\".*queued \"Test Case ERR: \tsomething went wrong\".*test a frame started in newt.*TotalSystemFree.*parameters 4:.*\"a frame\".*\"one\".*\"two three\".*\"four\".*debug\\(0\\) is a view.*is nil.*printed, not queued.*testagent: done"
                      FAIL_REGULAR_EXPRESSION "waited in vain")
+
+# the recognisers' replay metrics (recognition/ReplayMetrics.h): a word
+# journal of "ton to on no" in printed letters, with control strings for
+# learning off and the ink scaled smaller by a power of two, made and
+# played by tools/recognition/replaymetrics.py (demo/replaymetrics.ns), and
+# the ROM's metrics line for each word: Rosetta reads "ton" and "to" first
+# time, has "on" and "no" among its first five, and covers every word
+# exactly.  The .romBugs run pins HandleControlString's smaller scale,
+# which the ROM makes nought (ROM BUG).  tools.ReplayMetrics compares
+# Rosetta, ParaGraph and the unistroke engine on the same writing.
+if(Python3_FOUND)
+    add_test(NAME host.NewtonReplayMetrics
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/recognition/replaymetrics.py compare
+                     --newton $<TARGET_FILE:newton> ton to on no --control "**0" --control "**624"
+                     --recognizers printing --expect-lines 4 --keep ${CMAKE_CURRENT_BINARY_DIR}/replaymetrics
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    set_tests_properties(host.NewtonReplayMetrics PROPERTIES TIMEOUT 900
+                         PASS_REGULAR_EXPRESSION "Replay encountered control string: \\*\\*0.*Turn Learning Off.*Turning scaling on: scale factor +0.5000.*printing: 5 . 1 . W . W . 1 . 0 . 1 . 3 . ton . [0-9]+ . 4 .*printing +4 +2 +4 +4 .*printing +ton +read ton +rank first.*compare done")
+    add_test(NAME host.NewtonReplayMetrics.romBugs
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/recognition/replaymetrics.py compare
+                     --newton $<TARGET_FILE:newton> ton --control "**624"
+                     --recognizers printing --expect-lines 1 --keep ${CMAKE_CURRENT_BINARY_DIR}/replaymetrics-rombugs
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    set_tests_properties(host.NewtonReplayMetrics.romBugs PROPERTIES TIMEOUT 900 ENVIRONMENT NEWTON_ROM_BUGS=1
+                         PASS_REGULAR_EXPRESSION "Turning scaling on: scale factor +0.0000.*compare done")
+    add_test(NAME tools.ReplayMetrics
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/recognition/replaymetrics.py compare
+                     --newton $<TARGET_FILE:newton> ton to on no it --recognizers printing,cursive,UNIS
+                     --expect-lines 5 --keep ${CMAKE_CURRENT_BINARY_DIR}/replaymetrics-compare
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+    set_tests_properties(tools.ReplayMetrics PROPERTIES TIMEOUT 1500
+                         PASS_REGULAR_EXPRESSION "printing +5 +3 +5 +5 .*cursive +5 +5 +5 +5 .*UNIS +5 +0 +0 +0 .*compare done")
+endif()
 
 # the units the ROM's own packages export, as the unit natives see them
 # after the boot (packages/Units.h), the built-in NIE's among them

@@ -264,7 +264,7 @@ regenerate, don't edit.  What the fixes are and how to switch them off: `docs/ro
 - fixed `qd/Tile.cpp:328` fixed): the rows past the last whole band are turned as RotateTilesR turns
 - fixed `qd/Transform.cpp:238` fixed): the height is the pen's *width* times the vertical scale
 
-## recognition: 84/84 fixed
+## recognition: 85/85 fixed
 
 - fixed `recognition/Airus.cpp:1003` fixed): a word whose last node carries no attribute - a path
 - fixed `recognition/Airus.cpp:1429` fixed): it writes the bytes out by hand for the sizes 1, 2 and 4 and has no arm for 3, so a dictiona
@@ -272,9 +272,9 @@ regenerate, don't edit.  What the fixes are and how to switch them off: `docs/ro
 - fixed `recognition/Airus.cpp:2821` fixed): the tail - the loop that works out the single character
 - fixed `recognition/AirusIterator.cpp:130` fixed): the index it walks with is kept in a byte, so a state with more than 255 next-characters wra
 - fixed `recognition/AirusIterator.cpp:535` fixed): this copies the words and the dictionary and then copies the state stack - but it links each
-- fixed `recognition/Arbiter.cpp:960` fixed): the gather is walked and each entry's flags are tested, but the unit that is marked is the o
-- fixed `recognition/Areas.cpp:830` fixed): the three heights keep only their low byte - each is
-- fixed `recognition/Areas.cpp:854` fixed): the two spacings keep only their low byte, as the heights above do. The fix stores the whole
+- fixed `recognition/Arbiter.cpp:978` fixed): the gather is walked and each entry's flags are tested, but the unit that is marked is the o
+- fixed `recognition/Areas.cpp:832` fixed): the three heights keep only their low byte - each is
+- fixed `recognition/Areas.cpp:856` fixed): the two spacings keep only their low byte, as the heights above do. The fix stores the whole
 - fixed `recognition/CharBox.cpp:130` fixed):** the answer is meant to be nought when the stroke was taken and one when the box was full, 
 - fixed `recognition/Chunk.cpp:112` fixed): +0x92, which the numbers-alone way sets to one, is not
 - fixed `recognition/ChunkDigits.cpp:248` fixed): the test that the two are close enough is HWRAbs(0 3 > the earlier box's height - the argume
@@ -312,6 +312,7 @@ regenerate, don't edit.  What the fixes are and how to switch them off: `docs/ro
 - fixed `recognition/LowPunct.cpp:102` fixed): this walk back does not skip the extrema coded 0x6f that the copying above left out, so a st
 - fixed `recognition/OrthoDB.cpp:328` fixed): an empty list is not looked for - its first answer never written, is compared as though it w
 - fixed `recognition/RandomWords.cpp:107` fixed): the draw is 1 .. the total and a character is taken while the draw is *below* the running to
+- fixed `recognition/ReplayMetrics.cpp:970` fixed): the whole part is shifted left by whatever it is - for the smaller sizes a negative
 - fixed `recognition/RosEngine.cpp:249` fixed).** The first pass copies the shorts at +0x08 +0x0a and +0x0c but *not* the one at +0x0e, and 
 - fixed `recognition/RosEngine.cpp:356` fixed), twice over. The step between one entry and the next is
 - fixed `recognition/RosList.cpp:189` fixed): it answers true whatever `ListAddEntry` said so a caller cannot tell that the list was nil o
@@ -389,11 +390,11 @@ regenerate, don't edit.  What the fixes are and how to switch them off: `docs/ro
 
 ## testing: 5/5 fixed
 
-- fixed `testing/Journal.cpp:121` fixed): the offset is added to the stroke's first fCount words
+- fixed `testing/Journal.cpp:126` fixed): the offset is added to the stroke's first fCount words
 - fixed `testing/TestAgent.cpp:199` fixed): with no `where` the format asks for two strings and is
-- fixed `testing/TestAgent.cpp:515` fixed): the queue is freed but gTestAgentMessageQueue still points at it, so a TestMGetReportMsg aft
-- fixed `testing/TestAgent.cpp:646` fixed): the format asks for the text and is given none, so the
-- fixed `testing/TestAgent.cpp:898` fixed): the request is then queued as well, with a kind nothing set (whatever the
+- fixed `testing/TestAgent.cpp:519` fixed): the queue is freed but gTestAgentMessageQueue still points at it, so a TestMGetReportMsg aft
+- fixed `testing/TestAgent.cpp:650` fixed): the format asks for the text and is given none, so the
+- fixed `testing/TestAgent.cpp:902` fixed): the request is then queued as well, with a kind nothing set (whatever the
 
 ## text: 15/15 fixed
 

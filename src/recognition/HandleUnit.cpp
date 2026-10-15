@@ -314,15 +314,15 @@ UpdateStroke(TUnit* unit)
 // ROM 0x0019dad0 HandleExpiredStroke__FP5TUnit
 // A stroke no recogniser took: the after-writing state set; the stroke
 // goes to the stroke world's expired strokes to be grouped into ink, or,
-// while the arbiter is waiting on units not yet made, its ink is just
-// taken off.  An 'evt.ex' Throw is reported (anything else passed on).
+// while the arbiter replays the journal's units (TArbiter::fReplaying),
+// its ink is just taken off.  An 'evt.ex' Throw is reported (anything else passed on).
 void
 HandleExpiredStroke(TUnit* unit)
 {
 	newton_try
 	{
 		gRecognition.fAfterWriting = true;
-		if (!gArbiter->fWaiting)
+		if (!gArbiter->fReplaying)
 			gStrokeWorld.AddExpiredStroke((TStrokeUnit*) unit);
 		else
 			UpdateStroke(unit);

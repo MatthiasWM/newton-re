@@ -543,12 +543,12 @@ ExpireUsingCommand(TUnitPublic** units)
 // ROM 0x00145210 ExpireGroup__13StrokeCentralFPP11TUnitPublic
 // A group of expired strokes handed on - to the expire proc as a stroke
 // bundle, or as ink to the view under them - unless the arbiter is
-// waiting (a Throw of an 'evt.ex' reported); with no expire proc the
+// replaying the journal's units (a Throw of an 'evt.ex' reported); with no expire proc the
 // screen is brought up to date.
 void
 StrokeCentral::ExpireGroup(TUnitPublic** units)
 {
-	if (!gArbiter->fWaiting)
+	if (!gArbiter->fReplaying)
 	{
 		newton_try
 		{

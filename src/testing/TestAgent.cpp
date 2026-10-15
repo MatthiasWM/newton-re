@@ -237,13 +237,17 @@ TTestReporter::TestReportMessage(char* message, char* where)
 
 // ROM 0x0022b804 TestFPrintf__13TTestReporterFiPCce
 // A message (kind 2) or an error (anything else, and counted).
+// DEVIATION: the line is cut at its 255 characters; the ROM's vsprintf
+// runs on over the stack for a longer one (a line of the replay metrics
+// with words and shapes can be longer: ReplayMetrics.h), which the host
+// does not reproduce.
 void
 TTestReporter::TestFPrintf(int kind, const char* format, ...)
 {
 	char line[256];
 	va_list args;
 	va_start(args, format);
-	vsprintf(line, format, args);
+	vsnprintf(line, sizeof(line), format, args);
 	va_end(args);
 	ULong what;
 	if (kind == 2)
