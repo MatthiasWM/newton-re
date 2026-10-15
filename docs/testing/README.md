@@ -9,7 +9,7 @@ tablet buffer so that a test can write on the machine as a person would.
 38 NewtonScript natives reach it (`natives.py --unbound`, the `testing`
 area).
 
-Reconstructed so far: the journal, the tablet's bypass, the test agent
+Reconstructed so far: the journal, the tablet's bypass, the recogniser's replay metrics (below), the test agent
 with its reporters, message queue and NewtonScript natives (a test
 manager on the machine itself works end to end), and the debugging hooks
 (`debug`, `DebugRunUntilIdle`, `DebugMemoryStats`, `StdioOn`/`StdioOff`,
@@ -115,21 +115,10 @@ system's NOT YETs, gone through one by one - who reaches each
 NTK Inspector, the one debugger a Newton developer used, is already done
 (`comms/NTK.h`, ctest `host.NewtonNTK`).
 
+**Done:** the recogniser's replay metrics - below, "The replay metrics".
+
 **Worth doing:**
 
-- **The recogniser's replay metrics** (~8 KB: `HandleReplayUnit` 0x00090288,
-  `WriteTapStats`, `PrintMetrics`, the `Gather*Metrics` family,
-  `GetCorrespondingUnits`, `IsControlUnit`, `HandleControlString`,
-  `MaybeDoLearning`).  When the journal replays *units* rather than
-  strokes, the arbiter hands them to `HandleReplayUnit` (the unit handler
-  `Areas.cpp` leaves NOT YET), which matches what the recognisers made of
-  the ink against what the journal says was written (control strings in
-  it) and tallies words, shapes, scores and times - a recognition accuracy
-  harness.  On the host it would measure ParaGraph, Rosetta and the host's
-  own engines on the same recorded writing, which nothing does now
-  (`docs/recognition/engines.md`; "How well the recognisers read
-  synthetic writing" in `docs/next-steps.md`).  It needs the journal to
-  record and replay units as well as strokes.
 - **The NewtonScript function profiler's hooks** (`EnableFramesFunctionProfiling`
   0x002d41f4, `InstallFramesFunctionProfiler` 0x002d424c, the interpreter's
   `TInterpreter::Return(FramesProfilingKind)` and the hooks around the
@@ -293,3 +282,157 @@ never set - in `HandleWordUnit`'s case the word's text pointer - which
 is not nil; the host now does the same.  Nothing to do with the
 journal: a word written well away from the text with remote writing on
 did the same.)
+
+
+## The replay metrics (`recognition/ReplayMetrics.h`, ROM 0x00090284-0x000925c0)
+
+Apple's recognition accuracy harness.  Recorded writing with the text of
+each word ("TAP files": `TapFileWordNumber`, `CompleteTapFile` and the
+debugger's file channel `TapFileCntl` are what is left of them) was played
+back with the arbiter in replay mode; a *replayed unit* ('WRPL', a
+`TWordReplayUnit`) over each word's strokes said what had been written
+there, and the ROM measured the recognisers against it.  How each fact was
+established: the disassembly and Ghidra's decompile of every function
+(`analysis/decompile.py --range 0x00090284 0x000925c0 --asm`), the ROM's
+strings (the formats are verbatim), and `xrefs.py`/`callgraph.py
+--callers` for who reaches what.
+
+**What the ROM has and has not.**  It has the measuring and the arbiter's
+side; it has *nothing* that makes a replayed unit or sets the replay mode:
+no code writes the arbiter's +0x21 but `IArbiter` (0), no code refers to
+'WRPL' but the metrics and the arbiter, nothing calls `ExportReporter`, and
+`useWordReplayDomain` is only a slot in the preferences' defaults.  Those
+were Apple's test tools (a 'WRPL' domain reading the TAP file), outside the
+ROM.  The journal itself records and replays strokes only
+(`JournalRecordAStroke` is its one recorder); there is no unit recording.
+
+**The path, as the ROM has it.**
+
+- Replay mode is `TArbiter::fReplaying` (+0x21; misnamed `fWaiting` until
+  now).  `FindMatchingArea` and `MakeCharArea` then give a new area
+  `HandleReplayUnit` as its unit handler instead of `HandleUnit`;
+  `ArbitrateUnits` puts the replayed units first among the winners and,
+  after its usual choice (whose winners it marks `kGatheredUnit`), adds
+  everything else gathered over the same strokes; `ArbitrateWithScrubs`
+  never lets a replayed unit win; `HandleExpiredStroke` and `ExpireGroup`
+  leave no ink; `TUnitPublic::FindView` takes the view in the middle of the
+  screen.
+- `SetCaseAndTime` (0x0020830c) stamps the replayed units at the front of
+  the winners with the area's recognition case (`GetRecognitionCase`: the
+  scrub types, +2 shapes, +4 words - read once and kept in the arbiter's
+  `fCase`) and the time (0 from `DoArbitration`).
+- `HandleReplayUnit` (0x00090288): a single winner is left alone;
+  otherwise, with stdio on, `WriteTapStats`, and the arbiter told to
+  arbitrate at once.  ==> 1.
+- `WriteTapStats` (0x00090848): the stats channel must be there
+  (`gReplayReporter`, a `TTestReporter` set by `ExportReporter`
+  0x002527ac); the first winner may be a control string (`IsControlUnit`);
+  otherwise each replayed unit (they must come first) is measured -
+  `GatherExpectedMetrics`, then by its case `GatherGraphicsMetrics` (2,
+  3), `GatherWordsMetrics` (4, 5) or `GatherWordsGraphicsMetrics` (6, 7) -
+  and `PrintMetrics` writes its line.
+- `GetCorrespondingUnits` (0x00090b34) finds the winners of the word
+  recogniser in use (`gWordID`) or 'GSHP' that start within the replayed
+  unit's strokes, and says whether they cover them exactly, start late, run
+  on, and whether one of them was the arbitration's own choice.
+  `GatherWordMetrics`/`GatherWordScoreTime` count and score them (10000 a
+  unit with no reading), and one unit alone covering the strokes is
+  measured by `GatherRealWordMetrics`: its readings, strokes, box, first
+  reading and score, where the written word stood among the readings -
+  exactly, counting the first reading with its first letter's case
+  changed, ignoring case - the first five scores, and the learning
+  (`MaybeDoLearning`: with learning on, ParaGraph taught the word as a
+  writer correcting it `gCorrectRate` times in a hundred would,
+  `DoIndexedLearning('XRWR', ...)`).  Shapes likewise
+  (`GatherRealShapeMetrics`: the type number as text against the written
+  one).
+- `PrintMetrics` (0x000902d0), one line, tab-separated: recCase, correct
+  (the written kind's units cover exactly its strokes), expected kind (W,
+  G, ?), found kind (W, G, $), kind right, time; for words: units found,
+  the written word's length (-1 unless a word covered exactly), the word,
+  readings, strokes, width, height, first reading, score, eight 0/1
+  columns (right first; right first counting a wrong first-letter case; in
+  the first three, both ways; five; at all - all -1 unless a word covered
+  exactly), the two unit times and their sum (always 0: the unit timing,
+  `InitUnitTimingGlobals`, is compiled out of this ROM), the flags
+  (0x100000 covered exactly); for shapes the same columns for shapes.
+- Control strings (`IsControlUnit` 0x00092410, `HandleControlString`
+  0x00091a34): a replayed unit whose text starts "**".  "**0" learning off;
+  "**1d" learning on, d how often the writer corrects (0 always, 1 never,
+  2 half, 3 a quarter, 4 three quarters); "**2" ParaGraph's letter weights
+  reset; "**3d" as 1, learning from the corrector too; "**41"/"**40"
+  deferred recognition on/off; "**5..." recognition in a field (0 off,
+  "1d" nine fields, "2d" five more, a locale digit after City, State,
+  Company, Phone, Date and Time - `SetLocale5`/`SetLocale4` - and
+  `AddTestConfig` puts `testFields[n]` into
+  `userConfiguration.testConfig`); "**6..." the ink scaled
+  (`gScaleFactor`, read by nothing else in the ROM); "**71"/"**70"
+  recognition in the corrector.  Each is announced on the stats channel
+  (four 0xB4 bytes and "***Replay encountered control string: ...", "**Turn
+  Learning On", ..., and then "Beginning test: <name> Field").
+
+**Output.**  `PrintToStats` is `gReplayReporter->TestFPrintf(2, "%s",
+...)`: a test reporter's message, which the test agent queues (a test
+manager on the machine reads it with `TestMGetReportMsg`, cut at 0xe0
+bytes) or would send to the desktop test server.  `PrintError` adds a
+printf to stdio.  DEVIATION: every line for the stats channel is also
+written to the file `NEWTON_REPLAY_STATS` names; a 4-character type printed
+with `%4.4s` is printed as its characters on every host;
+`TTestReporter::TestFPrintf` cuts its line at 255 characters (the ROM's
+vsprintf overruns the stack for a longer one, which a words-and-shapes
+metrics line can be).
+
+**The host's stand-in for the test tools** (DEVIATION,
+`recognition/WordReplay.h`): the 'WRPL' recogniser, installed beside the
+ROM's in `InitRecognizers`, puts its type in every area that takes words
+or shapes while replaying (arbitrated at once, as words and shapes are, so
+the arbitration waits for it), and its domain groups the replayed strokes
+- told apart by the controller's stroke numbers, counted from the one the
+replay started at - into one `TWordReplayUnit` per labelled word, carrying
+the label's text and type (one reading, scored 9999, so that it never wins
+by score).  The words come from a **word journal** (`testing/Journal.cpp`):
+the journal's stroke file as `JournalReplayStrokes` plays it, followed by
+'WRPL', a label count, and per label its stroke count (a half word), its
+type ('WREC' a word, 'GSHP' a shape), its length and UTF-16 text, padded
+to four bytes - big-endian throughout.  Host natives:
+`JournalReplayWords(file, dx, dy)` (a binary or a host file's name; the
+test agent must be running: the newt world's reporter becomes the stats
+channel, the arbiter goes into replay mode, and the area cache is purged so
+that areas are built again with the handler and the type),
+`JournalReplayWordsBusy()`, `JournalStopReplayWords()`.
+`NEWTON_TRACE_REPLAY=1` traces the replayed units.
+
+**Comparing recognisers.**  `tools/recognition/replaymetrics.py`
+(`tools/recognition/README.md`) builds word journals from synthetic letters
+(printed, or joined into one stroke a word) with control strings, runs
+`newton` headless over one through `src/host/demo/replaymetrics.ns` with
+`printing` (Rosetta), `cursive` (ParaGraph) or a host engine ('UNIS'),
+chosen as the Handwriting Recognition slip chooses them, and tabulates the
+ROM's lines.  For "ton to on no it" printed: Rosetta 3 right first and 5 in
+its first five ("on" read "0M", "no" "MO"), ParaGraph 5 right first, the
+unistroke engine none (it makes a unit of each stroke, so no unit covers a
+word).
+
+ROM bug: `HandleControlString`'s smaller scales ("**62d") shift the factor
+left by a negative count, which the ARM takes as 255, so every smaller
+scale comes out 0 (fixed: shifted right; `NEWTON_ROM_BUGS=1` the ROM's 0).
+ROM quirk: `GetCorrespondingUnits` lowers the lowest stroke from the
+cleared metrics' 0, so it is always 0.  A curiosity: the space
+`GatherExpectedMetrics` puts between words is loaded with an unaligned
+`ldr` from `unicodeSpace + 2`, which the ARM rotates into the halfword it
+wants.
+
+Found on the way: the host's `TDomain::VUnitInClass` had ParaGraph's type
+as 'WRXR' (and 'KANJ' as 'JANK'), so a cursive area's recognition case
+counted no words and the scrub gesture won its arbitrations; with the
+ROM's literals ParaGraph's synthetic "mum" and "nun" are read
+(`host.NewtonCursiveJoined`).
+
+### Tests
+
+ctest `host.NewtonReplayMetrics` (the tool's `compare` on "ton to on no"
+printed, Rosetta, with "**0" and "**624": the control strings announced,
+the scale 0.5, the line for "ton", 2 right first and 4 in the first five),
+`host.NewtonReplayMetrics.romBugs` (the scale 0 with `NEWTON_ROM_BUGS=1`),
+`tools.ReplayMetrics` (Rosetta, ParaGraph and the unistroke engine on "ton
+to on no it").

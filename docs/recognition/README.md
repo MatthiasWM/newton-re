@@ -50,8 +50,7 @@ What is left, and why:
   `InkerOff`, `TBCWakeUpInker`) and the tablet driver's calibration
   (`CheckTabletHWCalibration`); the host's `hal/host/HostTablet.h` and
   its inker stand-in feed the same tablet buffer.
-* **Waiting on other areas**: the journal's replayed units
-  (`HandleReplayUnit`), large binaries on a store (`FLBAlloc`, where
+* **Waiting on other areas**: large binaries on a store (`FLBAlloc`, where
   training data would go), `CreateVMHeap` (the engine runs in the
   ordinary heap - DEVIATION), `WRecVerifyWordSymbols`,
   `TController::NextIdleTime` and `SearchAllocateReturnCache`.
@@ -291,6 +290,13 @@ forgotten), invalidated, and its strokes claimed
 (`TController::MarkUnits`, 0x40000000; so a click a view takes gets no
 tap gesture after it).  `HandleExpiredStroke` 0x0019fd8c passes a stroke
 no recogniser took to the stroke world's expired strokes (ink: NOT YET).
+
+While the recognisers' readings are being measured (the arbiter's
++0x21, `TArbiter::fReplaying` - it was misnamed `fWaiting` until the
+replay metrics were reconstructed) an area's unit handler is
+`HandleReplayUnit`, not `HandleUnit` (`FindMatchingArea`,
+`MakeCharArea`), and nothing reaches the views: see
+`docs/testing/README.md`, "The replay metrics".
 
 The click and stroke tracking loops - `FTrackHiliteX` 0x001ecaa8
 (`:TrackHilite(unit)`: the view hilited while the stroke's last point is
@@ -3085,20 +3091,19 @@ is the way to look for the next:
   ("on" came back "OR"); a cursive o's join arrives at its top right and
   goes over the top first, and drawn so it reads "on" (82, "or" 71).
 
-"mum" and "nun" are read but **lose their arbitration to the scrub
-gesture** (`NEWTON_TRACE_ARBITER=1` prints each arbitration: `'XRWR'/330
-'SCRB'/0; won 'SCRB'`): the arbiter takes the lowest score and a scrub
-scores nought.  The demo's m and n go down the stem and straight back up
-it, arches of a few whole pixels on letters fourteen high, which makes
-three or more turns of over 110 degrees that alternate - a zig-zag, which
-is what `TestScrub` looks for.  `TestScrub` and `ValidTurnSequence` agree
-with the ROM (the corner counts, the 110 and 170 degree limits, the half
-turn that makes a loop, the spread of the turns), so this is the drawing:
-rounder arches drawn with the pen in whole pixels do not change it.  With
-nothing to erase under them the scrubs do nothing, the strokes expire
-unclaimed, and they go down as ink words (the page's text holds 0x1a, the
-paragraph's ink-word character, for each).  Whether a MessagePad takes a
-joined "mum" for a scrub too cannot be checked without one.
+"mum" and "nun" are read and win (the page reads "on no Mom to nun").
+They used to **lose their arbitration to the scrub gesture**
+(`NEWTON_TRACE_ARBITER=1`: `'XRWR'/330 'SCRB'/0; won 'SCRB'`): the
+demo's retraced stems make the zig-zag `TestScrub` looks for, and in an
+area whose recognition case counts no words (case 1, a scrub alone) the
+arbiter takes the lowest score, and a scrub scores nought.  The case
+counted no words because the host's `TDomain::VUnitInClass` had
+ParaGraph's type as 'WRXR' (and the Kanji type as 'JANK'); the ROM's
+literals are 'XRWR' and 'KANJ'.  With them a cursive area is case 5 (a
+scrub and words), `ArbitrateWithScrubs` lets every word win beside the
+scrub, and the scrub, with nothing to erase, does nothing.  The replay
+metrics found it (`ReplayMetrics.h`): every cursive line came out as
+case 1 with no word metrics.
 
 ### A graph of alternatives (`MakeRecWordsFromGraph`, in `XrAnswers.cpp`)
 
