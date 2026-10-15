@@ -144,6 +144,7 @@ void		SetPenState(const PenState* state);
 void		PenSize(long width, long height);
 void		PenMode(long mode);
 void		SetFgPattern(PatternHandle pattern);		// (PenPat)
+void		DisposeFgPattern(void);						// ROM 0x00328e6c DisposeFgPattern__Fv - the pen pattern disposed and black put back
 void		SetBgPattern(PatternHandle pattern);		// (BackPat)
 void		PenNormal(void);
 void		MoveTo(long h, long v);

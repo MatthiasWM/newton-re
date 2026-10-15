@@ -142,7 +142,7 @@ def decode(rom: Rom, at: int) -> dict:
     bt = info["fBTableDelta"]
     if bt:
         i = 0
-        while i < 128:
+        while i < 1024:		# (TQDLibraryDriver's has 200 slots)
             w = rom.word(bt + 4 * i)
             if i == 0 and w == 0:
                 btable.append(None)

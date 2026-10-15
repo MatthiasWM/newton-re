@@ -4,6 +4,8 @@
 // text proc over the same layout the drawing uses - checked against
 // MeasureTextOnce's widths of the same text in the ROM's own font.
 #include "TextObject.h"
+#include "QDLibrary.h"
+#include "host/RomBugs.h"
 #include "Text.h"
 #include "Fonts.h"
 #include "Draw.h"
@@ -102,13 +104,15 @@ TestQuestions()
 	options.fWidth = four + 0x10000;							// "Wide" and a pixel: not the space as well
 	text = NewText(kText, kLength, styles, nil, at, &options);
 	fitted = -1;
-	TQDLibraryDriver::GetTextObjField(text, kTextObjFittedLength, &fitted);
+	TQDLibraryDriver library;			// (the QuickDraw library protocol's ROM BUG fixed: its methods pass the call on)
+	SetRomBugFixed(true);
+	library.GetTextObjField(text, kTextObjFittedLength, &fitted);
 	Fixed five = WidthOf(kText, 5, &style);
 	EXPECT(fitted == (five <= options.fWidth ? 5 : 4));
 	FPoint p;
-	TQDLibraryDriver::CharToPoint(text, 2, &p);
+	library.CharToPoint(text, 2, &p);
 	EXPECT(p.x == at.x + WidthOf(kText, 2, &style));
-	EXPECT(TQDLibraryDriver::PointToChar(text, at) == 0);
+	EXPECT(library.PointToChar(text, at) == 0);
 	DisposeText(text);
 
 	// right-aligned in a wider box: the characters start further in
@@ -127,7 +131,7 @@ TestQuestions()
 	EXPECT(TextArrowOffset(text, 0, false) == 0 && TextArrowOffset(text, kLength, true) == kLength);
 	EXPECT(TextArrowOffset(text, kLength + 5, false) == kLength);
 	EXPECT((TextObj(text)->fFlags & kTextObjOpMask) == kTextObjOpTextArrow);
-	EXPECT(TQDLibraryDriver::TextArrowOffset(text, 1, true) == 2);
+	EXPECT(library.TextArrowOffset(text, 1, true) == 2);
 	DisposeText(text);
 	DisposeStyleRecord(&style);
 }

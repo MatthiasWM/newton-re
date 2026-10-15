@@ -427,7 +427,6 @@ void		OuterBounds1(Rect* bounds, ULong viewFormat);			// ROM 0x0026404c OuterBou
 void		BadWickedNaughtyNoot(long which);						// ROM 0x001ef4c4 BadWickedNaughtyNoot__Fl
 Boolean		GetPattern(RefArg spec, Boolean* owned, PatternHandle* pattern, Boolean wasOwned);	// ROM 0x00197d2c GetPattern__FRC6RefVarPUcPPP8PixelMapUc - a pattern from its NewtonScript form
 Boolean		SetPattern(long index);									// ROM 0x000e37e8 SetPattern__Fl - the pen pattern from a viewFormat pattern index
-void		DisposeFgPattern(void);									// ROM 0x00328e6c DisposeFgPattern__Fv
 
 void		InitViewPrototypes(void);		// host: the canonical context, data context and rect frames when no ROM is imported
 void		InitViewSystem(void);			// host: the slot cache table, the prototypes, the root view (with the current port) - after InitObjects and InitGraf
