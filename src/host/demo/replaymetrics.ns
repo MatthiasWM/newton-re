@@ -1,0 +1,117 @@
+// The recognisers' replay metrics (recognition/ReplayMetrics.h): a word
+// journal - strokes and what each word was - played back with the arbiter
+// in replay mode, and the ROM's metrics line for each word printed.
+//
+//   NEWTON_REPLAY_JOURNAL=words.jnl NEWTON_REPLAY_RECOGNIZER=printing \
+//   NEWTON_REPLAY_STATS=stats.tsv build/host/host/newton --display 320x480 \
+//       --headless 300 --script src/host/demo/replaymetrics.ns
+//
+// tools/recognition/replaymetrics.py makes the journal (build) and runs this
+// (run, compare).  NEWTON_REPLAY_RECOGNIZER is "printing" (Rosetta, the
+// letter set 2), "cursive" (ParaGraph, the letter set 0) or the type of one
+// of the host's engines (HostWordEngines(): "UNIS"), chosen as the
+// Handwriting Recognition slip chooses them.
+//
+// After the Setup walk the test agent is started with this script as its
+// test manager (the journal plays from the agent's idle proc, and the newt
+// world's reporter is the stats channel), the recogniser chosen, and the
+// journal played by JournalReplayWords on the Notepad.  When every word
+// has been measured (JournalReplayWordsBusy() nil) the queued reports are
+// printed ("replaymetrics: msg: ...", cut at the agent's 0xe0 bytes; the
+// whole lines are in NEWTON_REPLAY_STATS), the replay mode left, and
+// "replaymetrics: done" printed.
+
+HostInclude("common.ns");			// tapAt, waitFor, walkSetup
+
+name := [2, 0, 45, 34, 14, 37];				// "Daniel" in ADB key codes
+
+rmTestMgr := {
+    testMgrCaseDoneScript: func() nil,
+    testMgrFrameDoneScript: func() nil,
+    Start: func() ActivateTestAgent("*", nil)};
+
+rmDrain := func()
+  begin
+    local msg;
+    while msg := TestMGetReportMsg() do
+      begin
+        local line := "";
+        for i := 0 to StrLen(msg) - 1 do
+          if Ord(msg[i]) = 10 or Ord(msg[i]) = 13 then
+            begin
+              if StrLen(line) > 0 then Print("replaymetrics: msg: " & line);
+              line := "";
+            end
+          else
+            line := line & msg[i];
+        if StrLen(line) > 0 then Print("replaymetrics: msg: " & line);
+      end;
+  end;
+
+rmChoose := func(which)
+  begin
+    if StrEqual(which, "cursive") then
+      begin
+        SetUserConfig('hostWordEngine, nil);
+        SetUserConfig('letterSetSelection, 0);
+      end
+    else if StrEqual(which, "printing") then
+      begin
+        SetUserConfig('hostWordEngine, nil);
+        SetUserConfig('letterSetSelection, 2);
+      end
+    else
+      begin
+        local found := nil;
+        foreach e in HostWordEngines() do
+          if StrEqual(e.type, which) then found := e;
+        if not found then
+          begin
+            Print("replaymetrics: no recogniser " & which);
+            return nil;
+          end;
+        SetUserConfig('letterSetSelection, 2);
+        SetUserConfig('hostWordEngine, found.value);
+      end;
+    ReadCursiveOptions();
+    true;
+  end;
+
+rmFinish := func()
+  begin
+    call rmDrain with ();
+    Print("replaymetrics: " & JournalStopReplayWords() & " words measured");
+    DeactivateTestAgent();
+    Print("replaymetrics: done");
+    HostQuit();
+  end;
+
+call walkSetup with (name, func() begin
+    local journal := HostGetEnv("NEWTON_REPLAY_JOURNAL");
+    local which := HostGetEnv("NEWTON_REPLAY_RECOGNIZER");
+    if not which then which := "printing";
+    if not journal then
+      begin
+        Print("replaymetrics: NEWTON_REPLAY_JOURNAL names no journal");
+        HostQuit();
+        return;
+      end;
+    if not call rmChoose with (which) then
+      begin
+        HostQuit();
+        return;
+      end;
+    Print("replaymetrics: recogniser " & which & ", letter set " & GetUserConfig('letterSetSelection));
+    rmTestMgr:Start();
+    // (a moment for the agent's world to start)
+    AddDelayedCall(func() begin
+        local err := JournalReplayWords(journal, 0, 0);
+        Print("replaymetrics: JournalReplayWords " & err);
+        if err <> 0 then
+          call rmFinish with ()
+        else
+          call waitFor with ("replaymetrics: the words measured", func() not JournalReplayWordsBusy(),
+            rmFinish, 240);
+      end, nil, 1000);
+  end);
+Print("replaymetrics: the script is loaded");
