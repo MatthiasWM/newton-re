@@ -9,6 +9,66 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-15: The public API's runtime and fixed-argument forms
+
+The uncited "runtime and overloads" category (65 functions) turned out to
+be mostly a gap for packages' native code: 64 of the 82 public jump table
+entries in it had no armcpu glue, and an unanswered entry stops the CPU
+(armcpu never runs the ROM's own copy).  Reconstructed: `NSSend`,
+`NSSendProto`, `NSSendIfDefined` and `NSSendProtoIfDefined` of every
+arity up to six arguments and their `WithArgArray` forms,
+`NSCallGlobalFn` of four to six and `NSSendRootMessage` of two to six and
+its array form (frames/Interpreter.cpp, views/RootView.cpp).  armcpu now
+answers all 64: the sends and calls (from registers and the stack into
+the `WithArgArray` forms), the RefArg tests and makers (`IsInt`, `IsPtr` -
+the low bit, so a magic pointer too, as the ROM's - `MAKECHAR`,
+`MAKEIMMED`, ...), `RefStruct`'s and `TObjectPtr`'s constructors,
+`realloc`, `SetMemory`, `MinMax`, errno's address, and `__vec_new`/
+`__vec_delete`, which call the package's own constructors and destructors
+back through `ARMCall`.  The category keeps the compiler's own runtime
+(11 functions); 18807 citations, 77.0%.  Tests: `armcpu.PackageNativeCPU`
+calls each through its public jump table address; `frames.Interpreter`
+the new arities.
+
+## 2026-10-15: The recogniser's replay metrics
+
+The ROM carries Apple's recognition accuracy harness: the arbiter's replay
+mode, `HandleReplayUnit` in place of the unit handler, and
+`WriteTapStats`/`PrintMetrics` tallying, for each replayed word, whether
+the recogniser's units cover its strokes, where the right reading stood,
+the scores and times; control strings (`**0`...`**7`) turn learning on,
+simulate a writer who corrects, scale the ink, and so on (27 functions,
+`recognition/ReplayMetrics.h`).  Nothing in the ROM drives it - the
+replayed units came from Apple's test tools' "TAP files" - so the host
+gives it a 'WRPL' recogniser of its own (`recognition/WordReplay.h`,
+DEVIATION) fed by a word journal (the stroke file plus labels;
+`JournalReplayWords`), and `tools/recognition/replaymetrics.py compare`
+runs the same writing through Rosetta, ParaGraph and the host's engines
+(ctests `host.NewtonReplayMetrics`, `.romBugs`, `tools.ReplayMetrics`).
+Found on the way: `VUnitInClass` had the word types' literals
+byte-swapped ('WRXR' for 'XRWR', 'JANK' for 'KANJ'), so a cursive
+area's recognition counted no words and ParaGraph's "mum" and "nun" lost
+to the scrub (`host.NewtonCursiveJoined` now reads "on no Mom to nun");
+a ROM BUG (fixed) in `HandleControlString` makes every smaller ink scale
+nought; the arbiter's +0x21 was misnamed `fWaiting` (it is `fReplaying`).
+
+## 2026-10-15: A NewtonScript profiler
+
+The ROM calls a frames function profiler on every call, send, return,
+exception unwind and collection, but has none of its own
+(`EnableFramesFunctionProfiling` 0x002d41f4, `InstallFramesFunctionProfiler`
+0x002d424c; "on" is the word 'ffpe').  The hooks are reconstructed - with
+the fast loop off while a profiler is in, as the ROM's - and the host has
+a profiler behind them (`frames/FunctionProfiler.h`): calls, inclusive and
+exclusive time per function and the collector's time, named when the
+report is written (`functions.X`, `vars.x`, an implementor's slot, the
+romsrc path by `tools/host/nsprofile.py`).  `NEWTON_NS_PROFILE=<file>`
+profiles a whole run; `HostNSProfileStart`/`Stop`/`Report` do it from a
+script or the T-Deck's console.  A ROM BUG only a profiler could hit -
+an unhandled exception popped one state too many with a profiler
+installed - is fixed beside the ROM's code.  Ctests `frames.Profiler`,
+`host.NewtonScriptProfile`, `...File`, `...Report`.
+
 ## 2026-10-15: same() paths survive edits to functions
 
 A `same("...")` definition and the layout's alias lines name an object by
