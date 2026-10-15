@@ -1848,6 +1848,7 @@ alias	obj_1000b05.AddAllInfoItem.literals[40]	map_10015e1
 alias	obj_1000b05.viewDrawScript.literals[3]	map_10015e1
 alias	obj_1000b05.viewSetupChildrenScript.literals[26]	obj_1002135
 alias	obj_1000b05.viewSetupChildrenScript.literals[33]	obj_1002135
+alias	obj_1003dc5.literals[0]	obj_1003f01
 alias	obj_100f659.buttonClickScript.literals[4]	obj_1002399
 alias	obj_100f659.buttonClickScript.literals[12]	obj_100f7a1
 alias	obj_100ffd9.stepChildren[0].stepChildren[1].viewSetupDoneScript.literals[26]	obj_100f7a1
@@ -1860,10 +1861,11 @@ alias	obj_1012731.menuLeftButtons[1].BuildPopUp.literals[12]	map_10136e1
 alias	obj_1012731.menuLeftButtons[1].BuildPopUp.literals[16]	map_10136e1
 alias	obj_1012731.viewSetupChildrenScript.literals[8]	map_1011e25
 alias	obj_1012731.viewSetupChildrenScript.literals[11]	map_1011e25
+alias	obj_1014bf5.viewSetupChildrenScript.literals[5].name	obj_1000779
 alias	obj_1014bf5.viewSetupChildrenScript.literals[5].viewSetupFormScript.instructions	obj_10008c9
 alias	obj_1014bf5.viewSetupChildrenScript.literals[5].viewSetupFormScript.literals[3]	map_100096d
+alias	obj_1014bf5.viewSetupChildrenScript.literals[5]._proto	obj_1000b05
 alias	obj_1015571.Abstract.literals[0]	obj_1003ce9
-alias	obj_1003dc5.literals[0]	obj_1003f01
 alias	obj_1004281.GenericSecurID.loginScript.instructions[1].data	obj_1004529
 alias	obj_1004281.GenericSecurID.loginScript.instructions[4].data	obj_1004591
 alias	obj_1004281.GenericUNIX.loginScript.instructions[1].data	obj_1004529

@@ -294,6 +294,8 @@ def same_object(rom, v, ref, where):
 		return None if name is not None and name.lower() == v.name.lower() else "%s: '%s" % (where, v.name)
 	if not isinstance(v, Obj) or not rom.is_ptr(ref):
 		return "%s: a different kind of value" % where
+	if closure_target(v) is not None:
+		return None if closure_target(v) == ref else "%s: a closure of %#x, the ROM's %#x" % (where, closure_target(v), ref)
 	f = rom.flags(ref)
 	if v.kind == "binary":
 		if f & 1:
@@ -307,7 +309,14 @@ def same_object(rom, v, ref, where):
 			return "%s: a frame, the ROM's is not" % where
 		slots = rom.frame_slots(ref)
 		if [t.lower() for t in v.tags] != [(t or "").lower() for t, _ in slots]:
-			return "%s: the tags differ" % where
+			if not sorted_by_compiler(v.tags, [t for t, _ in slots]):
+				return "%s: the tags differ" % where
+			# (the same slots in the order the compiler sorted them in: the
+			# builder writes them in the layout map's)
+			order = {t.lower(): i for i, t in enumerate(v.tags)}
+			items = [v.items[order[(t or "").lower()]] for t, _ in slots]
+			return next((why for why in (same_object(rom, item, value, where + "." + tag)
+										 for item, (tag, value) in zip(items, slots)) if why), None)
 		for tag, item, (_, value) in zip(v.tags, v.items, slots):
 			why = same_object(rom, item, value, where + "." + tag)
 			if why:
@@ -328,6 +337,48 @@ def same_object(rom, v, ref, where):
 				return why
 		return None
 	return "%s: a %s" % (where, v.kind)
+
+
+SORTED_MAP_TAGS = 0x14			# a map with more tags is sorted as it grows (Objects.cpp's AddSlot, ROM 0x0031a3b4)
+
+
+def sorted_by_compiler(compiled, original):
+	"""Whether a compiled frame's tags are a frame's of another compiler in
+	the order the host's sorted them in: a frame literal of more than
+	SORTED_MAP_TAGS slots is built slot by slot, and its map sorted once it
+	passes that many, as the ROM's is; the NTK built its frames with the
+	slots where the source had them (a map of flags 0)."""
+	return len(compiled) > SORTED_MAP_TAGS and len(compiled) == len(original) \
+		and sorted(t.lower() for t in compiled) == sorted((t or "").lower() for t in original)
+
+
+CLOSURE_STUB = re.compile(r"romsrc:(?:closure|native):([0-9a-f]+)\Z")
+
+
+def closure_target(v):
+	"""The ref a compiled closure stub stands for (nsdecompile.py's
+	NativeClosure: `func() :|romsrc:closure:<ref>|()`, an NTK native function
+	the function closes over), or None when v is no such stub."""
+	if not (isinstance(v, Obj) and v.kind == "frame" and "literals" in v.tags):
+		return None
+	lits = v.items[v.tags.index("literals")]
+	if isinstance(lits, Obj):
+		for x in lits.items:
+			m = CLOSURE_STUB.match(x.name) if isinstance(x, Sym) else None
+			if m:
+				return int(m.group(1), 16)
+	return None
+
+
+def mark_compiled(v, seen=None):
+	"""Every frame a compiled function holds, marked as the compiler's (Obj.compiled)."""
+	seen = set() if seen is None else seen
+	if isinstance(v, Obj) and id(v) not in seen:
+		seen.add(id(v))
+		v.compiled = True
+		for x in v.items:
+			mark_compiled(x, seen)
+		mark_compiled(v.cls, seen)
 
 
 def lengthen_first_string(tree):
@@ -465,6 +516,7 @@ class Extractor:
 		self.paths = {}					# object -> path
 		self.layout_extra = {}			# object -> extra manifest fields
 		self.functions = set(nd.rom_functions(rom, None if self.main else self.objs))
+		self.functions |= self.shared_nested_functions()
 		self.simple_sounds = self.find_simple_sounds()
 		self.ima_sounds = self.find_ima_sounds()
 		self.undecompiled = []			# (function, why): the ones kept as bytecode
@@ -477,6 +529,28 @@ class Extractor:
 		self.aliases = []				# (path, name): a named object inside a compiled function
 		self.named_refs = []			# (path, name, the definition being written): every named reference
 		self.current_def = None
+
+	def shared_nested_functions(self):
+		"""The functions inside others that are written as definitions of their
+		own: those held by a literals array that more than one object holds
+		(the NTK shared one between functions), and those more than one
+		object holds - each written as its own source, as every other function
+		is, rather than as its bytecode."""
+		rom = self.rom
+		found = set()
+		for ref in self.objs:
+			if not (rom.flags(ref) & 1 and rom.size(ref) >= 32):
+				continue
+			s = rom.slots(ref)
+			if s[0] != 0x32 or not rom.is_ptr(s[1]) or not rom.is_ptr(s[2]) or s[2] not in self.inside:
+				continue
+			shared = self.refcount[s[2]] != 1
+			for lit in rom.slots(s[2]):
+				if (shared or self.refcount[lit] != 1) and rom.is_ptr(lit) and lit in self.inside 						and rom.flags(lit) & 1 and rom.size(lit) >= 32:
+					ls = rom.slots(lit)
+					if ls[0] == 0x32 and rom.is_ptr(ls[1]):
+						found.add(lit)
+		return found
 
 	def refs_of(self, o):
 		rom = self.rom
@@ -620,23 +694,38 @@ class Extractor:
 				sources[o] = nd.record(self.rom, o)
 			except (nd.DecompileError, IndexError, KeyError, AttributeError, TypeError, ValueError) as e:
 				self.undecompiled.append((o, "decompile: %s" % e))
+		# (the native functions a function closes over, which its source has
+		# as stubs: each a definition of its own, which the builder puts in
+		# the stub's place - counted once more, so never taken from the
+		# compiled function, which has only the stub)
+		for o, text in sources.items():
+			for ref in re.findall(r"romsrc:(?:closure|native):([0-9a-f]+)\|", text):
+				self.refcount[int(ref, 16)] += 1
 		if self.newtonscript is None or not sources:
 			return sources
 		failed = self.verify_sources(sources)
-		# a function whose only difference is the argFrame the NTK's compiler
-		# gave it (three slots, where the host's compiler makes none): its
-		# record says so (ntk_arg_frame) and is tried again
-		again = {}
-		for o, why in failed.items():
-			flag = ntk_arg_frame_flag(self.rom, o)
-			if why.startswith(".argFrame: 0x2,") and flag:
+		# a function that differs only in the argFrame the NTK's compiler gave
+		# it (where the host's compiler makes none, or with 0 where it leaves
+		# nil), or in symbols at the end of its literals that nothing uses:
+		# its record says so (ntk_arg_frame_flag, ntk_extra_literals_flag)
+		# and it is tried again - and again, while each try finds the next
+		# such difference
+		for _ in range(3):
+			again = {}
+			for o, why in failed.items():
 				head, body = sources[o].split("\n", 1)
-				again[o] = head + flag + "\n" + body
-		if again:
+				flag = ntk_arg_frame_flag(self.rom, o) if why.startswith(".argFrame") and " argframe=" not in head else ""
+				flag = flag or (ntk_extra_literals_flag(self.rom, o, why) if " literals+=" not in head else "")
+				if flag:
+					again[o] = head + flag + "\n" + body
+			if not again:
+				break
 			still = self.verify_sources(again)
 			for o, text in again.items():
-				if o not in still:
-					sources[o] = text
+				sources[o] = text
+				if o in still:
+					failed[o] = still[o]
+				else:
 					del failed[o]
 		for o, why in failed.items():
 			self.undecompiled.append((o, why))
@@ -672,7 +761,7 @@ class Extractor:
 				why = "compile: " + " ".join(fields[3:])
 			else:
 				value = Reader(lines[i + 1], "compiled", self.out).value()
-				with_arg_frame(value, sources[o].split("\n", 1)[0])
+				with_record_flags(value, sources[o].split("\n", 1)[0])
 				why = same_object(self.rom, value, o, "")
 			if why:
 				failed[o] = why
@@ -1653,6 +1742,7 @@ class Obj:
 		self.kind, self.cls, self.items, self.tags, self.data = kind, cls, items or [], tags or [], data
 		self.path = None
 		self.native = None			# a binary of ARM code: its source (assembled where it falls)
+		self.compiled = False		# made by the host's compiler (a function's, its literals)
 
 
 class Reader:
@@ -1847,39 +1937,73 @@ def record_flags(head):
 	m = re.search(r" argframe=(nil|0),(nil|0)\b", head)
 	if m:
 		flags += m.group(0)
+	m = re.search(r" literals\+=[A-Za-z_][A-Za-z0-9_]*(?:,[A-Za-z_][A-Za-z0-9_]*)*", head)
+	if m:
+		flags += m.group(0)
 	return flags
 
 
+def ntk_extra_literals_flag(rom, ref, why):
+	"""" literals+=a,b" when a function's literals are the compiler's and then
+	symbols nothing uses - the NTK left one where it compiled a call it then
+	made a freq-func (Stringer) - else ""."""
+	m = re.match(r"\.literals: (\d+) slots, the ROM's (\d+)$", why)
+	if not m or int(m.group(1)) >= int(m.group(2)):
+		return ""
+	extra = rom.slots(rom.slots(ref)[2])[int(m.group(1)):]
+	names = [rom.symname(r) for r in extra]
+	if any(n is None or not IDENT.match(n) for n in names):
+		return ""
+	return " literals+=" + ",".join(names)
+
+
 def ntk_arg_frame_flag(rom, ref):
-	"""" argframe=P,I" when the function's argFrame is the one the NTK's
-	compiler gives a function that keeps nothing in it - its three header
-	slots only, _nextArgFrame nil, _parent and _implementor nil or 0 - else
-	"".  (The host's compiler, as the ROM's, makes no argFrame for such a
-	function: the NTK's native compiler's bytecode fallbacks, bcFunc, have
-	one.)"""
+	"""" argframe=P,I" for a function whose argFrame's _nextArgFrame is nil
+	and _parent and _implementor nil or 0 (P and I), else "".  The NTK's
+	native compiler's bytecode fallbacks (bcFunc) have an argFrame where the
+	host's compiler, as the ROM's, makes none - one that keeps nothing, its
+	three header slots - and 0 in _parent and _implementor where the host's
+	leaves a top-level function's nil."""
 	af = rom.slots(ref)[3] if len(rom.slots(ref)) > 3 else 2
 	if not rom.is_ptr(af) or rom.flags(af) & 3 != 3:
 		return ""
 	slots = rom.frame_slots(af)
-	if [t for t, _ in slots] != ["_nextArgFrame", "_parent", "_implementor"] or slots[0][1] != 2 \
-			or any(v not in (0, 2) for _, v in slots[1:]):
+	if [t for t, _ in slots[:3]] != ["_nextArgFrame", "_parent", "_implementor"] or slots[0][1] != 2 \
+			or any(v not in (0, 2) for _, v in slots[1:3]):
 		return ""
-	return " argframe=%s,%s" % tuple("nil" if v == 2 else "0" for _, v in slots[1:])
+	return " argframe=%s,%s" % tuple("nil" if v == 2 else "0" for _, v in slots[1:3])
 
 
 def with_arg_frame(value, head):
 	"""A compiled function given the argFrame its record's " argframe=P,I"
-	asks for, when the compiler made none: {_nextArgFrame: nil, _parent: P,
-	_implementor: I}."""
+	asks for: {_nextArgFrame: nil, _parent: P, _implementor: I} when the
+	compiler made none, else P and I in the one it made."""
 	m = re.search(r" argframe=(nil|0),(nil|0)\b", head)
 	if not m or not isinstance(value, Obj) or value.kind != "frame" or "argFrame" not in value.tags:
 		return value
 	k = value.tags.index("argFrame")
-	if not (isinstance(value.items[k], Imm) and value.items[k].ref == 2):
-		return value
 	ref = {"nil": 2, "0": 0}
-	value.items[k] = Obj("frame", tags=["_nextArgFrame", "_parent", "_implementor"],
-						 items=[Imm(2), Imm(ref[m.group(1)]), Imm(ref[m.group(2)])])
+	af = value.items[k]
+	if isinstance(af, Imm) and af.ref == 2:
+		value.items[k] = Obj("frame", tags=["_nextArgFrame", "_parent", "_implementor"],
+							 items=[Imm(2), Imm(ref[m.group(1)]), Imm(ref[m.group(2)])])
+	elif isinstance(af, Obj) and af.kind == "frame" and af.tags[:3] == ["_nextArgFrame", "_parent", "_implementor"]:
+		af.items[1], af.items[2] = Imm(ref[m.group(1)]), Imm(ref[m.group(2)])
+	return value
+
+
+def with_record_flags(value, head):
+	"""A compiled function given what its record's @@ line asks for beyond
+	what the compiler made: the argFrame (with_arg_frame), and symbols
+	appended to its literals (" literals+=a,b")."""
+	with_arg_frame(value, head)
+	m = re.search(r" literals\+=([A-Za-z_][A-Za-z0-9_]*(?:,[A-Za-z_][A-Za-z0-9_]*)*)", head)
+	if m and isinstance(value, Obj) and value.kind == "frame" and "literals" in value.tags:
+		k = value.tags.index("literals")
+		lits = value.items[k]
+		if isinstance(lits, Imm) and lits.ref == 2:
+			lits = value.items[k] = Obj("array", Sym("literals"), items=[])
+		lits.items += [Sym(n) for n in m.group(1).split(",")]
 	return value
 
 
@@ -2013,7 +2137,9 @@ class Builder:
 				n = int(lines[i][3:], 16)
 				value = Reader(lines[i + 1], "compiled %x" % n, self.src).value()
 				target, head = by_id.pop(n)
-				with_arg_frame(value, head)
+				with_record_flags(value, head)
+				value = self.replace_closure_stubs(value)
+				mark_compiled(value)
 				target.kind, target.cls, target.items, target.tags, target.data = \
 					value.kind, value.cls, value.items, value.tags, value.data
 				i += 3
@@ -2023,6 +2149,24 @@ class Builder:
 		shutil.rmtree(work, ignore_errors=True)
 		if by_id:
 			raise ValueError("%d functions came back uncompiled" % len(by_id))
+
+	def replace_closure_stubs(self, v, seen=None):
+		"""A compiled function's closure stubs (closure_target: the NTK native
+		functions its source cannot write) replaced by the definitions the
+		layout places at the addresses they name."""
+		if seen is None:
+			seen = set()
+			self.__dict__.setdefault("defined_at", {a + 1: path for a, path, _, _ in self.entries if IDENT.match(path)})
+		target = closure_target(v)
+		if target is not None:
+			name = self.defined_at.get(target)
+			if name is None or name not in self.defs:
+				raise ValueError("a closure stub names %#x, which no definition of the layout is at" % target)
+			return Name(name)
+		if isinstance(v, Obj) and id(v) not in seen:
+			seen.add(id(v))
+			v.items = [self.replace_closure_stubs(x, seen) for x in v.items]
+		return v
 
 	def resolve_same(self, name, seen):
 		"""A same(path) definition replaced by the object at that path."""
@@ -2069,6 +2213,13 @@ class Builder:
 			return v
 		# (paths are matched whatever their case: a compiled frame's tags are
 		# spelt as the host first interned the symbols)
+		if closure_target(v) is not None:
+			# (a native function the function closes over: the definition the
+			# layout's alias names, always - the stub is only its place)
+			if path.lower() not in self.aliases or self.aliases[path.lower()] not in self.defs:
+				raise ValueError("%s: a closure stub (romsrc:closure) with no alias in layout.tsv naming its "
+								 "native function's definition" % path)
+			return Name(self.aliases[path.lower()])
 		if path.lower() in self.aliases:
 			name = self.aliases[path.lower()]
 			if name not in self.defs:
@@ -2107,6 +2258,12 @@ class Builder:
 			seen.add((id(a), id(b)))
 			# (a compiled frame's map is an array the layout's map stands for)
 			kinds = {a.kind, b.kind}
+			if a.kind == "frame" == b.kind and [t.lower() for t in a.tags] != [t.lower() for t in b.tags] \
+					and (a.compiled or b.compiled) and sorted_by_compiler(a.tags, b.tags):
+				# (a compiled frame whose map the compiler sorted: the same slots)
+				ia = {t.lower(): x for t, x in zip(a.tags, a.items)}
+				return a.data == b.data and self.same_value(a.cls, b.cls, seen) \
+					and all(self.same_value(ia[t.lower()], y, seen) for t, y in zip(b.tags, b.items))
 			return ((len(kinds) == 1 or kinds == {"array", "map"})
 				and [t.lower() for t in a.tags] == [t.lower() for t in b.tags] and a.data == b.data
 				and len(a.items) == len(b.items) and self.same_value(a.cls, b.cls, seen)
@@ -2369,6 +2526,15 @@ class Builder:
 			tags = [t.lower() for t in v.tags]
 			current = frame_map.get(path)
 			if current is not None and self.map_tags(current) == tags:
+				continue
+			if current is not None and v.compiled and self.map_tags(current) is not None \
+					and sorted_by_compiler(v.tags, self.map_tags(current)):
+				# (a frame literal the compiler sorted the map of: its slots put
+				# back in the order of the map the layout gives it)
+				order = {t.lower(): i for i, t in enumerate(v.tags)}
+				new = [order[t] for t in self.map_tags(current)]
+				v.tags = [v.tags[i] for i in new]
+				v.items = [v.items[i] for i in new]
 				continue
 			name = by_tags.get(tuple(tags))
 			if name is None:

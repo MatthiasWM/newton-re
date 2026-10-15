@@ -883,12 +883,15 @@ Two changes to the built bytes came with them, both on purpose:
   to the source (`rex/inetenbl/README.md`, `rex/inetstup/README.md`):
   the NIE comes out 20 bytes longer, Internet Setup 60 shorter.
 
-Left as bytes: 6 of the NIE's functions, kept as bytecode as the
-extractor keeps any it cannot decompile so that it compiles back the same
-(`bytecode.tsv` in their trees says why: a `set-lex-scope` the decompiler
-does not follow, literals or tags the compiler gives otherwise) - their
-instructions are `bytes(...)` in the source or a `.bin` beside it.  The
-NTK's bytecode fallbacks (`bcFunc`) have an argFrame with only its three
-header slots where the host's compiler makes none; their records say so
-(` argframe=P,I` on the `@@` line), and the builder gives them one, which
-made 14 of them source.
+Every function of the three NIE packages is source too (none is kept as
+bytecode: no `bytecode.tsv`), which took the decompiler and builder some
+NTK ways (`docs/frames/decompiler.md`, "The NTK's own compiler"): an
+argFrame where the host's compiler makes none, or with 0 where it leaves
+nil (` argframe=P,I` on a record's `@@` line), an unused symbol at the end
+of the literals (` literals+=stringer`), a native function pushed or
+closed over (stubs the builder replaces with its definition), frame
+literals of more than 20 slots (the host's compiler sorts their maps; the
+builder writes them in the layout map's order), and nested functions the
+NTK shared, written as their own source - Cardfile's
+`obj_73d459` among them, the one function of the ROM's own packages that
+was still bytecode.  No function in the tree is bytecode now.

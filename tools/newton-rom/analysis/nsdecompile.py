@@ -174,6 +174,38 @@ class Func(Node):
 		self.fn = fn			# a Decompiled
 
 
+class NativeFunction(Node):
+	"""An NTK native function pushed as a literal (see NativeClosure),
+	closing over nothing: written as the stub
+
+		func() '|romsrc:native:<the frame's ref>|
+
+	which compiles to a function pushed with no lexical scope, and which
+	romsrc.py's builder replaces with the frame."""
+	def __init__(self, ref):
+		self.ref = ref
+
+
+class NativeClosure(Node):
+	"""set-lex-scope of an NTK native function (a frame of class 0x232: its
+	code, offset, closure and bytecode fallback, bcFunc) - a function the
+	NTK compiled to ARM code that this one closes over.  NewtonScript has
+	no source for it; it is written as a stub,
+
+		func() :|romsrc:closure:<the frame's ref>|()
+
+	which compiles to a function pushed and given a lexical scope as the
+	original is, and which romsrc.py's builder replaces with the frame
+	(romsrc.py: closure_target).  Its arguments are the variables the
+	function keeps in its argFrame - the ones the native code closes over -
+	so that the compiler keeps them there too."""
+	def __init__(self, ref, names):
+		self.ref, self.names = ref, names
+
+
+NATIVE_FUNCTION_CLASS = 0x232		# (an immediate: the NTK's native functions' class)
+
+
 class If(Node):
 	def __init__(self, cond, then, els, value):
 		self.cond, self.then, self.els, self.value = cond, then, els, value
@@ -620,6 +652,10 @@ class Decompiled:
 					stack.append(Self())
 				elif b == SETLEXSCOPE:
 					f = pop()
+					if isinstance(f, NativeFunction):
+						stack.append(NativeClosure(f.ref, list(self.frame_names)))
+						k += 1
+						continue
 					if not isinstance(f, Func):
 						raise DecompileError("set-lex-scope of something else")
 					f.lexical = True
@@ -629,7 +665,10 @@ class Decompiled:
 				k += 1
 			elif a == OP_PUSH:
 				ref = self.lit(b)
-				if self.rom.is_ptr(ref) and self.rom.flags(ref) & 1 and len(self.rom.slots(ref)) >= 5 \
+				if self.rom.is_ptr(ref) and self.rom.flags(ref) & 3 == 3 \
+						and dict(self.rom.frame_slots(ref)).get("class") == NATIVE_FUNCTION_CLASS:
+					stack.append(NativeFunction(ref))
+				elif self.rom.is_ptr(ref) and self.rom.flags(ref) & 1 and len(self.rom.slots(ref)) >= 5 \
 						and self.rom.slots(ref)[0] == 0x32 and not (self.rom.flags(ref) & 2 and False):
 					stack.append(Func(Decompiled(self.rom, ref, self).decompile()))
 				else:
@@ -1273,6 +1312,10 @@ class Writer:
 
 	def expr(self, fn, node, indent=0):
 		w = lambda n: self.expr(fn, n, indent)
+		if isinstance(node, NativeFunction):
+			return "func() '|romsrc:native:%x|" % node.ref
+		if isinstance(node, NativeClosure):
+			return "func() :|romsrc:closure:%x|(%s)" % (node.ref, ", ".join(ident(n) for n in node.names))
 		if isinstance(node, Lit):
 			if node.immediate:
 				return self.immediate(node.ref)

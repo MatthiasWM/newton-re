@@ -9,6 +9,23 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-15: The NIE's last functions as source
+
+The six functions of the Newton Internet Enabler's packages that were
+still bytecode, and Cardfile's `obj_73d459` (the one function of the
+ROM's own packages that was), are source now: no function in `romsrc/`
+is bytecode.  The decompiler and builder learnt the NTK compiler's ways
+(`docs/frames/decompiler.md`, "The NTK's own compiler"): its native
+functions, which no source makes, pushed or closed over (stubs the
+builder replaces with the native function's definition), argFrames with
+0 where the host's compiler leaves nil, an unused `'stringer` literal,
+frame literals of more than 20 slots (whose maps the host's compiler
+sorts), and nested functions it shared.  Found on the way: once
+`UnitsInstalledScript` was source, its own copies of InetStartUp and
+InetShutDown needed the NIE's change too, or the function table they
+install is a copy with Apple's code (16 NIE tests failed until they had
+it).  All 476 ctests pass.
+
 ## 2026-10-15: Every binary of romsrc/ as text
 
 The owner asked for the binary files left in `romsrc/` to be decoded into

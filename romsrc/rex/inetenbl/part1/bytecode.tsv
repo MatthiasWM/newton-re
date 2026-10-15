@@ -1,4 +1,0 @@
-# the functions kept as bytecode: they do not decompile, or do not compile back the same
-1013399	decompile: set-lex-scope of something else
-1014ad1	.literals: 61 slots, the ROM's 62
-1014ea1	decompile: set-lex-scope of something else

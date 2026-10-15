@@ -1,9 +1,9 @@
 obj_1020859 := array(nil, {_ImportTable: [|Array|: {name: '|SetupProtos:NIE|, major: 1, minor: 0}, {name: '|InternetSetup:NIE|, major: 1, minor: 0}], installScript: function("functions/obj_1020859_0_.installScript.ns"), devInstallScript: function("functions/obj_1020859_0_.devInstallScript.ns"), devRemoveScript: function("functions/obj_1020859_0_.devRemoveScript.ns")});
 obj_1020f31 := same("obj_1020859[0].devInstallScript.literals[1].description");
-obj_102108d := {class: #32, instructions: obj_10210ad, literals: [literals: obj_10210e1, 'StrEqual, obj_102110d], argFrame: nil, numArgs: 1};
-obj_10210ad := bytes('instructions, "7b18192a6f000b1a5f000c7b02");
-obj_10210e1 := "*";
-obj_102110d := "<Current AppleTalk Zone>";
+obj_102108d := function("functions/obj_102108d.ns");
+obj_10210ad := same("obj_102108d.instructions");
+obj_10210e1 := same("obj_1020859[0].devInstallScript.literals[1].NeededSlots.macIPGatewayZone");
+obj_102110d := same("obj_102108d.literals[2]");
 obj_1021531 := same("obj_1020859[0].devInstallScript.literals[1].blankEntry.localAddress");
 obj_102154d := same("obj_1020859[0].devInstallScript.literals[1].blankEntry.defaultDomain");
 obj_1021581 := same("obj_1020859[0].devInstallScript.literals[1].newEntryViews[0]");

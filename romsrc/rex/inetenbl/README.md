@@ -49,4 +49,8 @@ in the history); it is now made to the source: the four places, two in
 manager's acquire and release, its nested functions) and one each in
 `part11/functions/obj_103edc9.InetStartUp.ns` and `InetShutDown.ns` (the
 link manager's), read `'id` where Apple's read `GetPkgRefInfo(l1).id`, each
-under a `// DEVIATION` comment.
+under a `// DEVIATION` comment - and so do the copies of InetStartUp and
+InetShutDown that part 11's `UnitsInstalledScript` and
+`UnitsRemovedScript` hold as constants (the function table they install,
+`obj_103edc9`, is one object with InetStartUp's: a copy left as Apple's
+would be a table of its own, and the unchanged functions installed).

@@ -217,3 +217,37 @@ literals that take a constant evaluated to make them:
 Every constant evaluated this way relies on the host's objects, not on
 syntax. The ROM-free track's next step, extracting the resources, is
 what replaces them with source of their own (`docs/rom-free/README.md`).
+
+## The NTK's own compiler
+
+The ROM's functions came from Apple's build; the packages added to the
+extension (the Newton Internet Enabler's, `romsrc/rex/`) from the NTK's
+compiler, which differs in a few ways the source cannot say.  The
+extractor (`romsrc.py`'s `function_sources`) compiles each function back
+and, where the only difference is one of these, says so on the record's
+`@@` line and tries again; the builder applies the same after compiling
+(`with_record_flags`, `replace_closure_stubs`):
+
+- **` argframe=P,I`** - an argFrame where the host's compiler (as the
+  ROM's) makes none, its three header slots only, or 0 in `_parent` and
+  `_implementor` where it leaves a top-level function's nil: the NTK's
+  native compiler's bytecode fallbacks (`bcFunc`) are compiled so.
+- **` literals+=a,b`** - symbols at the end of the literals that nothing
+  uses: the NTK left `'stringer` where it made a call a freq-func.
+- **A native function** (a frame of class 0x232: code, offset, closure,
+  `bcFunc`), which NewtonScript has no source for, pushed - written
+  `func() '|romsrc:native:<ref>|` - or closed over with `set-lex-scope` -
+  `func() :|romsrc:closure:<ref>|(<the argFrame's variables>)`, the
+  arguments so that the compiler keeps those variables in the argFrame as
+  the NTK did.  Each stub compiles to the instructions the original has,
+  and the builder replaces it with the definition the layout places at
+  that ref (the extractor makes the native function a definition of its
+  own).
+- **A frame literal of more than 20 slots**: the host's compiler builds it
+  slot by slot and sorts its map once it passes 20 tags (`AddSlot`, as the
+  ROM's does); the NTK kept the source's order (a map of flags 0).  The
+  comparisons accept the sorted order, and the builder writes the slots in
+  the order of the map the layout gives the frame.
+- **Nested functions the NTK shared** - held by a literals array that
+  several functions share, or by more than one object - are definitions
+  of their own, so they are decompiled on their own too.

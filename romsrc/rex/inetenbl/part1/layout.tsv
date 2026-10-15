@@ -355,8 +355,8 @@ area	10014a0	17974	bf	4
 1013398	obj_1002a69.ProtoClone	43	map=map_10015d1
 10133b8	obj_1002a69.ProtoClone.instructions	40
 10133cc	obj_1002a69.ProtoClone.literals	41
-10133e0	obj_1002a69.ProtoClone.literals[0]	43	map=map_1002f01
-1013404	obj_1002a69.ProtoClone.literals[0].closure	43	map=map_1011e49
+10133e0	obj_10133e1	43	map=map_1002f01
+1013404	obj_10133e1.closure	43	map=map_1011e49
 1013420	obj_1013421	43	map=map_101342d
 101342c	map_101342d	41
 101343c	obj_101343d	41
@@ -366,9 +366,9 @@ area	10014a0	17974	bf	4
 10134f0	'Throw	40
 1013508	obj_101343d[5]	41
 101351c	'f	40
-1013530	obj_1002a69.ProtoClone.literals[0].bcFunc	43	map=map_10015d1
-1013550	obj_1002a69.ProtoClone.literals[0].bcFunc.instructions	40
-10135bc	obj_1002a69.ProtoClone.literals[0].bcFunc.argFrame	43	map=map_1001955
+1013530	obj_10133e1.bcFunc	43	map=map_10015d1
+1013550	obj_10133e1.bcFunc.instructions	40
+10135bc	obj_10133e1.bcFunc.argFrame	43	map=map_1001955
 10135d4	obj_1002a69.ProtoClone.argFrame	43	map=map_10135f1
 10135f0	map_10135f1	41
 1013610	obj_1002a69.WaitForTerminal	43	map=map_10015d1
@@ -471,18 +471,18 @@ area	10014a0	17974	bf	4
 10144e0	'printDepth	40
 10144fc	'IsNumber	40
 1014518	'printLength	40
-1014534	obj_10143c5[18]	43	map=map_1002f01
-1014558	obj_10143c5[18].closure	43	map=map_1011e49
+1014534	obj_1014535	43	map=map_1002f01
+1014558	obj_1014535.closure	43	map=map_1011e49
 1014574	obj_1014575	43	map=map_101342d
 1014580	obj_1014581	41
 101459c	obj_101459d	40
 10145b0	'EndsWith	40
 10145cc	'StrLen	40
 10145e4	'StrMunger	40
-1014600	obj_10143c5[18].bcFunc	43	map=map_10015d1
-1014620	obj_10143c5[18].bcFunc.instructions	40
-1014648	obj_10143c5[20]	43	map=map_1002f01
-101466c	obj_10143c5[20].closure	43	map=map_1011e49
+1014600	obj_1014535.bcFunc	43	map=map_10015d1
+1014620	obj_1014535.bcFunc.instructions	40
+1014648	obj_1014649	43	map=map_1002f01
+101466c	obj_1014649.closure	43	map=map_1011e49
 1014688	obj_1014689	43	map=map_101342d
 1014694	obj_1014695	41
 1014798	'IsValid	40
@@ -516,9 +516,9 @@ area	10014a0	17974	bf	4
 1014a78	'IsBinary	40
 1014a94	obj_1014695[58]	40
 1014ab4	'stringer	40
-1014ad0	obj_10143c5[20].bcFunc	43	map=map_10015d1
-1014af0	obj_10143c5[20].bcFunc.instructions	40
-1014df8	obj_10143c5[20].bcFunc.argFrame	43	map=map_1001955
+1014ad0	obj_1014649.bcFunc	43	map=map_10015d1
+1014af0	obj_1014649.bcFunc.instructions	40
+1014df8	obj_1014649.bcFunc.argFrame	43	map=map_1001955
 1014e10	'|evt.ex.outofmem|	40
 1014e30	obj_10143c5[24]	40
 1014e68	obj_10143c5[25]	40
@@ -1103,10 +1103,11 @@ alias	obj_1002a69.QueueTemplate.DeQueue.bcFunc.literals	obj_1013135
 alias	obj_1002a69.QueueTemplate.EnQueue.bcFunc.literals	obj_1013205
 alias	obj_1002a69.QueueTemplate.GetQueueSize.bcFunc.literals	obj_10132a1
 alias	obj_1002a69.QueueTemplate.IsEmpty.bcFunc.literals	obj_101333d
-alias	obj_1002a69.ProtoClone.literals[0].bcFunc.literals	obj_101343d
+alias	obj_1002a69.ProtoClone.literals[0]	obj_10133e1
 alias	obj_1002a69.waitViewTemplate.statusViewTemplate.viewIdleScript.literals[3]	obj_1013c61
 alias	obj_1002a69.waitViewTemplate.statusViewTemplate.SetOwnerContext.literals[3]	obj_1013eb9
 alias	obj_1002a69.waitViewTemplate.statusViewTemplate.SetOwnerContext.literals[10]	obj_1013c61
+alias	obj_1002a69.ObjectToString.bcFunc.literals	obj_10143c5
 alias	obj_1002a69.DoEvent_Check.bcFunc.literals	obj_1015045
 alias	obj_1002a69.PeriodicTemplate.viewIdleScript.bcFunc.literals	obj_1015421
 alias	obj_1002a69.PeriodicTemplate.viewSetupDoneScript.bcFunc.literals	obj_1015521
@@ -1117,4 +1118,6 @@ alias	obj_1002a69.EngineTemplate.ReorientToScreen.instructions	obj_1001c19
 alias	obj_1002a69.MCollectAncestorStates.bcFunc.literals	obj_1015841
 alias	obj_1002a69.MCollectAncestorEvents.bcFunc.literals	obj_1015919
 alias	obj_1002a69.DoUniqueEvent.bcFunc.literals	obj_1015b99
-alias	obj_10143c5[18].bcFunc.literals	obj_1014581
+alias	obj_10133e1.bcFunc.literals	obj_101343d
+alias	obj_1014535.bcFunc.literals	obj_1014581
+alias	obj_1014649.bcFunc.literals	obj_1014695

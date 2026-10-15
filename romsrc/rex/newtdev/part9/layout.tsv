@@ -501,6 +501,10 @@ alias	obj_101095d[0].devInstallScript.literals[23].literals[2].stepChildren[5]	o
 alias	obj_101095d[0].devInstallScript.literals[23].literals[2].stepChildren[6]	obj_1014351
 alias	obj_101095d[0].devInstallScript.literals[25].literals[0]	obj_1011ec5
 alias	obj_101095d[0].devRemoveScript.literals[0].literals[2]	obj_1011565
+alias	obj_1011565.literals[3]	obj_1011391
+alias	obj_1011565.literals[9]	obj_101179d
+alias	obj_1011565.literals[12]	obj_10117f9
+alias	obj_1011565.literals[13]	obj_1011811
 alias	obj_1012791.buttonClickScript.literals[5]	obj_1012991
 alias	obj_1012791.buttonClickScript.literals[12].stepChildren[1]	obj_1012b89
 alias	obj_1012791.buttonClickScript.literals[12].stepChildren[2].text	obj_1012991
@@ -520,10 +524,6 @@ alias	obj_1014351.UpdateAppleTalk.literals[5]	obj_101179d
 alias	obj_1014351.UpdateAppleTalk.literals[8]	obj_101179d
 alias	obj_1014351.UpdateAppleTalk.literals[9]	obj_10117f9
 alias	obj_1014351.UpdateAppleTalk.literals[10]	obj_1011811
-alias	obj_1011565.literals[3]	obj_1011391
-alias	obj_1011565.literals[9]	obj_101179d
-alias	obj_1011565.literals[12]	obj_10117f9
-alias	obj_1011565.literals[13]	obj_1011811
 alias	obj_10133c9.stepChildren[0]	obj_1013511
 alias	obj_10133c9.keyButton	obj_1013a99
 alias	obj_10133c9.stepAllocateContext[1]	obj_1013511

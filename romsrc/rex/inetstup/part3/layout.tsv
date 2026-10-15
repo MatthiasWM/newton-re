@@ -462,6 +462,9 @@ alias	obj_1020859[0].devInstallScript.literals[12].stepChildren[0].text	obj_1021
 alias	obj_1020859[0].devInstallScript.literals[14]	map_10216e9
 alias	obj_1020859[0].devInstallScript.literals[16].literals[1].instructions	obj_1023bc1
 alias	obj_1020859[0].devRemoveScript.literals[13].literals[1].instructions	obj_1023bc1
+alias	obj_102108d.instructions	obj_10210ad
+alias	obj_102108d.literals[0]	obj_10210e1
+alias	obj_102108d.literals[2]	obj_102110d
 alias	obj_1021581.stepChildren[1].MakePopup.instructions	obj_1021a61
 alias	obj_1021581.stepChildren[1].MakePopup.literals[0]	obj_1021991
 alias	obj_1021b5d.textSetup.literals[3]	obj_102108d

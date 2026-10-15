@@ -516,8 +516,8 @@ alias	obj_101d405.stepChildren[1].MakePopup.instructions	obj_101d939
 alias	obj_101d405.stepChildren[1].MakePopup.literals[0]	obj_101d851
 alias	obj_101da9d.textSetup.literals[6]	obj_101ddc1
 alias	obj_101da9d.GetIndex.literals[1]	obj_101de65
+alias	obj_101e905.literals[7]	obj_101ead1
+alias	obj_101e905.literals[11]	obj_101ead1
 alias	obj_101d405.stepChildren[1].labelCommands	obj_101d851
 alias	obj_101d405.stepChildren[1]._proto	obj_101d959
 alias	obj_101d405.stepChildren[2]._proto	obj_101da9d
-alias	obj_101e905.literals[7]	obj_101ead1
-alias	obj_101e905.literals[11]	obj_101ead1

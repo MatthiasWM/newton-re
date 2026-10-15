@@ -1,9 +1,9 @@
 obj_101095d := array(nil, {_ImportTable: [|Array|: {name: '|NameServerInterface:NSG|, major: 1, minor: 0}], installScript: function("functions/obj_101095d_0_.installScript.ns"), devInstallScript: function("functions/obj_101095d_0_.devInstallScript.ns"), devRemoveScript: function("functions/obj_101095d_0_.devRemoveScript.ns")});
-obj_1011391 := "Lantern";
+obj_1011391 := same("obj_101095d[0].devInstallScript.literals[6].literals[15]");
 obj_1011565 := same("obj_101095d[0].devInstallScript.literals[9]");
-obj_101179d := "llap";
-obj_10117f9 := "ATalk";
-obj_1011811 := "enet";
+obj_101179d := same("obj_1011565.literals[9]");
+obj_10117f9 := same("obj_1011565.literals[12]");
+obj_1011811 := same("obj_1011565.literals[13]");
 obj_1011b95 := same("obj_101095d[0].devInstallScript.literals[15].literals[7]");
 obj_1011ec5 := same("obj_101095d[0].devInstallScript.literals[23].literals[0]");
 obj_10125b5 := "";
