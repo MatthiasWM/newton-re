@@ -1,0 +1,37 @@
+// The NewtonScript profiler (frames/FunctionProfiler.h, behind the ROM's
+// frames function profiler hooks): a recursive function, a method sent 200
+// times and the Calculator opened and closed - the ROM's own scripts - run
+// under it, and the report printed, sorted by exclusive time.  The calls
+// are known: npFib(12) is 465 calls of npFib, npObj:Step 200 of Step.
+// (ctest host.NewtonScriptProfile checks the report's lines; run with
+// NEWTON_NS_PROFILE=<file> - host.NewtonScriptProfileFile - the profile is
+// of the whole run, boot included, and written to the file at the end,
+// for tools/host/nsprofile.py)
+//
+//   build/host/host/newton --headless 60 --script src/host/demo/nsprofile.ns
+//   NEWTON_NS_PROFILE=tmp/boot.prof build/host/host/newton --headless 60 --script src/host/demo/nsprofile.ns
+//   python tools/host/nsprofile.py tmp/boot.prof --romsrc romsrc --top 30
+
+HostInclude("common.ns");
+
+npFib := func(n) if n < 2 then n else call npFib with (n - 1) + call npFib with (n - 2);
+npObj := {total: 0, Step: func(k) begin total := total + k; total end};
+npOpened := nil;
+
+npSecond := func() begin
+	// the ROM's scripts: the Calculator closed again, once it is open
+	GetRoot().calculator:Close();
+	HostNSProfileStop();
+	Print("nsprofile: Step total " & NumberStr(npObj.total));
+	Print("nsprofile: report");
+	HostNSProfileReport(nil);
+	Print("nsprofile: done");
+	HostQuit();
+end;
+
+HostNSProfileStart();
+Print("nsprofile: profiling " & (if HostNSProfileRunning() then "on" else "off"));
+call npFib with (12);
+for k := 1 to 200 do npObj:Step(k);
+GetRoot().calculator:Open();
+call waitFor with ("nsprofile: the Calculator open", func() GetRoot().calculator.viewCObject, npSecond, 60);
