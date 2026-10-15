@@ -204,6 +204,10 @@ class NativeClosure(Node):
 
 
 NATIVE_FUNCTION_CLASS = 0x232		# (an immediate: the NTK's native functions' class)
+# the binaries of native ARM code (an NTK native module's, the NIE's): a
+# function's source names them ('|romsrc:object:<ref>|) rather than holding
+# their bytes, which romsrc keeps as ARM source (romsrc.py's NATIVE_CLASSES)
+NATIVE_CODE_CLASSES = ("nativeModule", "code")
 
 
 class If(Node):
@@ -1290,6 +1294,11 @@ class Writer:
 				top, left, bottom, right = struct.unpack(">4h", data)
 				text = "MakeRect(%d, %d, %d, %d)" % (left, top, right, bottom)
 				return text if cname == "rectangle" else "SetClass(%s, %s)" % (text, self.constant(cls))
+			if cname in NATIVE_CODE_CLASSES:
+				# native ARM code, which romsrc keeps as source of its own
+				# (native(...)): named, not copied - romsrc.py's builder puts
+				# the definition at that ref where the symbol is
+				return "'|romsrc:object:%x|" % ref
 			if "kBinaryFromHex" not in dict(self.constants):
 				self.constants.insert(0, ("kBinaryFromHex", BINARY_FROM_HEX))
 			return "call kBinaryFromHex with (\"%s\", %s)" % (rom.data(ref).hex(), self.constant(cls))

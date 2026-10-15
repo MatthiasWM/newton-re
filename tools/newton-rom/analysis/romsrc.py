@@ -289,6 +289,9 @@ def same_object(rom, v, ref, where):
 	object at ref; None when it is the same."""
 	if isinstance(v, Imm):
 		return None if v.ref == ref else "%s: %#x, the ROM's %#x" % (where, v.ref, ref)
+	if isinstance(v, Sym) and OBJECT_REF.match(v.name):
+		target = int(OBJECT_REF.match(v.name).group(1), 16)
+		return None if target == ref else "%s: names %#x, the ROM's %#x" % (where, target, ref)
 	if isinstance(v, Sym):
 		name = rom.symname(ref) if rom.is_ptr(ref) else None
 		return None if name is not None and name.lower() == v.name.lower() else "%s: '%s" % (where, v.name)
@@ -353,6 +356,9 @@ def sorted_by_compiler(compiled, original):
 
 
 CLOSURE_STUB = re.compile(r"romsrc:(?:closure|native):([0-9a-f]+)\Z")
+# a function's source naming an object it cannot hold the bytes of (native
+# code, nsdecompile.py's NATIVE_CODE_CLASSES): the symbol '|romsrc:object:<ref>|
+OBJECT_REF = re.compile(r"romsrc:object:([0-9a-f]+)\Z")
 
 
 def closure_target(v):
@@ -699,7 +705,7 @@ class Extractor:
 		# the stub's place - counted once more, so never taken from the
 		# compiled function, which has only the stub)
 		for o, text in sources.items():
-			for ref in re.findall(r"romsrc:(?:closure|native):([0-9a-f]+)\|", text):
+			for ref in re.findall(r"romsrc:(?:closure|native|object):([0-9a-f]+)\|", text):
 				self.refcount[int(ref, 16)] += 1
 		if self.newtonscript is None or not sources:
 			return sources
@@ -2152,16 +2158,20 @@ class Builder:
 
 	def replace_closure_stubs(self, v, seen=None):
 		"""A compiled function's closure stubs (closure_target: the NTK native
-		functions its source cannot write) replaced by the definitions the
-		layout places at the addresses they name."""
+		functions its source cannot write) and object names ('|romsrc:object:
+		<ref>|: native code it does not hold the bytes of) replaced by the
+		definitions the layout places at the addresses they name."""
 		if seen is None:
 			seen = set()
 			self.__dict__.setdefault("defined_at", {a + 1: path for a, path, _, _ in self.entries if IDENT.match(path)})
 		target = closure_target(v)
+		if target is None and isinstance(v, Sym) and OBJECT_REF.match(v.name):
+			target = int(OBJECT_REF.match(v.name).group(1), 16)
 		if target is not None:
 			name = self.defined_at.get(target)
 			if name is None or name not in self.defs:
-				raise ValueError("a closure stub names %#x, which no definition of the layout is at" % target)
+				raise ValueError("a function's source names %#x (romsrc:closure, native or object), which no "
+								 "definition of the layout is at" % target)
 			return Name(name)
 		if isinstance(v, Obj) and id(v) not in seen:
 			seen.add(id(v))

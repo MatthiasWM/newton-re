@@ -251,11 +251,6 @@ Where the binaries-to-text work left off (`docs/rom-free/README.md`,
   (point the `same()` at another function holding the object, correct
   the alias), but a tool that re-derives the paths after an edit would
   save doing it by hand - the NIE's Internet Setup edit needed it.
-- **Native code held twice.**  An NTK native module is ARM source
-  (`native(...)`), but a function whose literals hold the same binary
-  (written `call kBinaryFromHex with (...)`) keeps its own copy as hex:
-  once the `.s` is edited the two differ and the function's copy is laid
-  out on its own.  The decompiler could name the module instead.
 - **A `.s` part's `.origin`** is worked out when a package is packed; a
   part before it that grew leaves the committed line behind, harmlessly
   (`tools/armpart/README.md`).

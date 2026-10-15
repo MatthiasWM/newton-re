@@ -9,6 +9,18 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-15: Native code held once
+
+Newton Devices' `devInstallScript` held the driver's native module seven
+times over, as hex (`call kBinaryFromHex with (...)`) in the frame
+literal it installs, beside the module's ARM source (`native(...)`): an
+edit to the `.s` would have left the function's copies as they were and
+the function laid out a module of its own.  The decompiler now names
+native code a function holds (`'|romsrc:object:<ref>|`) and the builder
+puts the definition at that ref in its place, as it does the native
+function stubs (`docs/frames/decompiler.md`).  The object file is the
+same.
+
 ## 2026-10-15: The NIE's last functions as source
 
 The six functions of the Newton Internet Enabler's packages that were

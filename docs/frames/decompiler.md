@@ -251,3 +251,9 @@ and, where the only difference is one of these, says so on the record's
 - **Nested functions the NTK shared** - held by a literals array that
   several functions share, or by more than one object - are definitions
   of their own, so they are decompiled on their own too.
+- **Native code a function holds** (a binary of class `'nativeModule` or
+  `'code`, which romsrc keeps as ARM source, `native(...)`) is named, not
+  copied: `'|romsrc:object:<ref>|`, which the builder replaces with the
+  definition the layout places at that ref - so the module's bytes are in
+  one place, its `.s`, and an edit to it reaches every function that
+  holds it.
