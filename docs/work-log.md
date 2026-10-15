@@ -9,6 +9,17 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-15: No `.origin` to go stale
+
+A protocol part's ARM source carried an `.origin` line - its offset in
+the package - which the packer works out anyway; when a part before it
+grew (the NIE's change to its source made part 8 twenty bytes longer)
+the committed line was left behind.  A part of a package `newtonpkg.py`
+unpacks, and a native binary of `romsrc/`, now has none (a comment says
+where its origin comes from); the packer and the builder give it.  A
+standalone `.s` from `newtonarm.py unpack` keeps its `.origin`.  The
+object file is the same.
+
 ## 2026-10-15: Native code held once
 
 Newton Devices' `devInstallScript` held the driver's native module seven

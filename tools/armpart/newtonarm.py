@@ -29,7 +29,10 @@ The source (tools/armpart/README.md has the details):
     ; comment                   to the end of the line
     name:                       a label: its value is its offset in the part
     .origin 0x1038              the part's offset in its package as linked
-                                (what .rword adds to a label)
+                                (what .rword adds to a label); a part of a
+                                package unpacked by newtonpkg.py, or a
+                                native binary of romsrc, has none: its
+                                origin is worked out where it is built
     .word expr                  a word: expr is numbers, labels, `.` (here),
                                 + and -; the class info's self-relative
                                 offsets are `.word Label - .`
@@ -432,7 +435,7 @@ class Part:
 			out[at] = name
 		return out
 
-	def text(self, title=None):
+	def text(self, title=None, origin_line=True):
 		# `mov rX, pc` gives the address 8 bytes on (a string after a return, in ScreenDrivers)
 		for a in self.code:
 			w = word_at(self.data, a)
@@ -468,7 +471,10 @@ class Part:
 			lines += ["; " + line for line in title.splitlines()]
 		lines.append("; ARMv4 assembly: python tools/armpart/newtonarm.py pack THIS_FILE OUT.bin")
 		lines.append("")
-		lines.append("\t.origin 0x%x\t\t; the part's offset in its package as linked (.rword values add it)" % self.origin)
+		if origin_line:
+			lines.append("\t.origin 0x%x\t\t; the part's offset in its package as linked (.rword values add it)" % self.origin)
+		else:
+			lines.append(WORKED_OUT_ORIGIN)
 		lines.append("")
 		breaks = set(names) | set(self.code) | set(self.fixed) | self.lits | set(self.strings)
 		for a in self.code:
@@ -814,13 +820,20 @@ def pack(path: str, origin=None) -> bytes:
 	return assemble_file(path, origin).data
 
 
-def unpack(part: bytes, path: str, relocations=(), origin: int = 0, rom=None, title=None) -> dict:
+# what a source says in place of its .origin when whatever builds it gives
+# the origin (newtonpkg.py a package's part, romsrc.py a native binary):
+# written there, it would go stale as soon as anything before it grew
+WORKED_OUT_ORIGIN = "\t; .origin: the address its first byte falls at, worked out where it is built"
+
+
+def unpack(part: bytes, path: str, relocations=(), origin: int = 0, rom=None, title=None, origin_line=True) -> dict:
 	"""Writes the part's source to path; ==> stats (code words, data words,
 	instructions written as .word in code).  Raises ValueError unless the
-	source assembles back to the part exactly."""
+	source assembles back to the part exactly.  origin_line False: the
+	source has no .origin (WORKED_OUT_ORIGIN) - what builds it gives it."""
 	p = Part(part, relocations, origin, rom)
-	text = p.text(title)
-	back = assemble(text, None, path)
+	text = p.text(title, origin_line)
+	back = assemble(text, origin, path)
 	if back.data != bytes(part) or back.relocations != sorted(relocations):
 		raise ValueError("%s: the source does not give the part back byte for byte" % path)
 	with open(path, "w", encoding="utf-8", newline="\n") as f:

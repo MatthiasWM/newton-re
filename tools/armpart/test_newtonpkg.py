@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import glob
 import os
-import re
 import shutil
 import struct
 import sys
@@ -120,11 +119,8 @@ class RoundTrip(unittest.TestCase):
 							if os.path.isdir(os.path.join(d, name)) or name == "README.md":
 								continue		# (a tree: romsrc's round trip; the README is the tree's own)
 							with open(os.path.join(d, name), "rb") as a, open(os.path.join(tmp, name), "rb") as b:
-								# (a part's .origin is worked out when packing: a part before it
-								# that grew leaves the committed one behind, harmlessly; a
-								# checkout's own line ends do not count)
-								strip = lambda t: re.sub(rb"(?m)^\t\.origin [^\n]*\n", b"", t)
-								self.assertEqual(strip(a.read().replace(b"\r\n", b"\n")), strip(b.read().replace(b"\r\n", b"\n")), name)
+								# (a checkout's own line ends do not count)
+								self.assertEqual(a.read().replace(b"\r\n", b"\n"), b.read().replace(b"\r\n", b"\n"), name)
 				finally:
 					shutil.rmtree(tmp)
 

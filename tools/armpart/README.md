@@ -115,7 +115,7 @@ As modules:
 |---|---|
 | `; ...` | a comment, to the end of the line (not inside a string) |
 | `name:` | a label; its value is its offset in the part (labels may share a line with what follows) |
-| `.origin N` | where the part lies in its package as linked (its offset from the package's start: the relocation chunk's base address is 0) - what `.rword` adds; `pack --origin` overrides it |
+| `.origin N` | where the part lies in its package as linked (its offset from the package's start: the relocation chunk's base address is 0) - what `.rword` adds; `pack --origin` overrides it. A part of a package `newtonpkg.py` unpacks, or a native binary of `romsrc/` (`native(...)`), has none - `; .origin: the address its first byte falls at, worked out where it is built` stands in its place - because what builds it gives the origin, and a line written there would go stale as soon as a part before it grew |
 | `.word e, ...` | words; `e` sums numbers, labels and `.` (this word's offset) with `+`/`-`: `.word Label - .` is a self-relative offset |
 | `.rword e` | a word the package's relocation chunk names: `.origin + e`. `pack` reports their offsets so the package's chunk can be rebuilt |
 | `.byte n, ...`, `.ascii "s"`, `.asciz "s"`, `.space n`, `.align n` | bytes; strings take `\"`, `\\`, `\n`, `\t`, `\r`, `\0`, `\xHH`; `.space` is noughts; `.align 4` pads with noughts to a multiple of four from the part's start |

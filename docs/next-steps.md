@@ -251,9 +251,6 @@ Where the binaries-to-text work left off (`docs/rom-free/README.md`,
   (point the `same()` at another function holding the object, correct
   the alias), but a tool that re-derives the paths after an edit would
   save doing it by hand - the NIE's Internet Setup edit needed it.
-- **A `.s` part's `.origin`** is worked out when a package is packed; a
-  part before it that grew leaves the committed line behind, harmlessly
-  (`tools/armpart/README.md`).
 - **The patch table's pages**: `--relayout` now moves the patch table's
   branches with ScreenBuffer and ScreenDrivers, but the page tables
   `ptpt`/`glpt` still name its old physical page (0x7ee000), and the

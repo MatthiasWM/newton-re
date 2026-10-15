@@ -22,8 +22,8 @@ part its file, type, flags, info and compressor strings; for a part kept as
 bytes, the offsets of its words the relocation chunk names and where it was
 linked.  What follows from the parts is worked out when packing: the
 directory's size, each part's offset and size, the relocation chunk, the
-package's size, and each protocol part's .origin (so its relocated words
-follow it).  A frames part that moves is rebased (its pointer refs are
+package's size, and each protocol part's origin (so its relocated words
+follow it: a part's source has no .origin line, which would go stale).  A frames part that moves is rebased (its pointer refs are
 offsets in the package: packages.py's rebase_frames_part); what a frames
 part holds is not yet source (it stays bytes).
 
@@ -373,7 +373,7 @@ def unpack(data: bytes, directory: str, rom=None, base: int = 0, trees=None) -> 
 			lines[lines.index("\tfile %s" % file)] = "\tfile part%d/\t# a frames part as a source tree (romsrc.py)" % i
 		elif protocol:
 			title = '"%s" part %d: protocol (%d bytes)' % (name, i, len(blob))
-			newtonarm.unpack(blob, path, part["relocations"], part["origin"], rom, title)
+			newtonarm.unpack(blob, path, part["relocations"], part["origin"], rom, title, origin_line=False)
 		else:
 			with open(path, "wb") as f:
 				f.write(blob)

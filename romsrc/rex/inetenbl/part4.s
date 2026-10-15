@@ -1,7 +1,7 @@
 ; "Newton Internet Enabler" part 4: protocol (22568 bytes)
 ; ARMv4 assembly: python tools/armpart/newtonarm.py pack THIS_FILE OUT.bin
 
-	.origin 0x2e2f0		; the part's offset in its package as linked (.rword values add it)
+	; .origin: the address its first byte falls at, worked out where it is built
 
 ClassInfoTable:
 	.word 0x00000000			; fReserved1

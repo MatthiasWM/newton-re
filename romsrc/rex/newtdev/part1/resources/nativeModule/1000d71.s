@@ -1,7 +1,7 @@
 ; a nativeModule binary (obj_1000d71)
 ; ARMv4 assembly: python tools/armpart/newtonarm.py pack THIS_FILE OUT.bin
 
-	.origin 0xd7c		; the part's offset in its package as linked (.rword values add it)
+	; .origin: the address its first byte falls at, worked out where it is built
 
 
 sub_0000:

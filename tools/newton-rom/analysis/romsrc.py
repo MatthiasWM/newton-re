@@ -1268,7 +1268,7 @@ class Extractor:
 			at = o - 1 + 12
 			try:
 				newtonarm.unpack(data, where, sorted(r - at for r in self.relocated if at <= r < at + len(data)),
-								 at - self.link_base, None, "a %s binary (%s)" % (cname, path))
+								 at - self.link_base, None, "a %s binary (%s)" % (cname, path), origin_line=False)
 				return "native(%s, \"%s\")" % (self.value(cls, path + "^"), rel)
 			except (ValueError, newtonarm.AsmError):
 				if os.path.exists(where):
@@ -1894,10 +1894,10 @@ class Reader:
 			if text == "picture":
 				return Obj("binary", args[0], data=newtonpict.pack(os.path.join(self.root, args[1][1:-1])))
 			if text == "native":
-				# (its bytes at its own .origin - what a compiled function holding
-				# it has, Builder.same_value - until it is placed, Builder.build)
+				# (its size now - assembled at 0, its source having no .origin;
+				# its bytes when it is placed, Builder.build)
 				source = os.path.join(self.root, args[1][1:-1])
-				o = Obj("binary", args[0], data=newtonarm.pack(source))
+				o = Obj("binary", args[0], data=newtonarm.pack(source, 0))
 				o.native = source
 				return o
 			if text == "lexicon":
