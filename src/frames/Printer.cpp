@@ -662,6 +662,25 @@ IsRichString(RefArg str)
 }
 
 
+// ROM 0x001abe14 GetCStringFormat__FPUsUl
+// GetStringFormat of the characters themselves: size is in bytes, the
+// terminator's included.
+long
+GetCStringFormat(UniChar* str, ULong size)
+{
+	return str[size / sizeof(UniChar) - 1] & 3;
+}
+
+
+// ROM 0x001ab1fc IsRichCString__FPUsUl
+// IsRichString of the characters themselves.  Nothing in the ROM calls it.
+Boolean
+IsRichCString(UniChar* str, ULong size)
+{
+	return GetCStringFormat(str, size) != 0;
+}
+
+
 // ROM 0x000ecf04 IntegerString__FlPUs
 void
 IntegerString(Long i, UniChar* str)

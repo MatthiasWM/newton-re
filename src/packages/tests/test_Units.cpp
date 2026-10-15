@@ -513,6 +513,27 @@ TestImportTwice(void)
 }
 
 
+// the export list's comparer by source, which nothing in the ROM makes:
+// equal for the same part, less than for any other
+static void
+TestExportSourceComparer(void)
+{
+	MPExportItem a, b, c;
+	memset(&a, 0, sizeof(a));
+	memset(&b, 0, sizeof(b));
+	memset(&c, 0, sizeof(c));
+	a.fSource = (void*) 0x1000;
+	b.fSource = (void*) 0x1000;
+	c.fSource = (void*) 0x0800;
+	CMPExportListSourceComparer comparer;
+	comparer.SetTestItem(&a);
+	EXPECT(comparer.TestItem(&b) == kItemEqualCriteria);
+	EXPECT(comparer.TestItem(&c) == kItemLessThanCriteria);
+	comparer.SetTestItem(&c);
+	EXPECT(comparer.TestItem(&a) == kItemLessThanCriteria);
+}
+
+
 int
 main()
 {
@@ -532,6 +553,7 @@ main()
 	TestUnits();
 	TestCommPartHandler();
 	TestImportTwice();
+	TestExportSourceComparer();
 	if (failures == 0)
 		printf("test_Units: all passed\n");
 	return failures != 0;

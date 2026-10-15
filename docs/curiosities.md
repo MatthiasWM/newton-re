@@ -2572,3 +2572,32 @@ where it is from and to and, for a copy that overlaps itself, how far it
 has got before each byte or word, so `ContinuePersistentCopy` can pick it
 up again after a power failure - but nothing in it ever says the copy is
 over (ctest `stores.FlashStore`).
+
+## Functions that answer before they ask
+
+Twenty-eight functions of the U.S. ROM are reached by nothing at all - no
+call, no branch, no address in a vtable or a table - and are not public
+either. Most are an earlier way of placing written words in a paragraph
+(`WordFitsAtEndOfLine`, `CountTabStops`, `ValidateCaretPoint`,
+`FindLineContainingRect`), kept and unwired, and a few are bare returns
+(`PlaceAndAddWord` answers nought; `SimpleOffset(TPoint)` builds a stack
+frame, spills its point into it and takes the frame down again). Two of
+them are wrong in ways nobody could have seen:
+
+- `HitsOldHilitedInk` asks whether a selected polygon view has ink - and
+  compares the answer with nought rather than nil, so every view has -
+  then asks `PtInRect` whether the point is on it, and answers true
+  whatever `PtInRect` said. Every selected polygon view is hit, wherever
+  the pen is.
+- `ShutDownUnicode` frees each encoding's two maps and leaves the
+  converters installed over them, with the tables still marked in: the
+  next conversion would read freed memory, and a second shut-down would
+  free it all again.
+
+Both are fixed by default (`docs/rom-bugs.md`). And
+`CMPExportListSourceComparer::TestItem` answers "less than" for any other
+part and "equal" for the same one - never "greater" - so it is good only
+for an equality test, not for a sorted list's binary search; and no
+vtable in the ROM points at it, so no such comparer was ever made.
+(`docs/views/README.md`, "What nothing calls"; `docs/codebase-map.md`,
+"Build, portability and the ROM-study tools".)

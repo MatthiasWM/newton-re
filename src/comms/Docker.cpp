@@ -1188,6 +1188,34 @@ TDocker::Pad(ULong length)
 }
 
 
+// ROM 0x00097980 WriteString__7TDockerFPUs
+// A string as the protocol carries one: its size in bytes (the
+// terminator's included), the characters, the padding to a whole word,
+// and the pipe flushed.  No command header: the caller writes that.
+// Nothing in the ROM calls it - every string the docker sends goes as an
+// NSOF object (WriteRef) or by hand (WriteNewtonName).
+void
+TDocker::WriteString(UniChar* str)
+{
+	ULong size = sizeof(UniChar) + Ustrlen(str) * sizeof(UniChar);
+	*fPipe << (unsigned long) size;
+	// DEVIATION: the characters are the device's, big-endian (as
+	// WriteNewtonName's); the ROM writes its own memory as it is
+	UByte* bigEndian = (UByte*) NewPtr(size);
+	if (bigEndian == nil)
+		OutOfMemory();
+	for (ULong i = 0; i < size / sizeof(UniChar); i++)
+	{
+		bigEndian[2 * i] = (UByte) (str[i] >> 8);
+		bigEndian[2 * i + 1] = (UByte) str[i];
+	}
+	fPipe->WriteChunk(bigEndian, size, false);
+	DisposPtr((Ptr) bigEndian);
+	Pad(size);
+	fPipe->FlushWrite();
+}
+
+
 // ROM 0x00097904 FlushPadding__7TDockerFUl
 // The padding after data of that length read and thrown away.
 void

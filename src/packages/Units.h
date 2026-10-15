@@ -136,6 +136,15 @@ public:
 	virtual CompareResult	TestItem(const void* criteria) const;
 };
 
+// An export list comparer by the exporting part - equal or not, never
+// greater: nothing in the ROM makes one (its export list is kept in name
+// order and searched with CMPExportListNameComparer).
+class CMPExportListSourceComparer : public CItemComparer
+{
+public:
+	virtual CompareResult	TestItem(const void* criteria) const;
+};
+
 class CMPImportListSourceComparer : public CItemComparer
 {
 public:

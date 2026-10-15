@@ -60,6 +60,7 @@ struct TTransform
 
 void	Scale(Rect* rect, const TTransform& transform);		// ROM 0x001979bc Scale__5TRectFRC10TTransform
 void	Scale(Point* pt, const TTransform& transform);		// ROM 0x00197bcc Scale__6TPointFRC10TTransform
+void	InverseScale(Point* pt, const TTransform& transform);	// ROM 0x001982e8 InverseScale__6TPointFRC10TTransform - back from the destination into the source (nothing in the ROM calls it)
 
 
 // The transforms in force, innermost last, and the port's procs replaced

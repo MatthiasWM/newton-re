@@ -550,6 +550,27 @@ TestROMFunctions()
 }
 
 
+// the stacks' release procs (nothing in the ROM installs them): the range
+// in use, and the flag handed back
+static void
+TestReleaseProcs()
+{
+	TRefStack* refs = new TRefStack;
+	refs->PushNILs(3);
+	ULong start = 0, end = 0;
+	EXPECT(TRefStackReleaseProc(refs, &start, &end, true) == true);
+	EXPECT(start == (ULong) refs->fBase && end == (ULong) refs->fLimit);
+	EXPECT(TRefStackReleaseProc(refs, &start, &end, false) == false);
+	delete refs;
+
+	TRefStructStack* structs = new TRefStructStack;
+	structs->PushNILs(5);
+	EXPECT(TRefStructStackReleaseProc(structs, &start, &end, true) == true);
+	EXPECT(start == (ULong) structs->fHandles && end == (ULong) (structs->fHandles + 5));
+	delete structs;
+}
+
+
 int
 main()
 {
@@ -573,6 +594,7 @@ main()
 		TestClosures();
 		TestExceptions();
 		TestROMFunctions();
+		TestReleaseProcs();
 	}
 	newton_catch_all
 	{

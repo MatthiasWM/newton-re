@@ -136,6 +136,10 @@ TestArrays()
 	RefVar b(AllocateBinary(RSSYMstring, 2));
 	EXPECT(THROWS(GetArraySlot(b, 0), "evt.ex.fr.type") == kNSErrNotAnArray);
 	EXPECT(THROWS(AddArraySlot(b, NILREF), "evt.ex.fr.type") == kNSErrNotAnArray);
+	// the slot count read from the header alone
+	EXPECT(UnsafeArrayLength((char*) OBJ(a)) == 6);
+	RefVar empty(AllocateArray(RSSYMarray, 0));
+	EXPECT(UnsafeArrayLength((char*) OBJ(empty)) == 0);
 
 	// MapSlots and the iterator
 	struct Sum { static Ref Add(RefArg tag, RefArg value, ULong total) { if (ISINT(value)) *(long*) total += RINT(value); return NILREF; } };

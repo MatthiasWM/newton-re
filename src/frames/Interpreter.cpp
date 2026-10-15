@@ -96,6 +96,18 @@ TRefStackUpdate(void* stack)
 }
 
 
+// ROM 0x001a4600 TRefStackReleaseProc__FPvPUlT2Uc
+// The whole stack, base to limit.  Nothing in the ROM installs it.
+Boolean
+TRefStackReleaseProc(void* stack, ULong* start, ULong* end, Boolean flag)
+{
+	TRefStack* s = (TRefStack*) stack;
+	*start = (ULong) s->fBase;
+	*end = (ULong) s->fLimit;
+	return flag;
+}
+
+
 // ROM 0x001a48e4 __ct__9TRefStackFv
 TRefStack::TRefStack()
 {
@@ -145,6 +157,19 @@ TRefStack::PushNILs(long count)
 /* -------------------------------------------------------------------------------
 	TRefStructStack, TIntrpStack
 ------------------------------------------------------------------------------- */
+
+// ROM 0x001a4a48 TRefStructStackReleaseProc__FPvPUlT2Uc
+// The pointer stack, as far as the ref stack is deep (whether or not Fill
+// has got that far).  Nothing in the ROM installs it.
+Boolean
+TRefStructStackReleaseProc(void* stack, ULong* start, ULong* end, Boolean flag)
+{
+	TRefStructStack* s = (TRefStructStack*) stack;
+	*start = (ULong) s->fHandles;
+	*end = (ULong) (s->fHandles + (s->fTop - s->fBase));
+	return flag;
+}
+
 
 // ROM 0x001a4a78 __ct__15TRefStructStackFv
 TRefStructStack::TRefStructStack()

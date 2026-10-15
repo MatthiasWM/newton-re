@@ -37,6 +37,7 @@
 #include "RSSymbols.h"
 #include "Unicode.h"
 #include "Ink.h"
+#include "host/RomBugs.h"
 
 struct SortStuff
 {
@@ -152,6 +153,33 @@ Boolean
 IsOldInk(TView* view)
 {
 	return view->DerivedFrom(clPolygonView) && NOTNIL(view->GetProto(RSSYMink));
+}
+
+
+// ROM 0x000a40d4 HitsOldHilitedInk__FP5TView6TPoint
+// Whether the point is on an ink shape that is selected: a polygon view
+// with a hilite, with ink, the point inside its bounds.  Nothing in the
+// ROM calls it.
+//
+// ROM BUG (fixed): the ROM asks whether the view has ink (comparing the
+// answer with nought, not nil, so any view passes) and then whether the
+// point is inside, but answers true whatever the two say: every selected
+// polygon view is hit, wherever the point is.  The fix answers the two
+// questions' answer.
+Boolean
+HitsOldHilitedInk(TView* view, Point pt)
+{
+	if (!view->DerivedFrom(clPolygonView))
+		return false;
+	RefVar hilite(view->FirstHilite());
+	if (ISNIL(hilite))
+		return false;
+	Ref ink = view->GetProto(RSSYMink);
+	if (RomBugFixed())
+		return NOTNIL(ink) && PtInRect(pt, &view->viewBounds);
+	if (ink != 0)
+		(void) PtInRect(pt, &view->viewBounds);
+	return true;
 }
 
 

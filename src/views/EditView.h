@@ -104,6 +104,10 @@ public:
 	// the page - as an ink word in a paragraph of its own.
 	long			HandleInk(TUnitPublic* unit);			// ROM 0x000a6798 HandleInk__9TEditViewFP11TUnitPublic
 	long			HandleInk(RefArg bundle);				// ROM 0x000a6854 HandleInk__9TEditViewFRC6RefVar
+	long			HandleInk(Handle polygon);				// ROM 0x000a67d4 HandleInk__9TEditViewFPP7Polygon - a polygon's points as a stroke (nothing in the ROM calls it)
+	// Whether a box overlaps the page's graphics: the ROM's answers no,
+	// always, and nothing calls it.
+	Boolean			BoundsOverlapsGraphics(Rect& bounds);	// ROM 0x000a8a8c BoundsOverlapsGraphics__9TEditViewFR5TRect
 	void			HandleInkWord(RefArg cmd);				// ROM 0x000a6888 HandleInkWord__9TEditViewFRC6RefVar
 	TView*			AddForm(RefArg form);					// ROM 0x000ab28c AddForm__9TEditViewFRC6RefVar - the context frame made a child, undoably
 	void			JamText(UniChar* text, ULong length);	// ROM 0x000ab70c JamText__9TEditViewFPUsUl - typed text put on the page as a word
@@ -196,6 +200,8 @@ long	TestLineOverlap(Rect* line, Rect* kid);					// ROM 0x000a2ffc TestLineOverl
 long	MapIndex(long index);									// ROM 0x000a4078 MapIndex__Fl
 Ref		MakeKidForSort(TView* view, long index);				// ROM 0x000a3ef4 MakeKidForSort__FP5TViewl
 Boolean	IsOldInk(TView* view);									// ROM 0x000a4084 IsOldInk__FP5TView
+// Whether a point is on a selected ink shape (nothing in the ROM calls it).
+Boolean	HitsOldHilitedInk(TView* view, Point pt);				// ROM 0x000a40d4 HitsOldHilitedInk__FP5TView6TPoint
 Boolean	ContainsHilitedInkWord(TView* view);					// ROM 0x00171290 ContainsHilitedInkWord__FP5TView
 Ref		SortTextInk(RefArg kids);								// ROM 0x000a8220 SortTextInk__FRC6RefVar					// ROM 0x001a2aa4 TextOrInkWordsEnabled__FP5TView
 

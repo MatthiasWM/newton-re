@@ -3358,6 +3358,20 @@ TView::RemoveUnmarked(void)
 }
 
 
+// ROM 0x00260c98 GetLastClipper__FP9TViewList
+// The list walked while its views have clippers: where the walk stopped
+// (the first view without one, or the end).  Nothing in the ROM calls it.
+long
+GetLastClipper(TViewList* list)
+{
+	TListLoop loop(list);
+	TView* view;
+	while ((view = (TView*) loop.Next()) != nil && view->Clipper() != nil)
+		;
+	return loop.Index();
+}
+
+
 // ROM 0x00260cd8 ReorderView__5TViewFP5TViewl
 // The child moved to the index: a non-floater no further than the first
 // floater, a floater no nearer the front than the non-floaters (behind the

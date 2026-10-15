@@ -132,6 +132,7 @@ void	BlitToScreens(PixelMap* map, Rect* src, Rect* dst, long mode);	// ROM 0x001
 long	GetGrafInfo(long selector, void* info);	// ROM 0x001cd424 GetGrafInfo__FlPv
 void	SetGrafInfo(long selector, long value);	// ROM 0x001cc9dc SetGrafInfo__FlT1
 void	SetOrientation(long orientation);		// ROM 0x00202b3c SetOrientation__Fl
+void	SetScreenSize(long width, long height);	// ROM 0x00202c6c SetScreenSize__FlT1 - empty: nothing (nothing in the ROM calls it)
 
 // what a script can ask of the screen (ScreenNatives.cpp)
 Ref		FGetLCDContrast(RefArg rcvr);			// ROM 0x00202d64 FGetLCDContrast__FRC6RefVar

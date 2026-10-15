@@ -73,6 +73,14 @@ Ref		SharedFrameMap(RefArg frame);
 UniChar* CString(RefArg str);
 Ref		FStringer(RefArg rcvr, RefArg array);		// (StringNatives.cpp: ROM 0x001fd644) - the elements written one after another
 Ref		FStrEqual(RefArg rcvr, RefArg a, RefArg b);	// (StringNatives.cpp: ROM 0x001fedf4) - the same characters, cases apart
+// Three string helpers the ROM keeps after the string natives and that
+// nothing in it calls (StringNatives.cpp): a C string as a Pascal one (at
+// most 255 characters), and length characters copied into a new pointer
+// (no terminator) or a new handle (terminated) - nil when there is no
+// memory.
+void	CToPString(unsigned char* cstr, unsigned char* pstr);	// (ROM 0x001feee0)
+UniChar* MakeStringPtr(UniChar* str, ULong length);			// (ROM 0x001fef18)
+Handle	MakeStringHandle(UniChar* str, ULong length);			// (ROM 0x001fef54)
 Boolean	IsReal(RefArg ref);
 Ref		MakeSymbol(char* name);
 TObjectIterator*	NewTObjectIterator(RefArg obj);

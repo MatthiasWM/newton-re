@@ -1227,6 +1227,49 @@ into the middle of a word at the caret.
 `TestWordIntoParagraph` writes a word past the end of a paragraph's line
 and finds it in that paragraph's text.
 
+#### What nothing calls
+
+A handful of the paragraph's and the page's functions are reached by
+nothing in the ROM - no call, no branch, no address in a vtable or a
+table (`callgraph.py --callers`, and a scan of `rom.bin` for a word or a
+`B`/`BL` aimed at each) - and are not in the public jump table. They read
+like an earlier placement of written words, kept but unwired. Each is
+reconstructed as the ROM has it and called directly by `test_Views`
+(`TestParagraphUnreferenced`, `TestPolygonView`, `TestInkOnThePage`,
+`TestViews`):
+
+- `WordFitsAtEndOfLine` 0x00173270: whether a word goes at the end of the
+  line an offset is on - yes for a lone hyphen or bullet (`IsBullet`
+  0x0017a288: `-` or Mac Roman 0xa5), a word with a space, tab or return,
+  or bit 25 of viewJustify; otherwise only with more than 100 pixels
+  between the line's end and the view's right edge and room for the
+  word's width (fifteen pixels a character for an empty box) plus ten,
+  and the same past the last word the recogniser added when that is on
+  the line above.
+- `CountTabStops` 0x00173d5c: how many of the `tabs` a gap spans (a stop
+  within ten pixels of the gap's end, or past it, ends the count).
+- `FindLineContainingRect` 0x0017862c: the first line a box covers a
+  percentage of, the line let out 1000 pixels sideways and raised by half
+  its height on request. Like `FindLineContainingCharOffset`, the ROM's
+  answers the line's slot in the cache (the host's, the index).
+- `ValidateCaretPoint` 0x001756a4: whether a caret point is near enough a
+  line's baseline (each line let down by half the next one's height) to
+  be put on it, the point then moved to the line's middle.
+- `FindEndOfWord` 0x0017a498 (the first word's end by the break table),
+  `ContainsTabsOrCRs` 0x0017ae80.
+- Empty: `SimpleOffset(TPoint)` 0x0017e594 (a frame and nothing in it),
+  `PlaceAndAddWord` 0x00172e60 (answers nought), `RegisterIdler`
+  0x00180244, and the page's `BoundsOverlapsGraphics` 0x000a8a8c (no).
+- The page's `HandleInk(Polygon**)` 0x000a67d4: a polygon's points made a
+  stroke (`MakeStroke`, `PrepStrokeForRecognition`) and put on the page
+  as ink, as `HandleInk` of a unit does.
+- `HitsOldHilitedInk` 0x000a40d4: meant to say whether a point is on a
+  selected ink shape, it answers true for every selected polygon view -
+  the ink test (against nought, not nil) and `PtInRect`'s answer are
+  both thrown away (ROM BUG, fixed: both are asked).
+- `GetLastClipper` 0x00260c98 (`View.cpp`): how many of a view list's
+  views, from the first, have clippers.
+
 ### The caret gestures and the insert areas (`HandleCaret` 0x001753b4, `views/ParagraphInsertAreas.cpp`)
 
 A caret drawn over a paragraph opens space: pointing up it is one space
