@@ -9,17 +9,21 @@ here - this file says what is *not* done.  The history of how things got
 here, the plans of finished work and the host and ROM bugs found along
 the way are all in `docs/work-log.md`.
 
-## State at 2026-10-01
+## State at 2026-10-15
 
-- The full `ctest`: 319 of 319 (several agents work in parallel, each
+- The full `ctest`: 476 of 476 (several agents work in parallel, each
   building in its own directory under `tmp/`).
 - The OS boots from the reconstructed data by default
   (`<build>/romsrc-objects.bin`, from the committed `romsrc/`); `--rom` is
   only for cross-checks, and nothing reads the ROM image at run time.
   A configure with no ROM image builds, boots and runs every test that
   does not compare against the ROM.
-- `analysis/coverage.py build/MP2x00US --check`: 18118 citations, 0 bad;
-  12199 of 16671 functions (73%).
+- **`romsrc/` is all source and text**: no binary file is left in it, and
+  no function is kept as bytecode (`docs/rom-free/README.md`, "Every
+  binary as text"; `docs/work-log.md`, 2026-10-15).  What is left of that
+  work is under "Open", "romsrc".
+- `analysis/coverage.py build/MP2x00US --check`: 18705 citations, 0 bad;
+  12749 of 16671 functions (76.5%).
 - `analysis/natives.py --unbound`: 1284 of 1326 natives answered (96.8%).
   Left: comms 38 (AppleTalk and NBP, the online services and eWorld's
   `EW*`, the TV remote), intl 4 (the AppleTalk zones).
@@ -55,9 +59,12 @@ ported from lilyphone1) with a desktop's pretend air (`newton --mesh-air`,
 SX1262 (`tdeck_lora.cpp`); the radio's settings as values, MeshCore's
 community presets filling them in (`tools/mesh/meshpresets.py`), in the
 Mesh application's Prefs (its "i" button) with the radio's power.  On the board: up,
-announcing, switched off and on.  Next: a message with a real node on the
-board (the owner's other MeshCore devices); then the WiFi companion
-(MeshCore's companion protocol on TCP 5000) if wanted.
+announcing, switched off and on; hearing since its antenna switch is
+turned to receive; contacts as Names cards, channels, location in adverts
+(`docs/work-log.md`, 2026-10-14).  Next: a message exchanged with a real
+node on the board (the owner's other MeshCore devices); then the WiFi
+companion (MeshCore's companion protocol on TCP 5000) if wanted; the rest
+is the doc's "Not yet".
 
 ### A small device: the T-Deck Pro (branch `tdeck-pro-investigation`, 2026-10-10)
 
@@ -83,7 +90,7 @@ pass).  **WiFi**,
 set up in Internet Setup's Host network setup (scan, remember, join any
 remembered network in range; not yet tried on a real network); the panel
 following the Newton turned to landscape; the clock set from the network
-(SNTP) once joined, or by hand (`!time`); **the store's writes batched** (a driver's run of words in one flash write: soup adds and removes ~1.7x faster).  Next: NewtonScript's speed (the
+(SNTP) once joined, or by hand (`!time`); **the store's writes batched** (a driver's run of words in one flash write: soup adds and removes ~1.7x faster); the battery read from its gauge; a network printer found and a test page printed (`docs/work-log.md`, 2026-10-14).  Next: NewtonScript's speed (the
 object heap in PSRAM); the built-in packages' frames baked; the applications at 240x320 (some ask to rotate); later the
 panel's own waveforms for speed and grays (docs/host-tdeck-pro.md, "Order
 of work").
@@ -227,9 +234,39 @@ sanity check; and `SaveResource`, which the ROM's `TArray::Save` reaches
 after `MakeHandle`/`NameHandle` - the host's only compacts.
 
 Printing: PostScript and HP PCL to a network printer by IPP are done, and
-printers on the network are found and added both ways and kept.  Left
-there: a PCL printer's state is not asked (ThpPCL has no status
-path).
+printers on the network are found and added both ways and kept - on the
+reMarkable and the T-Deck Pro too, by an mDNS question of the host's own
+where it has no browse.  Left there: a PCL printer's state is not asked
+(ThpPCL has no status path).
+
+### romsrc (all text since 2026-10-15)
+
+Where the binaries-to-text work left off (`docs/rom-free/README.md`,
+"Every binary as text"):
+
+- **Editing a function that another names by path.**  A `same("...")`
+  definition or a `layout.tsv` alias names an object by the path it has
+  inside a compiled function (`literals[3]`); an edit that moves that
+  function's literals breaks it.  The builder says so and how to mend it
+  (point the `same()` at another function holding the object, correct
+  the alias), but a tool that re-derives the paths after an edit would
+  save doing it by hand - the NIE's Internet Setup edit needed it.
+- **Native code held twice.**  An NTK native module is ARM source
+  (`native(...)`), but a function whose literals hold the same binary
+  (written `call kBinaryFromHex with (...)`) keeps its own copy as hex:
+  once the `.s` is edited the two differ and the function's copy is laid
+  out on its own.  The decompiler could name the module instead.
+- **A `.s` part's `.origin`** is worked out when a package is packed; a
+  part before it that grew leaves the committed line behind, harmlessly
+  (`tools/armpart/README.md`).
+- **The patch table's pages**: `--relayout` now moves the patch table's
+  branches with ScreenBuffer and ScreenDrivers, but the page tables
+  `ptpt`/`glpt` still name its old physical page (0x7ee000), and the
+  NIE's imports get no 'fimp.  Nothing on the host reads either.
+- **The other NTK packages in `fixtures/`** could be unpacked to source
+  the same way (`romsrc.py package unpack`); only the NIE's three are.
+- The ARM sources of the protocol parts are not run: the host has its own
+  screen driver, and armcpu runs no protocol part (below, Comms).
 
 ### Left by decision or out of reach
 
@@ -299,9 +336,6 @@ path).
   restart") - `docs/armcpu/README.md`, "Stores, store events and the private jump
   table"; an
   ATA card's ARM610 boot code, which the ROM jumps into.
-- The NIE built into the ROM extension: the page tables `ptpt`/`glpt`
-  still name the patch table's old physical page (0x7ee000); 'fimp is not
-  generated.
 - The system alerts: the card position alert's trigger, the fault
   monitor's route into `ReinsertCard`, the screen semaphores.
 - Flash stores past 128 MB (the migrated-entry cap: slow lookups, or

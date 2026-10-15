@@ -83,6 +83,35 @@ rather than patched. It still reads `.bin` pieces (the tag
 
 ctests `tools.RExText`, `tools.RExTextROM`.
 
+## 2026-10-14: Mesh on the board - hearing, contacts, channels, location
+
+The Mesh application on the T-Deck Pro, after its first day
+(`docs/host-tdeck-pro-mesh.md`):
+
+- **The board was all but deaf**: the owner's other MeshCore receiver had
+  a morning of channel messages and the board none.  DIO2 drives the
+  SX1262 module's antenna switch, and nothing turned it to receive
+  (lilyphone1 has the same omission); with `SX126X_DIO2_AS_RF_SWITCH`,
+  the 2.4 V TCXO and the boosted receive gain (LilyGO's own example and
+  Meshtastic's variant) it hears.  `HostMeshStatus()` says what the radio
+  hears (packets read before MeshCore parses them, the frequency error,
+  channel packets of channels known and unknown), a per-packet trace and
+  `tools/mesh/meshdecode.py` take a missed message apart, and a radio
+  found out of receive (a missed interrupt) is put back.  The poor
+  reception left after that was a screw missing: the antenna's spring
+  contacts.
+- **Contacts are Names cards** (the owner's choice), added by key; a full
+  contact table makes room.
+- **Channels**: hashtag channels by name, private ones by their secret,
+  up to 8, kept across restarts (the message the board had missed was on
+  a channel it was not in).
+- **Location**: the node's position in its adverts and Send Location,
+  from the host's GPS (the board's own u-blox M10; the Host panel's "The
+  GPS on" switches it off to save the battery).
+- Deleting messages, a Reply line that grows, Prefs from the "i" button's
+  menu, and one alert slip of the application's own while it is closed
+  (as Messages').
+
 ## 2026-10-14: Network printers on the reMarkable and the T-Deck Pro
 
 The owner could not print from either device: the reMarkable no longer
