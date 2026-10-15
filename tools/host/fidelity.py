@@ -45,16 +45,13 @@ PGMDIFF = os.path.join(ROOT, "tools", "imaging", "pgmdiff.py")
 SCRIPT = os.path.join(ROOT, "src", "host", "demo", "fidelity.ns")
 
 # The steps at which the default boot (with the NIE built into the ROM
-# extension, romsrc/README.md) draws something the ROM does not, and why.
+# extension, romsrc/README.md) draws something the ROM does not, and why:
+# none since Newton Devices' AppleTalk panel came out of the Prefs list
+# (romsrc/rex/newtdev/README.md) - the NIE's icons are not in the Extras
+# drawer's Unfiled Icons, and the host's own Prefs pages (Network Printers,
+# Host, Developer) are in both boots.
 EXPECTED = {
-	"preferenceRoll": "Newton Devices (rex/newtdev.pkg) adds an AppleTalk panel to the Prefs list",
-	"prefs-sound": "the Prefs list showing below the Sound panel has Newton Devices' AppleTalk entry",
-	"prefs-sleep": "the Prefs list showing below the Sleep panel has Newton Devices' AppleTalk entry",
-	"prefs-handwriting": "the Prefs list showing below the Handwriting panel is one row longer with Newton Devices' AppleTalk entry: its last row (Network Printers, the host's Host page above it) shows",
 }
-# (the NIE's icons are not in the Extras drawer's Unfiled Icons, so that step
-# is the same in both; the Handwriting Recognition panel covered the list's
-# last rows until the host's Host preferences page made it one row longer)
 
 
 def boot(newton, args, out, label, timeout):

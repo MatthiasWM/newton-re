@@ -209,6 +209,51 @@ Mahjongg's two natives deal the board and NewtHack's runs each turn.
 
 NOT YET: frames in the code binary.
 
+### The public API the ROM does not call (2026-10-15)
+
+Forty-four functions of the public jump table that nothing in the ROM calls,
+branches to or points at (`uncited-categories.tsv` had a category of them)
+are reconstructed in their areas and answered for a package's code:
+
+- **Bare returns** (`mov pc, lr` in the ROM): TIdleTimer's eight functions
+  (`utility/IdleTimer.h` - an older idle timer that is nothing in this ROM;
+  its constructor does not even allocate), TAEventHandler's `ResetIdle` with
+  a port, TView's `DoCommand`/`RealDoCommand` of a `TCommand*`,
+  TEndpointEventHandler's `CallService` of eight arguments,
+  `CallServiceBlocking`, `GetPrivatePortId` and `GetSyncPortId`.  The glue
+  (`Glue_BareReturn`) leaves r0 as the caller passed it, which is what the
+  ROM's caller gets back.
+- **Over ARM memory, in the ROM's layouts**: `TUCTTable` (`Add`, both
+  `Remove`s, `HeldBy`: 32 task queues at +0x14, a task's key at +0x9c, its
+  state bit 0x4000 - `os600/kernel/UCTTable.h`), `TAppWorldState::GetError`
+  (the first word), `HasDigits` (the UniChars), placement new.
+- **The out-of-line copies of inlines** (`RCHAR`, `RefToUniChar`,
+  `FrameHasSlot` and `IsSubclass` of RefArgs) are cited on their glue, as
+  the earlier RefArg forms are.  The public `SetVariableOrGlobal` of two
+  ints is `frames/VariableLookup.cpp`'s: the ints unread, flags 7 (the glue
+  passed r3 as the flags before).
+- **`ComputeCRC(CBufferList&)`** calls the ARM code's own list - its Seek
+  (vtable +0x38) and Get (+0x10) through `ARMCall` - and works the ROM's
+  nibble tables into the TCRC16's `fCRC` (+4).
+- **`ROMSoupBounds`** answers the ROM's own addresses (0x003afda8, size
+  0x002cfc98): the ARM world has the ROM where the ROM has it.
+- **The GC-safe lists** (`ARMLists.cpp`): CLists (a sorted one's comparer at
+  +0x18).  DEVIATION: the collector is not told about an ARM list - its
+  refs are the call's handles, whose objects the collector keeps through
+  the handle table already - so `GCMarkItems`, `GCUpdateItems` and the
+  static procs (reached only by their private slots) do nothing.
+- **`GetNewtTaskPort`/`GetNewtRootView`** (`ARMKernelGlue.cpp`): the newt
+  library sets `gARMNewtTaskPort`/`gARMNewtRootView` (it is above armcpu);
+  the port is a TUPort of the ARM code's (its id, then 0), the root view an
+  opaque mirror (DEVIATION: a host TView has no ROM layout to read).
+- **`GetCardReinsertionInfo`** (`ARMPSSManager.cpp`): the host's answer,
+  written as five words - always false on the host, which has no ROM domain
+  manager to note a page faulted in from a card that came back.
+
+Tests: `armcpu.PackageNativeCPU` (`TestPublicAPI`, through the public
+table) and `armcpu.ARMProtocols` (the lists, the newt globals, the PSS
+glue).
+
 ## Protocol parts (2026-10-01; layer by layer)
 
 A package's protocol part with no host stand-in is run on the interpreter

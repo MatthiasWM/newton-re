@@ -91,9 +91,10 @@ sizes as the switch has them:
 | 80 | `TMonthView` (on `TView`) | 0x94 |
 | 81 | `TParagraphView` (on `TDataView`) | 0xd0 |
 | 82 | `TPolygonView` | 0x30 |
-| 83, 84 | `TMathExpView` (on `TContainerView`, 0x44, RefStruct at +0x38) | 0x44 |
-| 85 | `TMathOpView` | 0x34 |
-| 86 | `TMathLineView` | 0x38 |
+| 83 | `TDataView` | 0x30 |
+| 84 | `TMathExpView` (on `TContainerView`, RefStruct at +0x38) | 0x44 |
+| 85 | `TMathOpView` (on `TDataView`) | 0x34 |
+| 86 | `TMathLineView` (on `TDataView`) | 0x38 |
 | 87, 88 | `TRemoteView` | 0x58 |
 | 89-91 | `TPickView` (on `TView`; RefStructs at +0x34, +0x54, +0xa4, +0xac) | 0xbc |
 | 92 | `TGaugeView` | 0x38 |
@@ -2003,6 +2004,37 @@ drawn as a polyline, an oval or arc in its box, or ink).
 NOT YET: `PlaybackInk`, `SetSelection`/`GetSelection`,
 `GetValue`/`SetValue`.  (Drag and drop, `TrackScale`, `TrackDistort` and
 the resize border are described above.)
+
+## The math views (`views/MathViews.h`)
+
+Classes 84-86, `TMathExpView`, `TMathOpView` and `TMathLineView`
+(0x0011bb38-0x0011c168), are what the math recogniser - not in this ROM -
+would have laid a written expression out as.  `BuildView` makes them for
+a template of their classes (0x0025edd0-0x0025ee88), but nothing in the
+U.S. ROM, its extension or its stationery has one, so they were dead; a
+package or a script that opens such a template now gets them.
+
+* `TMathExpView` (0x44 bytes, a `TContainerView`): its constructor keeps
+  the `viewFont` frame's `family` (a RefStruct at +0x38), `face` and
+  `size`, and sets the container's gap to 16 (+0x30, the container's 5)
+  and its +0x34 to 3 (2).  It draws nothing of its own; a key going up
+  (`aeKeyUp`) is taken and nothing done unless the view is read-only;
+  scrubbed (`HandleScrub`), once the container has taken something, every
+  child whose data frame has a non-nought `isResult` - in the frame
+  itself, not its protos - goes too, each by an undoable `aeRemoveData`;
+  its `GetContext` is `CopyForm`.
+* `TMathOpView` (0x34, a `TDataView`): `mathOperator` at +0x30 - 0 a
+  plus, 1 a minus, 2 a times, 3 a slash, anything else nothing - drawn
+  in the view's bounds a pixel in from the bottom and right (the plus
+  falls through into the minus's line, the times into the slash's).
+* `TMathLineView` (0x38, a `TDataView`): `mathLine` (a rectangle) at
+  +0x30, of which only the size is used: a line from the view's top left
+  that wide and that deep - a fraction's bar.
+
+Their `PreDraw` (and the two data views' `RealDoCommand`) are `TView`'s,
+branched to.  Ctest `views.Views` (`TestMathViews`): an expression of a
+plus, a bar and a times from a template, the pixels, the key, the result
+taken away with a scrub.
 
 ## How the machine's own views get on screen
 

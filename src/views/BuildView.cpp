@@ -27,6 +27,7 @@
 #include "SliderView.h"
 #include "ClipboardView.h"
 #include "PickView.h"
+#include "MathViews.h"
 #include "Rects.h"
 #include "Ports.h"
 #include "ObjectHeap.h"
@@ -145,8 +146,8 @@ TView::BuildContext(RefArg templ, Boolean forceVisible)
 // The C++ object for the context's viewClass, constructed under the
 // parent; a Throw in the Constructor removes the view again, and a class
 // the ROM does not know is -8501 (kViewErrCouldNotCreate).  Every class
-// the ROM makes is here but the math views (TMathExpView, TMathOpView,
-// TMathLineView), which are NOT YET RECONSTRUCTED and get a plain TView.
+// the ROM makes is here, the math views (MathViews.h) among them - which
+// nothing in the ROM opens.
 TView*
 BuildView(TView* parent, RefArg context)
 {
@@ -155,11 +156,17 @@ BuildView(TView* parent, RefArg context)
 	switch (viewClass)
 	{
 	case clView:
-	case clMathExpView:
-	case clMathOpView:
-	case clMathLineView:
 	case clPrintView - 1:
 		view = new TView;
+		break;
+	case clMathExpView:
+		view = new TMathExpView;
+		break;
+	case clMathOpView:
+		view = new TMathOpView;
+		break;
+	case clMathLineView:
+		view = new TMathLineView;
 		break;
 	case clPrintView:
 		view = new TPrintView;

@@ -132,6 +132,11 @@ GENERATED = [
                      "kXrToLetters1@0x0c1056cc:cstr:3", "kXrToLetters1Tail@0x0c1056d8:u8:4",
                      "kLettersToXr@0x0c1056dc:cstr:3", "kLettersToXrTail@0x0c1056e8:u8:4",
                      "-o", "src/recognition/XrPostTables.cpp"]),
+    # the accent check's tables (CheckDiacriticsDirections): a letter's row,
+    # a mark's xr types, and the rows of what a mark each way makes
+    ("diacritics",
+     "romtable.py", ["{build}", "IndexDiacriticsLetter:u8:52", "xrsToFind:u8:4", "DiacrPresence:u16:196",
+                     "-o", "src/recognition/XrDiacriticsTables.cpp"]),
     # the digit reader's sines and cosines of 0, 15, 30 and 45 degrees
     # (GetDirection copies them from two unnamed tables)
     ("chunk",

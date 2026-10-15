@@ -10,6 +10,8 @@
 #include "Frames.h"
 #include "ObjectHeap.h"
 #include "Interpreter.h"
+#include "GCSafeList.h"
+#include "ItemComparer.h"
 #include "memory/host/KernelHeap.h"
 #include "NewtonMemory.h"
 
@@ -480,6 +482,41 @@ TestGC()
 }
 
 
+// TGCSafeList and TGCSafeSortedList: an object only a list refers to lives
+// through a collection, and the list's item follows it as it moves
+static void
+TestGCSafeLists()
+{
+	// garbage below, so that what is made after it moves down
+	for (int i = 0; i < 100; i++)
+		RefVar junk(AllocateBinary(RSSYMstring, 100));
+	TGCSafeList* list = new TGCSafeList;
+	CItemComparer comparer;
+	TGCSafeSortedList* sorted = new TGCSafeSortedList(&comparer);
+	Ref a = AllocateArray(RSSYMarray, 1);
+	SetArraySlot(RefVar(a), 0, MAKEINT(11));
+	Ref b = AllocateArray(RSSYMarray, 1);
+	SetArraySlot(RefVar(b), 0, MAKEINT(22));
+	EXPECT(list->InsertAt(0, (void*) a) == noErr && list->InsertAt(1, (void*) MAKEINT(5)) == noErr);
+	EXPECT(sorted->Insert((void*) b) == noErr);
+	GC();
+	Ref a2 = (Ref) list->At(0);
+	Ref b2 = (Ref) sorted->At(0);
+	EXPECT(a2 != a && b2 != b);										// they moved down over the garbage
+	EXPECT(IsArray(a2) && RINT(GetArraySlot(RefVar(a2), 0)) == 11);
+	EXPECT(IsArray(b2) && RINT(GetArraySlot(RefVar(b2), 0)) == 22);
+	EXPECT((Ref) list->At(1) == MAKEINT(5));						// an immediate is left as it is
+	// gone with the lists, the objects are garbage
+	delete list;
+	delete sorted;
+	ULong freeBefore, freeAfter, largest;
+	Statistics(&freeBefore, &largest);
+	GC();
+	Statistics(&freeAfter, &largest);
+	EXPECT(freeAfter > freeBefore);
+}
+
+
 static void
 TestExceptions()
 {
@@ -559,6 +596,7 @@ main()
 	TestFrames();
 	TestClones();
 	TestGC();
+	TestGCSafeLists();
 	TestExceptions();
 	TestHostNatives();
 	if (failures == 0)

@@ -63,9 +63,12 @@ struct CICSkipPoints
 struct CICDecoder
 {
 	InkPointProc	fSink;			// +0x00  where the points go
-	void*			fSinkData;		// +0x04  the sink's own working store
+	void*			fSinkData;		// +0x04  the sink's own working store (the default sink's CICPointSink)
 	ULong			fError;			// +0x08  the stream ran out (a halfword)
-	void*			fRefCon;		// +0x14  what the caller passed
+	ULong			fOutSize;		// +0x0c  the default sink's buffer: its size in bytes
+	long			fStoredCount;	// +0x10  what DecoderClose reports (nothing sets it)
+	InkPoint*		fOutPoints;		// +0x14  ... and the buffer (the ROM's handle, which the caller's own sink is handed instead)
+	void*			fRefCon;		// (host) what the caller passed - the ROM's sinks read it out of +0x14
 	const UByte*	fData;			// +0x20  the bits
 	ULong			fBitCount;		// +0x28  how many there are
 	ULong			fBitPos;		// +0x2c  where the reader has got to
@@ -94,6 +97,28 @@ struct CICDecoder
 	long			fSegEndY;		// +0x1b0
 	CICSkipPoints	fSkip;			// +0x1b4  the thinner the points go through
 };
+
+// The default sink's place in its buffer (the CIC library's _ALIST, 0x14
+// bytes; the ROM allocates it at the begin and frees it at the end).
+struct CICPointSink
+{
+	UShort			fIndex;			// +0x00  the next point to write
+	long			fEnded;			// +0x04  set at each stroke's end and the group's (read by nothing)
+	long			fDone;			// +0x08  the end has been written
+	UShort			fCapacity;		// +0x0c  the points the buffer holds
+	InkPoint*		fPoints;		// +0x10  the buffer
+};
+
+// The default source's (0xc bytes).
+struct CICPointSource
+{
+	UShort			fIndex;			// +0x00  the next point to read
+	long			fDone;			// +0x04  the end has been read
+	const InkPoint*	fPoints;		// +0x08
+};
+
+// the marker between strokes in the default sink's and source's buffers
+const short kCICMarkerY = -1;
 
 // How many points either buffer holds - the ROM's are the 33 longs
 // between the fields that follow them.
@@ -260,7 +285,10 @@ struct CICEncoder
 	ULong			fBookNumber;	// +0xe58   the book in use (a halfword)
 	ULong			fFirst;			// +0xe5a   this is the run's first stroke
 	InkPointSource	fSource;		// +0x1c    where the points come from
-	void*			fRefCon;		// +0x18    and what it is given
+	void*			fRefCon;		// (host)   and what it is given - the ROM's sources read it out of +0x18
+	const InkPoint*	fTracePoints;	// +0x18    the default source's points (the ROM's handle, which a caller's own source is handed instead)
+	ULong			fTraceSize;		// +0x16    ... and their size in bytes
+	void*			fTraceList;		// +0xe2c   the default source's place in them (a CICPointSource)
 	ULong			fEndOfStroke;	// +0xdf8   the stroke has ended
 	ULong			fDone;			// +0xdf4   and so has the run
 	long			fMoved;			// +0xe5c   how far the last try moved the curve
@@ -314,9 +342,25 @@ Boolean	TestStrokeSeg(CICEncoder* encoder, ULong allowance, ULong tries);
 Boolean	WriteLongStroke(CICEncoder* encoder);
 
 // ROM 0x0027f938 EncoderOpen__FUsUlT1T2T1
-// A context made ready to write a block of ink.
+// A context made ready to write a block of ink: the points to write (in
+// the default source's form - see GetInputTraceDefault - and their size
+// in bytes), where the bits go and how much room there is, and the code
+// book.  The context reads the points through GetInputTraceDefault; its
+// one caller (GenericCSCompress) puts its own source in its place before
+// the run, which the form below does.  ==> false (the ROM's nil handle)
+// for no points or no room, or a book it does not have.
+Boolean	EncoderOpen(CICEncoder* encoder, const InkPoint* points, ULong pointsSize,
+					UByte* out, long size, ULong book);
+// (host) ... opened on a source of the caller's own.
 Boolean	EncoderOpen(CICEncoder* encoder, InkPointSource source, void* refCon,
 					UByte* out, long size, ULong book);
+
+// ROM 0x0027fbac GetInputTraceDefault__FsP6_POINTP4_CDC
+// The encoder's own source: the points in a buffer, a stroke after each
+// marker point (0, -1) and the end two markers in a row - the form
+// StorePointProcDefault writes - a point the same as the one after it
+// left out.  The refCon is the encoder.
+short	GetInputTraceDefault(short what, InkPoint* pt, void* refCon);
 
 // ROM 0x002804f8 EncoderRun__FUl
 // Stroke after stroke written into it.
@@ -422,18 +466,34 @@ Boolean	ClearSkipPoint(CICSkipPoints* skip);
 Boolean	DecodeLongStroke(CICDecoder* decoder);
 
 // ROM 0x0028240c DecoderOpen__FUsUlT1T2T1
-// A context made ready to read a block of ink.
+// A context made ready to read a block of ink into a buffer of points
+// (`pointsSize` bytes of it), which StorePointProcDefault fills; its one
+// caller (Decode) puts its own sink in its place before the run, which the
+// form below does.  ==> false (the ROM's nil handle) for no data or no
+// buffer.
+Boolean	DecoderOpen(CICDecoder* decoder, const void* data, long size,
+					InkPoint* points, ULong pointsSize, ULong mode);
+// (host) ... with a sink of the caller's own.
 void	DecoderOpen(CICDecoder* decoder, const void* data, long size,
 					InkPointProc sink, void* refCon, ULong mode);
+
+// ROM 0x00282150 StorePointProcDefault__FsP6_POINTP4_DCC
+// The decoder's own sink: the points written into the context's buffer -
+// a marker point (0, -1) to begin, the points, a marker after each
+// stroke, and two at the end - until it is all but full (five points'
+// room is kept), when the end is written early and the rest thrown away.
+// The refCon is the decoder.
+short	StorePointProcDefault(short what, const InkPoint* pt, void* refCon);
 
 // ROM 0x00282518 DecoderRun__FUl
 // Stroke after stroke read out of it.
 Boolean	DecoderRun(CICDecoder* decoder);
 
 // ROM 0x002826a0 DecoderClose__FUlPl
-// The context taken down, the sink told the group is over; ==> what the
+// The context taken down, the sink told the group is over (and `count`,
+// when asked for, the context's +0x10, which nothing sets); ==> what the
 // sink answered.
-Boolean	DecoderClose(CICDecoder* decoder);
+Boolean	DecoderClose(CICDecoder* decoder, long* count = nil);
 
 
 // What ReadNewStroke answers: a long stroke, a short one, or the end.

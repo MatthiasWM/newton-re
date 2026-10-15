@@ -164,7 +164,8 @@ func(a1, a2) begin
 	DefGlobalFn(EnsureInternal('UnRegAppleTalklink), kFunction_100cf69);
 	RegAppleTalklink({item: "LocalTalk", id: "llap", sym: nil});
 	RegAppleTalklink({item: "EtherTalk", id: "pnet", sym: 'ethernet});
-	RegPrefs(EnsureInternal('AppleTalk), kLiteral_100d0cd);
+	// DEVIATION (romsrc/rex/newtdev/README.md): no AppleTalk panel in the Prefs list -
+	// the host has no AppleTalk; was RegPrefs(EnsureInternal('AppleTalk), kLiteral_100d0cd)
 	(if StrEqual("pnet", GetUserConfig('appletalkLink)) then AddDeferredCall(kFunction_100e321, [Array: ]))
 end
 @@end

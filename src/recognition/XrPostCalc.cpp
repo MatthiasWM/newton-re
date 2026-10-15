@@ -1523,8 +1523,9 @@ static intptr_t	vy6(intptr_t a, intptr_t, intptr_t, int*, POST_PARAMS*)	{ return
 // How much of the letter's stretch of xrs another letter of the graph -
 // one of the (up to three) characters named - claims: the largest share,
 // in tenths, of the two stretches' union that their overlap is (by xrs
-// times points).  10 when switched off.
-static intptr_t
+// times points).  10 when switched off.  (CheckDiacriticsDirections
+// calls it too.)
+intptr_t
 RetOneIfLettersCompeteForXRs(intptr_t a, intptr_t b, intptr_t c, int*, POST_PARAMS* pp)
 {
 	if (pp->competeOn == 0)

@@ -323,6 +323,19 @@ TestGlobalsAndCalls()
 	THROWS(NSCallGlobalFn(RefVar(SYMBOL("Sleep")), RefVar(MAKEINT(1))), "evt.ex.fr.intrp");
 	EXPECT(gThrown != nil && gThrownCode == kNSErrNativeNotReconstructed);
 	EXPECT_STACKS_CLEAN();
+	// the public jump table's SetVariableOrGlobal (ints unread, flags 7): a
+	// slot of the context, an existing global, else a slot made in the
+	// context - never a new global
+	{
+		RefVar ctx(AllocateFrame());
+		SetFrameSlot(ctx, SYMBOL("a"), RefVar(MAKEINT(1)));
+		EXPECT(SetVariableOrGlobal(ctx, RefVar(SYMBOL("a")), RefVar(MAKEINT(5)), 0, 0));
+		EXPECT(RINT(GetFrameSlot(ctx, SYMBOL("a"))) == 5);
+		EXPECT(SetVariableOrGlobal(ctx, RefVar(SYMBOL("gCount")), RefVar(MAKEINT(40)), 1, 2));
+		EXPECT(RINT(GetFrameSlot(vars, SYMBOL("gCount"))) == 40 && !FrameHasSlot(ctx, SYMBOL("gCount")));
+		EXPECT(SetVariableOrGlobal(ctx, RefVar(SYMBOL("testNewVar")), RefVar(MAKEINT(7)), 0, 8));
+		EXPECT(RINT(GetFrameSlot(ctx, SYMBOL("testNewVar"))) == 7 && !FrameHasSlot(vars, SYMBOL("testNewVar")));
+	}
 }
 
 
@@ -495,6 +508,17 @@ TestExceptions()
 static void
 TestROMFunctions()
 {
+	// ROMSoupBounds: where the ROM's objects start, and their size in the
+	// second (not their end)
+	{
+		Ptr start = nil, size = nil;
+		char* begin;
+		char* end;
+		ROMSoupBounds(&start, &size);
+		ROMObjectAreaBounds(&begin, &end);
+		EXPECT(start == begin && start != nil && (uintptr_t) size == (uintptr_t) (end - begin));
+		EXPECT(InROMObjectArea(RSSYMarray));
+	}
 	// the ROM's own NewtonScript functions, over what is reconstructed
 	RefVar vars(gVarFrame);
 	SetFrameSlot(vars, SYMBOL("vars"), vars);

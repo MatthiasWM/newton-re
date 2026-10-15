@@ -14,7 +14,8 @@
 				+8, fAllocatedSize +0xc, fArrayBlock +0x10, fIterator +0x14.
 				CArrayIterator (0x1c): fDynamicArray +0, fCurrentIndex +4,
 				fLowBound +8, fHighBound +0xc, fIterateForward +0x10 (a
-				byte), fPreviousLink +0x14, fNextLink +0x18.
+				byte), fPreviousLink +0x14, fNextLink +0x18.  And the
+				GC-safe lists over them (frames/GCSafeList.h).
 
 	Written by:	the reconstruction (DEVIATION: the ROM runs these where they
 				lie).  Each glue function cites the ROM function it answers
@@ -536,6 +537,86 @@ Glue_NextItem(void*, ARMTrapContext& c)
 	return true;
 }
 
+/*------------------------------------------------------------------------------
+	T G C S a f e L i s t ,   T G C S a f e S o r t e d L i s t
+	(frames/GCSafeList.h): a CList (CSortedList, its comparer at +0x18) of
+	Refs.  DEVIATION: the collector is not told about an ARM list - the
+	refs in it are the ARM world's, handles of the call's table, whose
+	objects the collector already keeps and moves through the table's
+	RefStructs (the handle itself does not change); and a ref in ARM
+	memory does not outlive the call anyway (docs/armcpu/README.md, "Refs
+	in the 32-bit world").  So the mark and update functions have nothing
+	to do.
+------------------------------------------------------------------------------*/
+
+// a CList's fields, empty (CList::CList)
+static void
+InitList(Mem& m, uint32_t self)
+{
+	m.W(self + kBlock, 0);
+	m.W(self + kAllocated, 0);
+	m.W(self + kChunkSize, 4);
+	m.W(self + kElementSize, 4);
+	m.W(self + kSize, 0);
+	m.W(self + kIterator, 0);
+}
+
+// ROM 0x000d7074 __ct__11TGCSafeListFv
+static bool
+Glue_TGCSafeList_ct(void*, ARMTrapContext& c)
+{
+	Mem m(c);
+	uint32_t self = c.Arg(0);
+	if (self == 0)
+		self = ARMAlloc(0x18, true);
+	if (self != 0)
+		InitList(m, self);
+	c.Return(self);
+	return true;
+}
+
+// ROM 0x000d72f0 __ct__17TGCSafeSortedListFP13CItemComparer
+static bool
+Glue_TGCSafeSortedList_ct(void*, ARMTrapContext& c)
+{
+	Mem m(c);
+	uint32_t self = c.Arg(0);
+	if (self == 0)
+		self = ARMAlloc(0x1c, true);
+	if (self != 0)
+	{
+		InitList(m, self);
+		m.W(self + 0x18, c.Arg(1));
+	}
+	c.Return(self);
+	return true;
+}
+
+// ROM 0x000d70c0 __dt__11TGCSafeListFv
+// ROM 0x000d7344 __dt__17TGCSafeSortedListFv
+// (CList's and CSortedList's destructors are CDynamicArray's)
+static bool
+Glue_TGCSafeList_dt(void* refCon, ARMTrapContext& c)
+{
+	return Glue_CDynamicArray_dt(refCon, c);
+}
+
+// ROM 0x000d71f8 GCMarkItems__11TGCSafeListFv
+// ROM 0x000d7264 GCUpdateItems__11TGCSafeListFv
+// ROM 0x000d71f0 GCMarkRefs__11TGCSafeListSFPv
+// ROM 0x000d71f4 GCUpdateRefs__11TGCSafeListSFPv
+// ROM 0x000d70f8 GCMarkItems__17TGCSafeSortedListFv
+// ROM 0x000d7164 GCUpdateItems__17TGCSafeSortedListFv
+// ROM 0x000d737c GCMarkRefs__17TGCSafeSortedListSFPv
+// ROM 0x000d7380 GCUpdateRefs__17TGCSafeSortedListSFPv
+// (nothing to mark or update in an ARM list: above)
+static bool
+Glue_TGCSafeList_Nothing(void*, ARMTrapContext& c)
+{
+	c.Return(0);
+	return true;
+}
+
 
 void
 InstallARMLists(void)
@@ -558,4 +639,16 @@ InstallARMLists(void)
 	ARMRegisterGlue("NextIndex__14CArrayIteratorFv", Glue_NextIndex);
 	ARMRegisterGlue("FirstItem__13CListIteratorFv", Glue_FirstItem);
 	ARMRegisterGlue("NextItem__13CListIteratorFv", Glue_NextItem);
+	ARMRegisterGlue("__ct__11TGCSafeListFv", Glue_TGCSafeList_ct);
+	ARMRegisterGlue("__dt__11TGCSafeListFv", Glue_TGCSafeList_dt);
+	ARMRegisterGlue("__ct__17TGCSafeSortedListFP13CItemComparer", Glue_TGCSafeSortedList_ct);
+	ARMRegisterGlue("__dt__17TGCSafeSortedListFv", Glue_TGCSafeList_dt);
+	ARMRegisterGlue("GCMarkItems__11TGCSafeListFv", Glue_TGCSafeList_Nothing);
+	ARMRegisterGlue("GCUpdateItems__11TGCSafeListFv", Glue_TGCSafeList_Nothing);
+	ARMRegisterGlue("GCMarkRefs__11TGCSafeListSFPv", Glue_TGCSafeList_Nothing);
+	ARMRegisterGlue("GCUpdateRefs__11TGCSafeListSFPv", Glue_TGCSafeList_Nothing);
+	ARMRegisterGlue("GCMarkItems__17TGCSafeSortedListFv", Glue_TGCSafeList_Nothing);
+	ARMRegisterGlue("GCUpdateItems__17TGCSafeSortedListFv", Glue_TGCSafeList_Nothing);
+	ARMRegisterGlue("GCMarkRefs__17TGCSafeSortedListSFPv", Glue_TGCSafeList_Nothing);
+	ARMRegisterGlue("GCUpdateRefs__17TGCSafeSortedListSFPv", Glue_TGCSafeList_Nothing);
 }

@@ -88,6 +88,11 @@ public:
 	FILE*			fFile;			// +0x108
 };
 
+// the encoding the compiler reads and writes its eight-bit text in (Mac
+// Roman in every ROM's code; a file's two-byte characters are those
+// IsFirstByteOf2Byte says begin with their first byte)
+extern long		gNewtonScriptCompilerCharacterEncoding;
+
 
 /* -------------------------------------------------------------------------------
 	TLoopState: the break exits of the loop being compiled

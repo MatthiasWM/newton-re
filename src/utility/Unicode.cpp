@@ -11,6 +11,7 @@
 */
 
 #include "Unicode.h"
+#include "NewtonExceptions.h"		// ThrowMsg
 #include <string.h>
 
 
@@ -451,6 +452,25 @@ A_CONST_CHAR(UniChar c)
 	char a[2];
 	ConvertFromUnicode(u, a, kMacRomanEncoding, 1);
 	return a[0];
+}
+
+
+// ROM 0x002575ec IsFirstByteOf2Byte__FUcl
+// Whether the byte begins a two-byte character of the encoding: never in
+// the three eight-bit ones (1-3); in encoding 6 - Shift-JIS's lead bytes,
+// 0x81-0x9f, 0xe0-0xef and 0xf0-0xfb (the last the user-defined area) -
+// when it is one; any other encoding is an error.  The compiler's file
+// reader asks it of every byte (TStdioInputStream, frames/Lexer.cpp), and
+// the U.S. ROM's compiler encoding is always Mac Roman (1), so the
+// two-byte answer is never given in it.
+Boolean
+IsFirstByteOf2Byte(UChar c, long encoding)
+{
+	if (encoding == 1 || encoding == 2 || encoding == 3)
+		return false;
+	if (encoding != 6)
+		ThrowMsg((char*) "Unknown character encoding");
+	return (c >= 0x81 && c <= 0x9f) || (c >= 0xe0 && c <= 0xef) || (c >= 0xf0 && c <= 0xfb);
 }
 
 

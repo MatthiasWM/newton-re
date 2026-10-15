@@ -416,6 +416,8 @@ long	brk_right(short* y, long i, long j);						// ROM 0x00305fd4 brk_right__FPsi
 long	brk_left(short* y, long i, long j);							// ROM 0x00305ffc brk_left__FPsiT2 - the last pen-up from i back to j, j - 1 for none
 long	TriangleSquare(short* x, short* y, long a, long b, long c);	// ROM 0x00307820 TriangleSquare__FPsT1iN23 - the signed area of triangle a, b, c
 long	ClosedSquare(short* x, short* y, long i, long j, short* flag);	// ROM 0x00307744 ClosedSquare__FPsT1iT3T1 - the area the trace from i to j closes with its chord
+long	CurvFromSquare(short* x, short* y, long i, long j);			// ROM 0x003078b0 CurvFromSquare__FPsT1iT3 - the bend from i to j by the area it closes, in thousandths, signed
+long	LengthOfTraj(short* x, short* y, long i, long j, long* chord, short* flag);	// ROM 0x003079b0 LengthOfTraj__FPsT1iT3PlT1 - the trace's length from i to j (and its chord's)
 long	IsTriangledPath(short* x, short* y, long i, long j, long k);	// ROM 0x00306524 IsTriangledPath__FPsT1iN23
 long	iMostCurvedPoint(short* x, short* y, long i, long j, long sgn);	// ROM 0x00306c44 iMostCurvedPoint__FPsT1iN23
 long	SideExtr(short* x, short* y, long i, long j, long slope, short* x0, short* y0, short* map, long* k, ULong strict);	// ROM 0x00306734 SideExtr__FPsT1iN23N31PiUi - 1/3 a bend to the left, 2/4 to the right, 0 none

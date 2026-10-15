@@ -22,6 +22,7 @@
 #include "ARMProtocols.h"
 #include "ARMWorld.h"
 #include "PublicJumpTable.h"
+#include "PrivateJumpTable.h"
 #include "Protocols.h"
 #include "OSErrors.h"
 #include "AEventHandler.h"
@@ -246,9 +247,53 @@ struct TTestEvent : public TAEvent
 	uint8_t	fValue[4];
 };
 
+// a function a package reaches only by its private jump table slot (the
+// GC-safe lists' mark and update functions)
+static uint32_t
+CallPrivate(const char* name, uint32_t a)
+{
+	for (unsigned long i = 0; i < kPrivateJumpTableCount; i++)
+		if (strcmp(kPrivateJumpTable[i].fName, name) == 0)
+			return ARMCall((uint32_t) kPrivateJumpTable[i].fSlot, &a, 1);
+	EXPECT(!"no private slot");
+	return 0xffffffff;
+}
+
+// the newt world's port and root view as the newt library would give them
+static TUPort		gTestNewtPort(0x4321);
+static int			gTestRoot;
+static TUPort*		TestNewtTaskPort(void)	{ return &gTestNewtPort; }
+static TRootView*	TestNewtRootView(void)	{ return (TRootView*) &gTestRoot; }
+
 static void
 KernelScenario(void)
 {
+	// the GC-safe lists: CLists (a sorted one with its comparer at +0x18),
+	// their mark and update functions nothing to do in the ARM world
+	uint32_t safe = Call("__ct__11TGCSafeListFv", 0);
+	uint32_t w0 = 0;
+	EXPECT(safe != 0 && ARMRead32(safe + 4, &w0) && w0 == 4);			// fElementSize
+	EXPECT(Call("InsertAt__5CListFlPv", safe, 0, 0x55) == noErr && Call("At__5CListFl", safe, 0) == 0x55);
+	EXPECT(CallPrivate("GCMarkItems__11TGCSafeListFv", safe) == 0 && CallPrivate("GCUpdateRefs__11TGCSafeListSFPv", safe) == 0);
+	EXPECT(Call("At__5CListFl", safe, 0) == 0x55);
+	Call("__dt__11TGCSafeListFv", safe, 1);
+	uint32_t sortedSafe = Call("__ct__17TGCSafeSortedListFP13CItemComparer", 0, 0x7770);
+	EXPECT(sortedSafe != 0 && ARMRead32(sortedSafe + 0x18, &w0) && w0 == 0x7770);
+	EXPECT(CallPrivate("GCUpdateItems__17TGCSafeSortedListFv", sortedSafe) == 0 && CallPrivate("GCMarkRefs__17TGCSafeSortedListSFPv", sortedSafe) == 0);
+	Call("__dt__17TGCSafeSortedListFv", sortedSafe, 1);
+
+	// the newt world's port, a TUPort of the ARM code's with its id; its
+	// root view, an address standing for it; nil before newt says
+	EXPECT(Call("GetNewtTaskPort__Fv") == 0 && Call("GetNewtRootView__Fv") == 0);
+	gARMNewtTaskPort = TestNewtTaskPort;
+	gARMNewtRootView = TestNewtRootView;
+	uint32_t port = Call("GetNewtTaskPort__Fv");
+	EXPECT(port != 0 && ARMRead32(port, &w0) && w0 == 0x4321 && Call("GetNewtTaskPort__Fv") == port);
+	uint32_t root = Call("GetNewtRootView__Fv");
+	EXPECT(root != 0 && root != port && ARMHostOf(root, 'view') == &gTestRoot);
+	gARMNewtTaskPort = nil;
+	gARMNewtRootView = nil;
+
 	// a CList: three items in, found, walked, one taken out
 	uint32_t list = Call("__ct__5CListFv", 0);
 	EXPECT(list != 0);
@@ -382,6 +427,12 @@ DeviceScenario(void)
 
 	// the PSS manager's slots through gPSSManager (this ROM's 0x0c1016bc)
 	InstallARMPSSManager();
+	// GetCardReinsertionInfo: nothing noted on the host - false, the info
+	// left alone
+	uint32_t reinsertion = ARMAlloc(20, true);
+	gCardReinsertionTracker.fStore = nil;
+	EXPECT(Call("GetCardReinsertionInfo__FP20TCardReinsertionInfo", reinsertion) == 0);
+	EXPECT(ARMRead32(reinsertion + 16, &w) && w == 0);
 	TPSSManager* manager = new TPSSManager;
 	// (its slots cleared as MainConstructor clears them - the test never
 	// runs the world, and the constructor leaves them as the heap had them,

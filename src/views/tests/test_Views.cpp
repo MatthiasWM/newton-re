@@ -18,6 +18,7 @@
 #include "Hilites.h"
 #include "LargeBinaries.h"
 #include "ContainerView.h"
+#include "MathViews.h"
 #include "EditView.h"
 #include "Ink.h"
 #include "Paths.h"
@@ -208,6 +209,15 @@ TestStructure()
 	// GlobalBox/LocalBox
 	EXPECT(RINT(Eval("ctxA:GlobalBox().right")) == 60 && RINT(Eval("ctxA:LocalBox().right")) == 50 && RINT(Eval("ctxA:LocalBox().top")) == 0);
 	EXPECT(RINT(Eval("ctxA:GlobalOuterBox().right")) == 60);
+
+	// the TCommand overloads (bare returns): nothing about the view changes
+	{
+		ULong flags = a->fFlags;
+		long children = a->fChildren->Count();
+		a->DoCommand((TCommand*) nil);
+		a->RealDoCommand((TCommand*) nil);
+		EXPECT(a->fFlags == flags && a->fChildren->Count() == children && BoundsAre(a, 10, 10, 60, 40));
+	}
 
 	// RemoveView takes the child out and deletes its view
 	Eval("RemoveView(ctxA, ctxA:ChildViewFrames()[0])");
@@ -3275,6 +3285,64 @@ TestTrailingReturn()
 	EXPECT(p->CaretRelativeToVisibleRect(p->viewBounds) == 1);
 
 	Eval("RemoveView(GetRoot(), ctxCR)");
+	Refresh();
+}
+
+
+// The math views (classes 84-86), which nothing in the ROM opens: an
+// expression of a plus, a fraction's bar and a times marked as the
+// result, made from a template as a package would; the operators and the
+// bar drawn; a key going up taken; and the result taken away when the
+// expression is scrubbed.
+static void
+TestMathViews()
+{
+	TMathExpView* e = (TMathExpView*) ViewOf("ctxMx := AddView(GetRoot(), {viewClass: 84, viewFlags: 1, "
+		"viewBounds: {left: 4, top: 4, right: 154, bottom: 44}, viewFont: {family: 'espy, face: 1, size: 12}, "
+		"viewChildren: [{viewClass: 85, viewFlags: 1, viewBounds: {left: 2, top: 2, right: 23, bottom: 23}, mathOperator: 0}, "
+		"{viewClass: 86, viewFlags: 1, viewBounds: {left: 30, top: 2, right: 70, bottom: 32}, mathLine: {left: 3, top: 4, right: 23, bottom: 4}}, "
+		"{viewClass: 85, viewFlags: 1, viewBounds: {left: 80, top: 2, right: 101, bottom: 23}, mathOperator: 2, isResult: 1}]})");
+	EXPECT(e != nil && e->ClassID() == clMathExpView && e->DerivedFrom(clContainerView) && e->DerivedFrom(clMathExpView));
+	if (e == nil)
+		return;
+	EXPECT(EQRef(e->fFamily, RSSYMespy) && e->fFace == 1 && e->fSize == 12);
+	EXPECT(e->fGap == 16 && e->fUnknown34 == 3);
+	EXPECT(e->fChildren->Count() == 3);
+	if (e->fChildren->Count() != 3)
+		return;
+	TMathOpView* plus = (TMathOpView*) e->fChildren->At(0);
+	TMathLineView* bar = (TMathLineView*) e->fChildren->At(1);
+	TMathOpView* times = (TMathOpView*) e->fChildren->At(2);
+	EXPECT(plus->ClassID() == clMathOpView && plus->DerivedFrom(clDataView) && !plus->DerivedFrom(clContainerView));
+	EXPECT(plus->fOperator == kMathPlus && times->fOperator == kMathTimes);
+	EXPECT(bar->ClassID() == clMathLineView && bar->DerivedFrom(clDataView));
+	EXPECT(bar->fLine.left == 3 && bar->fLine.right == 23 && bar->fLine.top == 4 && bar->fLine.bottom == 4);
+	Eval("ctxMx:Dirty()");
+	Refresh();
+	// the plus: its bounds (6,6)-(27,27), a pixel in, crossed at (16,16)
+	EXPECT(Pixel(16, 8) != 0 && Pixel(16, 24) != 0 && Pixel(8, 16) != 0 && Pixel(24, 16) != 0);
+	EXPECT(Pixel(10, 10) == 0 && Pixel(22, 22) == 0);
+	// the bar: twenty wide from the view's top left, wherever mathLine lies
+	EXPECT(Pixel(36, 6) != 0 && Pixel(52, 6) != 0 && Pixel(36, 10) == 0 && Pixel(60, 6) == 0);
+	// the times: both diagonals of (84,6)-(105,27)
+	EXPECT(Pixel(89, 11) != 0 && Pixel(99, 11) != 0 && Pixel(94, 11) == 0);
+	// a key going up is taken (and nothing done), unless it is read-only
+	RefVar keyUp(MakeCommand(aeKeyUp, e, 0));
+	EXPECT(e->RealDoCommand(keyUp));
+	EXPECT(NOTNIL(e->GetContext()));
+	// scrubbed out over the plus: what the container takes, and the result
+	// with it
+	// (isResult is looked for in the data frame itself, not its protos: the
+	// template's slot is not enough, as in the ROM)
+	SetFrameSlot(RefVar(times->DataFrame()), RSSYMisresult, RefVar(MAKEINT(1)));
+	Rect scrub;
+	SetRect(&scrub, 5, 5, 28, 28);
+	long took = e->HandleScrub(scrub, -1, nil, true);
+	EXPECT(took == -1 && e->fChildren->Count() == 1 && e->fChildren->At(0) == bar);
+	// nothing taken: the result is left alone
+	SetRect(&scrub, 140, 60, 150, 70);
+	EXPECT(e->HandleScrub(scrub, -1, nil, true) == 0 && e->fChildren->Count() == 1);
+	Eval("RemoveView(GetRoot(), ctxMx)");
 	Refresh();
 }
 
@@ -8091,6 +8159,7 @@ main()
 		TestClicks();
 		TestTrailingReturn();
 		TestScrubbing();
+		TestMathViews();
 		TestCaretGesture();
 		TestLineGesture();
 		TestEffects();

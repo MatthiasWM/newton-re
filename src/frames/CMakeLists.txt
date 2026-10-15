@@ -11,6 +11,7 @@ add_library(frames STATIC
     MarshalOut.cpp
     PackageNatives.cpp
     GC.cpp
+    GCSafeList.cpp
     Objects.cpp
     ScriptBoot.cpp
     UnicodeTables.cpp

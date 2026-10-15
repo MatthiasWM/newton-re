@@ -28,6 +28,8 @@
 #include "Newton.h"
 #endif
 
+class CBufferList;
+
 
 extern const unsigned short	kCrc16HTbl[16];			// ROM 0x0033bfec
 extern const unsigned short	kCrc16LTbl[16];			// ROM 0x0033bfcc
@@ -41,6 +43,7 @@ public:
 	void	Reset();									// ROM 0x00049cd0 Reset__6TCRC16Fv
 	void	ComputeCRC(UByte byte);						// ROM 0x00049cdc ComputeCRC__6TCRC16FUc
 	void	ComputeCRC(UByte* data, ULong count);		// ROM 0x00049dd0 ComputeCRC__6TCRC16FPUcUl
+	void	ComputeCRC(CBufferList& data);				// ROM 0x00049d28 ComputeCRC__6TCRC16FR11CBufferList - the list from its start
 	void	Get();										// ROM 0x00049e30 Get__6TCRC16Fv - fResult = fCRC, big-endian
 
 	UShort	Value() const	{ return (UShort) fCRC; }	// host: the running value

@@ -123,18 +123,30 @@ TStdioInputStream::TStdioInputStream(FILE* file, const char* filename)
 
 
 // ROM 0x000eb614 GetChar__17TStdioInputStreamFv
-// Host: a file's line feed is the Newton's carriage return (the ROM
-// converts each byte through the compiler's encoding, two-byte
-// characters included - NOT YET RECONSTRUCTED: IsFirstByteOf2Byte).  A
-// file's CR LF is one line end on every host, as Windows' text mode reads
-// it (a source checked out with Windows line ends otherwise gives a string
-// literal two carriage returns per line on Linux).
+// A character of the file, in the compiler's encoding: a byte, or two
+// when the first begins a two-byte character (IsFirstByteOf2Byte; the
+// file ending between them is an error).  Host: a file's line feed is the
+// Newton's carriage return, and a file's CR LF is one line end on every
+// host, as Windows' text mode reads it (a source checked out with Windows
+// line ends otherwise gives a string literal two carriage returns per
+// line on Linux); an eight-bit character goes through U_CONST_CHAR.
+// DEVIATION: a two-byte character is its two bytes as one number, high
+// first - the ROM converts it through the encoding's table (ConvertToUnicode),
+// and has none past its five eight-bit ones, so it reads past the table
+// there; no Shift-JIS table is on the host.
 UniChar
 TStdioInputStream::GetChar(void)
 {
 	int c = getc(fFile);
 	if (c == EOF)
 		return kEndOfStream;
+	if (IsFirstByteOf2Byte((UChar) c, gNewtonScriptCompilerCharacterEncoding))
+	{
+		int second = getc(fFile);
+		if (second == EOF)
+			ThrowMsg((char*) "Expected 2nd byte of 2-byte character, got EOF");
+		return (UniChar) ((c << 8) | (second & 0xff));
+	}
 	if (c == '\r')
 	{
 		int next = getc(fFile);
@@ -153,6 +165,10 @@ TStdioInputStream::GetChar(void)
 
 
 // ROM 0x000eb3d0 UngetChar__17TStdioInputStreamFUs
+// The character's bytes in the compiler's encoding put back, the second
+// of a two-byte one first.  (Host: a carriage return goes back as the
+// line feed it was read as; a two-byte character is its two bytes, high
+// first - see GetChar.)
 void
 TStdioInputStream::UngetChar(UniChar c)
 {
@@ -164,7 +180,20 @@ TStdioInputStream::UngetChar(UniChar c)
 		ungetc('\n', fFile);
 		return;
 	}
-	ungetc(A_CONST_CHAR(c), fFile);
+	UChar bytes[2];
+	if (c > 0xff && gNewtonScriptCompilerCharacterEncoding >= kNumberOfEncodings)
+	{
+		bytes[0] = (UChar) (c >> 8);
+		bytes[1] = (UChar) c;
+	}
+	else
+	{
+		bytes[0] = (UChar) A_CONST_CHAR(c);
+		bytes[1] = 0;
+	}
+	if (IsFirstByteOf2Byte(bytes[0], gNewtonScriptCompilerCharacterEncoding))
+		ungetc(bytes[1], fFile);
+	ungetc(bytes[0], fFile);
 }
 
 

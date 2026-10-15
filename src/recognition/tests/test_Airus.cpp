@@ -250,14 +250,189 @@ TestAL16Lexicon(void)
 
 // what AE8_NextSet9 hands its callback
 static ULong	gNextSetAttributes[8];
+static ULong	gNextSetCharacters[8];
+static ULong	gNextSetNodes[8];
 static long		gNextSetCount;
 
 static void
-CollectNextSet(void* /*context*/, ULong /*character*/, ULong /*node*/, ULong attribute)
+CollectNextSet(void* /*context*/, ULong character, ULong node, ULong attribute)
 {
 	if (gNextSetCount < 8)
+	{
 		gNextSetAttributes[gNextSetCount] = attribute;
+		gNextSetCharacters[gNextSetCount] = character;
+		gNextSetNodes[gNextSetCount] = node;
+	}
 	gNextSetCount++;
+}
+
+
+/*------------------------------------------------------------------------------
+	S i x t e e n - b i t   d i c t i o n a r i e s
+------------------------------------------------------------------------------*/
+
+// a word as a sixteen-bit dictionary takes it: UniChars, terminated
+static UByte*
+Wide(const char* text)
+{
+	static UniChar buffer[4][32];
+	static long next = 0;
+	UniChar* w = buffer[next++ & 3];
+	long i = 0;
+	for (; text[i] != 0; i++)
+		w[i] = (UniChar) (UByte) text[i];
+	w[i] = 0;
+	return (UByte*) w;
+}
+
+// a word looked up in a sixteen-bit dictionary, from the root
+static long
+LookUp16(Handle dictionary, const char* text)
+{
+	AirusAParmBlock* d = (AirusAParmBlock*) *dictionary;
+	CheckDictPtrs(d);
+	static UniChar word[32];
+	memcpy(word, Wide(text), sizeof(word));
+	d->fWord = (UByte*) word;
+	d->fNode = 0;
+	d->fIndex = (long) strlen(text) - 1;
+	d->fAttribute = 0;
+	return AEnum_Verify(d);
+}
+
+// what AEnum_NextSet (selector 8) writes, as a string of the characters'
+// low bytes; and the UniChars themselves
+static UniChar	gNextSet16[32];
+static char*
+NextSet16(Handle dictionary)
+{
+	AirusAParmBlock* d = (AirusAParmBlock*) *dictionary;
+	memset(gNextSet16, 0x55, sizeof(gNextSet16));
+	d->fWord = (UByte*) gNextSet16;
+	CallAirusA(dictionary, kAirusNextSet);
+	static char text[32];
+	long i = 0;
+	for (; i < 31 && gNextSet16[i] != 0; i++)
+		text[i] = (char) gNextSet16[i];
+	text[i] = 0;
+	return text;
+}
+
+
+// A dictionary of two-byte characters (kind 5) made, words added, and
+// walked: AE16_Verify looks a word up, AE16_NextSet9/AE16_NextSetCB say
+// what may follow.  Nothing in the ROM makes one; its walkers misread the
+// sibling offsets of the two small size classes (ROM BUG, fixed), which
+// is every sibling in a dictionary this small.
+static void
+TestAE16(void)
+{
+	Handle h = NewDictionary(kAirusKindEnum16 | kAirusLockedBit, 1);
+	EXPECT(h != nil);
+	if (h == nil)
+		return;
+	AddWord(h, 0, Wide("a"), 1);
+	AddWord(h, 0, Wide("ab"), 2);
+	AddWord(h, 0, Wide("ac"), 3);
+	AddWord(h, 0, Wide("b"), 4);
+	AddWord(h, 0, Wide("ba"), 5);
+	EXPECT(airusResult == 0);
+	AirusAParmBlock* d = (AirusAParmBlock*) *h;
+
+	EXPECT(LookUp16(h, "ab") == kAirusLeaf && d->fAttribute == 2 && d->fIndex == 2);
+	EXPECT(LookUp16(h, "ac") == kAirusLeaf && d->fAttribute == 3);
+	EXPECT(LookUp16(h, "a") == kAirusPrefixWithAttr && d->fAttribute == 1 && d->fSymbol == (ULong) -1);
+	EXPECT(LookUp16(h, "b") == kAirusPrefixWithAttr && d->fAttribute == 4 && d->fSymbol == 'a');
+	EXPECT(LookUp16(h, "ba") == kAirusLeaf && d->fAttribute == 5);
+	EXPECT(LookUp16(h, "bb") == kAirusNoMatch);
+	EXPECT(LookUp16(h, "c") == kAirusNoMatch);
+	EXPECT(LookUp16(h, "abc") == kAirusNoMatch);
+
+	// what may follow: the top row, then what follows "a"
+	d->fNode = 0;
+	EXPECT(strcmp(NextSet16(h), "ab") == 0 && d->fResult == 0);
+	LookUp16(h, "a");
+	EXPECT(strcmp(NextSet16(h), "bc") == 0);
+	LookUp16(h, "ab");
+	EXPECT(strcmp(NextSet16(h), "") == 0 && d->fResult == 1);
+
+	// the walk with a callback of one's own: the character comes byte-
+	// swapped, the node's flags in its top bits, the attributes as stored
+	gNextSetCount = 0;
+	d->fNode = 0;
+	d->fWalkContext = nil;
+	d->fWalkProc = CollectNextSet;
+	AE16_NextSet9(d);
+	EXPECT(d->fResult == 0 && gNextSetCount == 2);
+	EXPECT(gNextSetCharacters[0] == 0x6100 && gNextSetCharacters[1] == 0x6200);
+	EXPECT(gNextSetAttributes[0] == 1 && gNextSetAttributes[1] == 4);
+	EXPECT((gNextSetNodes[0] >> 30) == 1 && (gNextSetNodes[1] >> 30) == 1);		// an attribute, children
+
+	// the ROM's walkers, sibling offsets misread: past the first of a row
+	// nothing is found
+	SetRomBugFixed(false);
+	EXPECT(LookUp16(h, "a") == kAirusPrefixWithAttr);
+	EXPECT(LookUp16(h, "b") == kAirusNoMatch);
+	EXPECT(LookUp16(h, "ac") == kAirusNoMatch);
+	SetRomBugFixed(true);
+	DisposDictionary(&h);
+
+	// with no attributes: the walk's other loop
+	h = NewDictionary(kAirusKindEnum16 | kAirusLockedBit, 0);
+	AddWord(h, 0, Wide("a"), 0);
+	AddWord(h, 0, Wide("b"), 0);
+	AddWord(h, 0, Wide("c"), 0);
+	d = (AirusAParmBlock*) *h;
+	EXPECT(LookUp16(h, "c") == kAirusLeaf);
+	d->fNode = 0;
+	EXPECT(strcmp(NextSet16(h), "abc") == 0);
+	SetRomBugFixed(false);
+	d->fNode = 0;
+	EXPECT(strcmp(NextSet16(h), "abc") != 0);
+	SetRomBugFixed(true);
+	DisposDictionary(&h);
+}
+
+
+// The sixteen-bit lexicon's what-may-follow (AL16_NextSet, AL16_NextSet9,
+// AL16_NextSetCB) over the small one above: the sets run together as
+// UniChars; a leaf has nothing after it (ROM BUG (fixed): the ROM's reads
+// a first-child offset the leaf does not have - not run here, as it reads
+// past the lexicon).
+static void
+TestAL16NextSet(void)
+{
+	UByte bytes[sizeof(kSmallAL16)];
+	memcpy(bytes, kSmallAL16, sizeof(kSmallAL16));
+	Ptr data = (Ptr) bytes;
+	UniChar buffer[64];
+	AirusAParmBlock block;
+	memset(&block, 0, sizeof(block));
+	block.fDataHandle = (Handle) &data;
+	block.fData = data;
+	block.fDataEnd = data + sizeof(kSmallAL16);
+	block.fSize = (long) sizeof(kSmallAL16);
+	block.fWord = (UByte*) buffer;
+	block.fAttributeSize = 1;
+
+	block.fNode = 0;
+	EXPECT(AL16_Shell(kAirusNextSet, &block) == 0);
+	EXPECT(buffer[0] == 'a' && buffer[1] == 0);
+	LookUpAL16(&block, "a");
+	EXPECT(AirusAL16(kAirusNextSet, &block) == 0);
+	EXPECT(buffer[0] == 't' && buffer[1] == 'n' && buffer[2] == 0);
+	// the walk: each child's set, node and attribute
+	LookUpAL16(&block, "a");
+	gNextSetCount = 0;
+	block.fWalkProc = CollectNextSet;
+	EXPECT(AirusAL16(kAirusNextSet9, &block) == 0 && gNextSetCount == 2);
+	EXPECT(gNextSetAttributes[0] == 2 && gNextSetAttributes[1] == 3);
+	EXPECT((gNextSetNodes[0] & 0xffff) == 8 && (gNextSetNodes[1] & 0xffff) == 12);
+	EXPECT(gNextSetCharacters[0] == (ULong) (uintptr_t) (data + 20));
+	// a leaf: nothing follows
+	LookUpAL16(&block, "at");
+	gNextSetCount = 0;
+	EXPECT(AL16_NextSet9(&block) == 1 && block.fResult == 1 && gNextSetCount == 0);
 }
 
 
@@ -342,6 +517,8 @@ main()
 	TestALLexicon();
 	TestAL16Lexicon();
 	TestWideAttributes();
+	TestAE16();
+	TestAL16NextSet();
 
 	// an empty dictionary of the kind the machine writes into
 	// (the type InitDictionaries asks for: the walkers the machine writes

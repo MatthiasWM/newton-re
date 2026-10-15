@@ -4,13 +4,14 @@
 	Contains:	The Airus dictionary engine's container (Airus.h): a
 				dictionary made, its bytes grown and shifted, and the
 				selector call everything else goes through; and the
-				walkers - the enumerated dictionaries' (AEnum_*, AE8_*)
-				and the ROM lexicons' (AL_*, AL16_Verify).
+				walkers - the enumerated dictionaries' (AEnum_*, AE8_*,
+				AE16_*) and the ROM lexicons' (AL_*, AL16_*).
 
-				NOT YET RECONSTRUCTED: the sixteen-bit walks other than
-				AL16_Verify (AE16_Verify, AE16_NextSet9/AE16_NextSetCB,
-				AL16_NextSet, AL16_NextSet9) - no dictionary in this ROM
-				is sixteen-bit, so nothing reaches them.
+				The sixteen-bit walkers (AE16_*, AL16_*) are reached only
+				by a dictionary of two-byte characters (kinds 5 and 2), and
+				every dictionary in this ROM is eight-bit (kinds 1 and 7):
+				they are here for a localisation that has one, and a
+				dictionary made of kind 5 (NewDictionary) reaches them.
 */
 
 #include "Airus.h"
@@ -428,13 +429,24 @@ Ashortstrlen(const UniChar* s)
 // ROM 0x00029a20 CopyBufferHack__FPUcPUsi
 // The word moved between the bytes the caller handed in and the UniChars
 // the adding works in.  A 16-bit dictionary's word is already UniChars,
-// so nothing is copied and the buffer it was in is the answer.
+// so it is copied as it is (Ashortstrcpy) - the host once answered the
+// buffer it was in without copying, and AEnum_AddWord and
+// AEnum_DeleteWord, which (as the ROM's) look only at their own buffer,
+// worked on whatever that held.
 UniChar*
 CopyBufferHack(UByte* bytes, UniChar* chars, long back)
 {
 	long kind = (UByte) (*AE_Parms->fDataHandle)[1] & 7;
 	if (kind == kAirusKindEnum16 || kind == kAirusKindAL16)
-		return back == 0 ? (UniChar*) bytes : chars;
+	{
+		if (back == 0)
+		{
+			Ashortstrcpy(chars, (const UniChar*) bytes);
+			return chars;
+		}
+		Ashortstrcpy((UniChar*) bytes, chars);
+		return (UniChar*) bytes;
+	}
 	if (back == 0)
 	{
 		long length = (long) strlen((const char*) bytes);
@@ -712,12 +724,242 @@ AEnum_Verify(AirusAParmBlock* parms)
 	long kind = (UByte) (*parms->fDataHandle)[1] & 7;
 	if (kind == kAirusKindEnum16 || kind == kAirusKindAL16)
 	{
-		// NOT YET RECONSTRUCTED: AE16_Verify 0x0002b2cc - the same walk over
-		// two-byte characters
-		parms->fResult = kAirusNoMatch;
-		return kAirusNoMatch;
+		AE16_Verify(parms);
+		return AE_Parms->fResult;
 	}
 	return AE8_Verify(parms);
+}
+
+
+/*------------------------------------------------------------------------------
+	T h e   s i x t e e n - b i t   w a l k s
+
+	A node of a dictionary of two-byte characters is laid out as an
+	eight-bit one with its character two bytes long, high byte first: the
+	flags at +2, the sibling offset's bytes after them, then the
+	attribute.  The ROM's walkers over them are the eight-bit ones copied
+	out again with the offsets moved on by one - all but one of them.
+------------------------------------------------------------------------------*/
+
+// a sixteen-bit node's character
+static inline ULong
+AE16Char(const UByte* p)
+{
+	return ((ULong) p[0] << 8) | p[1];
+}
+
+
+// The node's next sibling: past its character, flags, sibling offset and
+// attribute, and on by the offset.
+//
+// ROM BUG (fixed): the offset of the two small size classes is read from
+// the byte the eight-bit walkers read it from - p[size], one short of the
+// sixteen-bit node's: for class 1 (a nibble) the character's second byte
+// rather than the flags, for class 2 (twelve bits) the flags over again
+// rather than the byte after them.  The largest class's three bytes are
+// moved on by one, as they should be.  So the walkers step to the wrong
+// place from almost every node with a sibling (class 1 and 2 are what
+// PutRP gives any offset under 0x1000), and a dictionary of two-byte
+// characters cannot be walked - which, with no such dictionary in the
+// ROM, nobody ever saw.  The fix reads p[size + 1].
+static const UByte*
+AE16Sibling(const UByte* p, UByte flags, long attributeSize)
+{
+	long size = flags >> 6;
+	const UByte* next = p + kAirusNodeSize[size] + 1 + ((flags & kAirusHasAttribute) != 0 ? attributeSize : 0);
+	ULong delta;
+	if (size == 3)
+		delta = ((ULong) (flags & 0x0f) << 24) | ((ULong) p[3] << 16) | ((ULong) p[4] << 8) | p[5];
+	else
+		delta = (((ULong) flags << 8) | p[RomBugFixed() ? size + 1 : size]) & kAirusRPMask[size];
+	return next + delta;
+}
+
+
+// ROM 0x0002b2cc AE16_Verify__FP15AirusAParmBlock
+// AE8_Verify over two-byte characters: the block's word buffer is
+// UniChars, compared with the nodes' characters as unsigned numbers; the
+// answer, the node and how far it got are left in the block as there.
+// (The index of the last character to match is compared unsigned.)
+void
+AE16_Verify(AirusAParmBlock* parms)
+{
+	CheckDictPtrs(parms);
+	long node = AE_Parms->fNode;
+	if (node == 0)
+		node = 2;
+	const UByte* p = (const UByte*) parms->fData + node;
+	UByte flags = p[2];
+	const UniChar* word = (const UniChar*) parms->fWord;
+	long attrSize = parms->fAttributeSize;
+	ULong limit = (ULong) AE_Parms->fIndex;
+	AE_Parms->fSymbol = (ULong) -1;
+
+	Boolean fresh = AE_Parms->fNode == 0;
+	if (fresh)
+	{
+		AE_Parms->fIndex = 0;
+		if (AE_Parms->fDataEnd - AE_Parms->fData == 2)
+		{
+			AE_Parms->fResult = kAirusNoMatch;
+			return;
+		}
+	}
+	for (;;)
+	{
+		if (!fresh)
+		{
+			// down to the first child of the node reached
+			if ((flags & kAirusNoChildren) != 0)
+			{
+				AE_Parms->fResult = kAirusNoMatch;
+				return;
+			}
+			p += kAirusNodeSize[flags >> 6] + 1 + ((flags & kAirusHasAttribute) != 0 ? attrSize : 0);
+			flags = p[2];
+		}
+		fresh = false;
+		ULong ch = word[AE_Parms->fIndex];
+		// along the children until the character is found, or passed
+		while (AE16Char(p) < ch && (flags & kAirusSizeMask) != 0)
+		{
+			p = AE16Sibling(p, flags, attrSize);
+			flags = p[2];
+		}
+		if (AE16Char(p) != ch)
+		{
+			AE_Parms->fResult = kAirusNoMatch;
+			return;
+		}
+		node = p - (const UByte*) AE_Parms->fData;
+		AE_Parms->fNode = node;
+		ULong index = (ULong) AE_Parms->fIndex;
+		AE_Parms->fIndex = (long) (index + 1);
+		if (index >= limit)
+			break;
+	}
+
+	// every character matched: what is at the end of them
+	long charSize = AirusCharSize();
+	UByte at = (UByte) AE_Parms->fData[node + charSize];
+	long result = (at & kAirusHasAttribute) != 0 ? kAirusPrefixWithAttr : kAirusPrefix;
+	if ((at & kAirusHasAttribute) != 0)
+		AE_Parms->fAttribute = GetAttr(SkipNode(node));
+	if (((UByte) AE_Parms->fData[node + charSize] & kAirusNoChildren) != 0)
+		result = kAirusLeaf;
+	else
+	{
+		// when the only way on is one character, say which
+		long child = FollowLeft(node);
+		if ((((UByte) AE_Parms->fData[child + AirusCharSize()] & kAirusSizeMask) >> 6) == 0)
+			AE_Parms->fSymbol = GetSymbol(child);
+	}
+	AE_Parms->fResult = result;
+}
+
+
+// ROM 0x0002ac78 AE16_NextSet9__FP15AirusAParmBlock
+// AE8_NextSet9 over two-byte characters: every child of the block's node
+// offered to the callback in the order they lie, with the node (its flags
+// in the top two bits) and the attribute register as AE8_NextSet9 keeps
+// it.  The character is the node's two bytes taken low one first - p[0] |
+// p[1] << 8, the character byte-swapped - which is what AE16_NextSetCB
+// expects (ROM QUIRK: a callback of one's own sees it swapped).
+//
+// The ROM's two loops (no attribute anywhere, or some) are kept apart
+// here because they differ: besides the sibling offset (AE16Sibling),
+// ROM BUG (fixed): the loop for a dictionary without attributes reads the
+// next sibling's flags from p[1] - the eight-bit node's place, here the
+// character's second byte - and walks on from whatever that says.  The
+// fix reads p[2], as the other loop does.  And the attribute is
+// assembled low byte first, as AE8_NextSet9's is (ROM BUG (fixed) there:
+// fixed the same way here).
+void
+AE16_NextSet9(AirusAParmBlock* parms)
+{
+	CheckDictPtrs(parms);
+	long node = parms->fNode;
+	const UByte* data = (const UByte*) parms->fData;
+	const UByte* p = data + (node == 0 ? 2 : node);
+	UByte flags = p[2];
+	long result = 1;
+	AirusNextSetProc proc = parms->fWalkProc;
+	if (proc != nil)
+	{
+		long attributeSize = parms->fAttributeSize;
+		void* context = parms->fWalkContext;
+		if (AE_Parms->fDataEnd - AE_Parms->fData == 2)
+		{
+			AE_Parms->fResult = 1;		// nothing in it
+			return;
+		}
+		if (node != 0)
+		{
+			if ((flags & kAirusNoChildren) != 0)
+			{
+				AE_Parms->fResult = 1;	// nothing goes on from it
+				return;
+			}
+			p += kAirusNodeSize[flags >> 6] + 1 + ((flags & kAirusHasAttribute) != 0 ? attributeSize : 0);
+			flags = p[2];
+		}
+		Boolean implied = (data[1] & 7) == kAirusKindEnum;
+		if (attributeSize == 0 && !implied)
+		{
+			for (;;)
+			{
+				proc(context, (ULong) p[0] | ((ULong) p[1] << 8),
+					 (ULong) (p - data) | ((ULong) ((flags >> 4) & 3) << 30), 0);
+				if ((flags & kAirusSizeMask) == 0)
+					break;
+				p = AE16Sibling(p, flags, attributeSize);
+				flags = p[RomBugFixed() ? 2 : 1];
+			}
+		}
+		else
+		{
+			ULong attribute = implied ? 0x80 : 0;
+			for (;;)
+			{
+				if ((flags & kAirusHasAttribute) != 0 && attributeSize > 0)
+				{
+					const UByte* bytes = p + kAirusNodeSize[flags >> 6] + 1;
+					attribute = 0;
+					for (long i = 0; i < attributeSize && i < 4; i++)
+					{
+						if (RomBugFixed())
+							attribute = (attribute << 8) | bytes[i];
+						else
+							attribute |= (ULong) bytes[i] << (i * 8);
+					}
+				}
+				proc(context, (ULong) p[0] | ((ULong) p[1] << 8),
+					 (ULong) (p - data) | ((ULong) ((flags >> 4) & 3) << 30), attribute);
+				if ((flags & kAirusSizeMask) == 0)
+					break;
+				p = AE16Sibling(p, flags, attributeSize);
+				flags = p[2];
+			}
+		}
+		result = 0;
+	}
+	AE_Parms->fResult = result;
+}
+
+
+// ROM 0x0002af48 AE16_NextSetCB__FUlN31
+// AEnum_NextSet's callback for a sixteen-bit dictionary: the character
+// written out into the caller's buffer through the pointer it keeps, low
+// byte of the swapped number first - which puts the node's two bytes in
+// the buffer as they are, a big-endian UniChar.  (Host: the buffer holds
+// native UniChars, so the character it makes is written as one.)
+void
+AE16_NextSetCB(void* context, ULong character, ULong /*node*/, ULong /*attribute*/)
+{
+	UByte** where = (UByte**) context;
+	UniChar c = (UniChar) (((character & 0xff) << 8) | ((character >> 8) & 0xff));
+	memcpy(*where, &c, sizeof(c));
+	*where += 2;
 }
 
 /*------------------------------------------------------------------------------
@@ -1552,7 +1794,12 @@ DeleteWord(Handle dictionary, UByte* word)
 // The ROM writes the loop out twice, once for a dictionary whose words
 // carry no attribute at all and once for the rest; the two differ only in
 // whether the attribute is read, and the step to the next sibling is the
-// same either way, so it is one loop here.
+// same either way, so it is one loop here.  ROM QUIRK: the attribute is
+// one register for the whole row - 0x80 to begin with in a plain
+// enumerated dictionary (kind 3, whose words imply one), nought otherwise -
+// and only a node that carries one replaces it, so a node that carries
+// none is handed the last one read (its flags, in the node word's top
+// bits, say it has none).
 void
 AE8_NextSet9(AirusAParmBlock* parms)
 {
@@ -1579,13 +1826,14 @@ AE8_NextSet9(AirusAParmBlock* parms)
 			at = FollowLeft(at);
 		}
 		Boolean implied = ((UByte) (*AE_Parms->fDataHandle)[1] & 7) == kAirusKindEnum;
+		ULong attribute = implied ? 0x80 : 0;
 		for (;;)
 		{
 			UByte flags = (UByte) AE_Parms->fData[at + 1];
-			ULong attribute = 0;
 			if ((attributeSize != 0 || implied)
 				&& (flags & kAirusHasAttribute) != 0 && attributeSize > 0)
 			{
+				attribute = 0;
 				const UByte* bytes = (const UByte*) AE_Parms->fData + SkipNode(at);
 				if (RomBugFixed())
 				{
@@ -1611,15 +1859,13 @@ AE8_NextSet9(AirusAParmBlock* parms)
 
 
 // ROM 0x0002af18 AEnum_NextSet9__FP15AirusAParmBlock
-// The walk of what may follow, by the dictionary's kind.  NOT YET
-// RECONSTRUCTED: AE16_NextSet9 (a sixteen-bit dictionary answers
-// nothing to follow).
+// The walk of what may follow, by the dictionary's kind.
 void
 AEnum_NextSet9(AirusAParmBlock* parms)
 {
 	UByte kind = (UByte) (*parms->fDataHandle)[1] & 7;
 	if (kind == kAirusKindEnum16 || kind == kAirusKindAL16)
-		parms->fResult = 1;
+		AE16_NextSet9(parms);
 	else
 		AE8_NextSet9(parms);
 }
@@ -1638,11 +1884,8 @@ AE8_NextSetCB(void* context, ULong character, ULong /*node*/, ULong /*attribute*
 
 // ROM 0x0002afd0 AEnum_NextSet__FP15AirusAParmBlock
 // The set of characters that may follow the block's node, written into
-// the block's word buffer and terminated.
-//
-// NOT YET RECONSTRUCTED: the sixteen-bit walk (AE16_NextSet9 0x0002af18,
-// AE16_NextSetCB), which is what a dictionary of UniChars would need; the
-// ones the machine writes are all eight-bit.
+// the block's word buffer and terminated (a sixteen-bit dictionary's as
+// UniChars, the terminator two bytes).
 void
 AEnum_NextSet(AirusAParmBlock* parms)
 {
@@ -1651,8 +1894,8 @@ AEnum_NextSet(AirusAParmBlock* parms)
 	long kind = (UByte) (*parms->fDataHandle)[1] & 7;
 	if (kind == kAirusKindEnum16 || kind == kAirusKindAL16)
 	{
-		parms->fWalkProc = nil;			// AE16_NextSetCB
-		parms->fResult = 1;				// AE16_NextSet9(parms)
+		parms->fWalkProc = AE16_NextSetCB;
+		AE16_NextSet9(parms);
 		*out++ = 0;
 	}
 	else
@@ -2935,14 +3178,121 @@ AL16_Verify(AirusAParmBlock* parms)
 }
 
 
+// ROM 0x0002bb54 AL16_NextSetCB__FUlN31
+// AL16_NextSet's callback: a child's set of characters (UniChars,
+// big-endian in the data, ended by a nought) copied out after the ones
+// before it through the pointer the caller keeps, no terminator.  (Host:
+// the buffer holds native UniChars.)
+void
+AL16_NextSetCB(void* context, ULong set, ULong /*node*/, ULong /*attribute*/)
+{
+	UByte** where = (UByte**) context;
+	UByte* out = *where;
+	for (const UByte* s = (const UByte*) (uintptr_t) set; ((s[0] << 8) | s[1]) != 0; s += 2)
+	{
+		UniChar c = (UniChar) ((s[0] << 8) | s[1]);
+		memcpy(out, &c, sizeof(c));
+		out += 2;
+	}
+	*where = out;
+}
+
+
+// ROM 0x0002bba4 AL16_NextSet__FP15AirusAParmBlock
+// The characters that may follow the node reached, every child's set run
+// together into the block's word buffer and ended by a nought UniChar.
+// (Unlike AL_NextSet, a character in more than one child's set comes out
+// as often as it is there: there is no sixteen-bit AL_FilterString.)
+void
+AL16_NextSet(AirusAParmBlock* parms)
+{
+	UByte* out = parms->fWord;
+	parms->fWalkContext = &out;
+	parms->fWalkProc = AL16_NextSetCB;
+	AL16_NextSet9(parms);
+	out[1] = 0;
+	out[0] = 0;
+}
+
+
+// ROM 0x0002bbe4 AL16_NextSet9__FP15AirusAParmBlock
+// AL_NextSet9 over sixteen-bit character sets: each child of the node
+// reached (nought: the top row) handed to the walk callback - its set, the
+// node with its flags in the top two bits, its attribute.  ==> 0, 1 (the
+// block's result too) for an empty lexicon.
+//
+// ROM BUG (fixed): where AL_NextSet9 answers that nothing follows a node
+// with no children, this one takes the leaf's first-child offset all the
+// same - two bytes that a leaf does not have (its attribute, or the next
+// node) - and walks whatever row they point at, reading past the lexicon
+// as likely as not.  The fix answers 1 for a leaf, as AL_NextSet9 does.
+// (A top row whose first node is a leaf is walked, where AL_NextSet9
+// answers nothing - which is AL_NextSet9's oddity, not this one's.)
+long
+AL16_NextSet9(AirusAParmBlock* parms)
+{
+	AL16_Prep(parms);
+	long node = AE_Parms->fNode;
+	if (node == 0)
+		node = 2;
+	AE_Parms->fResult = 0;
+	if (AE_Parms->fDataEnd == AE_Parms->fData + 2)
+	{
+		AE_Parms->fResult = 1;
+		return 1;
+	}
+	if (AE_Parms->fNode != 0)
+	{
+		if (RomBugFixed() && (((const UByte*) AE_Parms->fData)[node + 2] & 2) != 0)
+		{
+			AE_Parms->fResult = 1;
+			return 1;
+		}
+		node = AL16_LBNode(node);
+	}
+	for (;;)
+	{
+		const UByte* data = (const UByte*) AE_Parms->fData;
+		ULong attribute = 0;
+		if ((data[node + 2] & 1) != 0)
+		{
+			AL16_GetAttribute(node);
+			attribute = AE_Parms->fAttribute;
+		}
+		long set = AL16_ClassOffset(node);
+		data = (const UByte*) AE_Parms->fData;
+		AE_Parms->fWalkProc(AE_Parms->fWalkContext, (ULong) (uintptr_t) (AE_Parms->fData + set),
+							(ULong) node | ((ULong) data[node + 2] << 30), attribute);
+		data = (const UByte*) AE_Parms->fData;
+		if ((data[node + 2] & 4) != 0)
+			break;
+		node = AE_Parms->fAttributeSize + node + ((data[node + 2] & 2) == 0 ? 5 : 3);
+	}
+	return 0;
+}
+
+
 // ROM 0x0002b790 AirusAL16__FUlP15AirusAParmBlock
+// The sixteen-bit lexicon's three operations.
 long
 AirusAL16(ULong selector, AirusAParmBlock* parms)
 {
 	if (selector == kAirusVerify)
 		AL16_Verify(parms);
-	// NOT YET RECONSTRUCTED: AL16_NextSet 0x0002bba4 and AL16_NextSet9
-	// 0x0002bbe4.
+	else if (selector == kAirusNextSet)
+		AL16_NextSet(parms);
+	else if (selector == kAirusNextSet9)
+		AL16_NextSet9(parms);
+	return parms->fResult;
+}
+
+
+// ROM 0x0002b774 AL16_Shell__FiP15AirusAParmBlock
+// A sixteen-bit lexicon's walker; ==> its result.
+long
+AL16_Shell(long selector, AirusAParmBlock* parms)
+{
+	AirusAL16(selector, parms);
 	return parms->fResult;
 }
 
@@ -2976,7 +3326,7 @@ CallAirusANoLock(Handle dictionary, long selector)
 		AL_Shell(selector, parms);
 		break;
 	case kAirusKindAL16:
-		AirusAL16(selector, parms);		// (AL16_Shell 0x0002b774)
+		AL16_Shell(selector, parms);
 		break;
 	case kAirusKindEnum:
 	case kAirusKindEnum16:

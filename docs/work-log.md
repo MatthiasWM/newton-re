@@ -9,6 +9,65 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-15: The public API the ROM does not call, and the dead code
+
+The owner asked for every public API function, even those the ROM never
+calls, and the code dead in the U.S. ROM.  Both categories of
+`uncited-categories.tsv` are empty: coverage 18914 citations, 12938 of
+16671 functions (77.6%), 88.4% of the code; 488 ctests.
+
+- **Public API (44)** (`docs/armcpu/README.md`, "The public API the ROM
+  does not call"): `TCRC16::ComputeCRC(CBufferList&)`; `TIdleTimer`
+  (`utility/IdleTimer.h`, every function a bare return in this ROM) and
+  the third `TAEventHandler::ResetIdle` (a `sync_ddk_headers.py` patch
+  declares it); `TUCTTable` (`os600/kernel/UCTTable.h`: 32 task queues,
+  nothing in the ROM makes one); `TGCSafeList`/`TGCSafeSortedList`
+  (`frames/GCSafeList.h`); `ROMSoupBounds`; the five-argument
+  `SetVariableOrGlobal` (always flags 7, as the ROM's `mov r3,#7` - the
+  armcpu glue passed the caller's r3 before); `TView::DoCommand`/
+  `RealDoCommand`; `TEndpointEventHandler`'s `CallService` family;
+  `HasDigits`; `GetNewtTaskPort`/`GetNewtRootView`;
+  `GetCardReinsertionInfo` (`gCardReinsertionTracker` now the ROM's
+  0x10-byte struct); and the out-of-line inlines (`RCHAR`,
+  `RefToUniChar`, `FrameHasSlot`, `IsSubclass`, placement new).  armcpu
+  answers every entry (`PrivateJumpTable.cpp` regenerated).  New ctests
+  `utility.PublicAPI`, `os600.kernel.UCTTable`, `stores.CardReinsertion`.
+- **Dead in the U.S. ROM (56)**: `MemBufferPipe` (`utility/Pipes.h`); the
+  package validation driver (`packages/ValidatePackage.h`, and the real
+  `TPackageEventHandler::ValidatePackage`, reached when a
+  "TValidatePackage" implementation is registered); TextArrow (`StdText`'s
+  operation 0x2000); `IsFirstByteOf2Byte` in the compiler's file reader;
+  the ink codec's default point procs (`DecoderOpen`/`EncoderOpen` in the
+  ROM's shape); the sixteen-bit Airus walkers (kind-5 dictionaries); the
+  French/German accent checks (`CheckDiacriticsDirections`, tables by
+  `regenerate.py diacritics`, reached when a locale names an
+  `enabledLanguage`); the math views (`views/MathViews.h`, classes 84-86
+  made by `BuildView` as the ROM's switch does).
+- ROM bugs found (fixed behind `RomBugFixed()`): AE16_Verify/NextSet9 read
+  the sibling offset a byte short; AE16_NextSet9 reads the next node's
+  flags at +1 and assembles attributes low byte first; AL16_NextSet9
+  follows a leaf's first-child offset; AnalyseDiacriticsDirection leaves
+  two class lists unterminated.  Host mis-ports corrected: `CopyBufferHack`
+  did not copy a sixteen-bit word; `AE8_NextSet9` cleared the attribute
+  per node where the ROM keeps one for the row (a ROM QUIRK).
+- Found, not fixed: `packages.PackageManager` passes without running most
+  of its scenarios - `ROMAt(kSetup)` reads the romsrc objects' copy of
+  the extension, `TestPackagePipe` throws, the world warm-reboots and main
+  still prints "all passed" (`TestValidator` runs first, on a synthetic
+  package, so as not to depend on it).
+
+## 2026-10-15: A Developer page in Prefs, and no AppleTalk
+
+The owner asked for Newton Devices' AppleTalk panel to go from the Prefs
+list (the host has no AppleTalk) and for a Developer page for tools like
+the NewtonScript profiler.  The AppleTalk `RegPrefs` is taken out of
+Newton Devices' install script (DEVIATION, `romsrc/rex/newtdev/README.md`);
+`src/host/HostDeveloper.ns` is a Prefs page beside the Host one, on every
+host: "Profile NewtonScript" on and off, "Write profile" (to
+`<store>.nsprofile.txt`, a notice saying where; the console on the
+T-Deck Pro) and "Clear" (`docs/host-settings.md`, "The Developer panel";
+ctest `host.NewtonDeveloperPanel`).
+
 ## 2026-10-15: The public API's runtime and fixed-argument forms
 
 The uncited "runtime and overloads" category (65 functions) turned out to

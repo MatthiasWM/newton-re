@@ -1,0 +1,86 @@
+// The Developer preferences panel (host/HostDeveloper.h, HostDeveloper.ns):
+// ctest host.NewtonDeveloperPanel.
+//
+// Setup walked through, then Extras, Prefs: the list has "Developer" and
+// no "AppleTalk" (Newton Devices' panel, which the host has no AppleTalk
+// for: romsrc/rex/newtdev/README.md); "Developer" tapped, the panel's
+// "Profile NewtonScript" checkbox tapped starts the NewtonScript profiler,
+// some NewtonScript run, "Write profile" tapped writes the report to the
+// file HostDeveloperReportPath() names, and the checkbox tapped again
+// stops it.
+//
+//   build/host/host/newton --display 320x480 --headless 200 --erase --store build/dev.store \
+//       --script src/host/demo/developer.ns
+
+HostInclude("common.ns");			// tapAt, waitFor, walkSetup
+HostInclude("walkhelpers.ns");		// findView
+HostInclude("apphelpers.ns");		// tapCentre, tapPrefsItem
+
+devPrefsIcon := func() if GetRoot().extrasDrawer.viewCObject then
+	call findView with (GetRoot().extrasDrawer, func(v) v.target and v.target.fentry
+		and v.target.fentry.app = 'preferenceRoll);
+
+devPanel := func() call findView with (GetRoot(), func(v) v.overview and IsString(v.overview)
+	and StrEqual(v.overview, "Developer") and v.viewCObject and v.stepChildren and Length(v.stepChildren) > 1);
+
+// the names the Prefs list shows
+devListed := func() begin
+	local names := [];
+	foreach list in GetRoot().preferenceRoll:ChildViewFrames() do
+		if list.pieces then
+			foreach piece in list.pieces do
+				if IsArray(piece) and IsFrame(piece[0]) and IsBinary(piece[0].data) then
+					AddArraySlot(names, SetClass(Clone(piece[0].data), 'string));
+	names;
+end;
+
+devHas := func(names, name) begin
+	local found := nil;
+	foreach n in names do if StrEqual(n, name) then found := true;
+	found;
+end;
+
+// a NewtonScript function the profile should count
+devFib := func(n) if n < 2 then n else call devFib with (n - 1) + call devFib with (n - 2);
+
+devRun := func() begin
+	call tapAt with (20, 460);				// Extras
+	call waitFor with ("developer: the Prefs icon", func() call devPrefsIcon with (), func() begin
+		call tapCentre with (call devPrefsIcon with ());
+		call waitFor with ("developer: Prefs", func() GetRoot().preferenceRoll.viewCObject, func() begin
+			local names := call devListed with ();
+			Print("developer: the Prefs list " & (if call devHas with (names, "Developer") then "has" else "has no")
+				  & " Developer, " & (if call devHas with (names, "AppleTalk") then "has" else "has no") & " AppleTalk");
+			if not call tapPrefsItem with ("Developer") then Print("developer: no Developer row in Prefs");
+			call waitFor with ("developer: the panel", func() call devPanel with (), func() begin
+				local panel := call devPanel with ();
+				local box := call findView with (panel, func(v) v.profilerSwitch and v.viewCObject);
+				Print("developer: the panel shows " & box.text & ", profiling " & (if HostNSProfileRunning() then "on" else "off"));
+				call tapCentre with (box);
+				call waitFor with ("developer: profiling on", func() HostNSProfileRunning(), func() begin
+					Print("developer: profiling on");
+					call devFib with (12);
+					local path := HostDeveloperReportPath();
+					call tapCentre with (call findView with (panel, func(v) IsString(v.text) and StrEqual(v.text, "Write profile") and v.viewCObject));
+					local dev := GetGlobalVar('|HostDeveloper:host|);
+					call waitFor with ("developer: the profile written", func() dev.lastWritten, func() begin
+						Print("developer: the profile written to " & (if IsString(dev.lastWritten) then dev.lastWritten else "the console"));
+						// (the notice saying where closed, the slip it is in)
+						local notice := call findView with (GetRoot(), func(v) IsString(v.text)
+							and StrPos(v.text, "NewtonScript profile", 0) and v.viewCObject);
+						while notice and notice:Parent() and notice:Parent() <> GetRoot() do notice := notice:Parent();
+						if notice then notice:Close();
+						call tapCentre with (box);
+						call waitFor with ("developer: profiling off", func() not HostNSProfileRunning(), func() begin
+							Print("developer: profiling off");
+							Print("developer: done");
+							HostQuit();
+						end, 30);
+					end, 30);
+				end, 30);
+			end, 30);
+		end, 30);
+	end, 30);
+end;
+
+call walkSetup with ([4, 31, 1, 17], func() call devRun with ());

@@ -503,6 +503,58 @@ DoPointToChar(TextObjectRef text, Fixed hScale, Fixed vScale)
 }
 
 
+// the arguments TextArrowOffset leaves at the object's +0x4c
+struct TextArrowArgs
+{
+	long		fOffset;		// +0x00  where the caret is
+	UChar		fForward;		// +0x04  the right arrow (else the left)
+	long		fNewOffset;		// +0x08  ==> where it goes
+};
+
+// ROM 0x00359fb8 DoTextArrow__FlN21
+// The caret moved a character by an arrow key: one on (forward) or one
+// back, held within the text - nought and its length.  With no layout it
+// stays where it was.
+void
+DoTextArrow(TextObjectRef text, Fixed hScale, Fixed vScale)
+{
+	TextArrowArgs* args = (TextArrowArgs*) TextObj(text)->fResult;
+	long offset = args->fOffset;
+	args->fNewOffset = offset;
+	if (!UpdateLayoutState(text, 0, hScale, vScale))
+		return;
+	long to = args->fForward ? offset + 1 : offset - 1;
+	if (to < 0)
+		to = 0;
+	long length = TextObj(text)->fLength;
+	if (length < to)
+		to = length;
+	args->fNewOffset = to;
+}
+
+
+// ROM 0x00359f70 TextArrowOffset__FlT1Uc
+// Where an arrow key takes the caret from the offset: the question asked
+// of the port's text proc (operation 0x2000), so that a printer or a
+// recording picture would see it too.  Nothing in the ROM asks it but the
+// QuickDraw library's protocol (TQDLibraryDriver::TextArrowOffset), whose
+// caller is a package's code.  (Host: the answer starts at nought - the
+// ROM's is the stack's word - for a text proc that does not answer.)
+long
+TextArrowOffset(TextObjectRef text, long offset, Boolean forward)
+{
+	TextArrowArgs args;
+	args.fOffset = offset;
+	args.fForward = forward;
+	args.fNewOffset = 0;
+	TextObject* obj = TextObj(text);
+	obj->fFlags = (obj->fFlags & ~kTextObjOpMask) | kTextObjOpTextArrow;
+	obj->fResult = &args;
+	CallDrawText(text, 0x10000, 0x10000);
+	return args.fNewOffset;
+}
+
+
 // ROM 0x00359d40 PointToChar__Fl6FPoint
 long
 PointToChar(TextObjectRef text, FPoint point)
@@ -675,6 +727,15 @@ TQDLibraryDriver::PointToChar(TextObjectRef text, FPoint point)
 }
 
 
+// ROM 0x00195cc4 TextArrowOffset__16TQDLibraryDriverFlT1Uc
+// (the direction narrowed to a byte, as the ROM's does)
+long
+TQDLibraryDriver::TextArrowOffset(TextObjectRef text, long offset, Boolean forward)
+{
+	return ::TextArrowOffset(text, offset, (UChar) forward);
+}
+
+
 // ROM 0x0035b07c StdText
 // The standard text proc: the operation the object's flags ask for.
 // Drawing is recorded into an open picture and then drawn; the fitted
@@ -722,6 +783,9 @@ StdText(TextObjectRef text, Fixed hScale, Fixed vScale)
 		break;
 	case kTextObjOpPointToChar:
 		DoPointToChar(text, hScale, vScale);
+		break;
+	case kTextObjOpTextArrow:
+		DoTextArrow(text, hScale, vScale);
 		break;
 	case kTextObjOpMetrics:
 		{

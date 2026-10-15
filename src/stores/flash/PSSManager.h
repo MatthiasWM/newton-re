@@ -164,6 +164,33 @@ extern TUPort*		gPSSPort;						// ROM 0x0c1016d4 gPSSPort
 extern Boolean		gFormatCardsWhenInserted;		// ROM 0x0c1016c0 gFormatCardsWhenInserted
 extern TStore*		gCardStore;						// ROM 0x0c1016cc gCardStore
 
+// What is known of a card that went and came back (ROM 0x0c106820, 0x10
+// bytes): set when one comes back (CardIsSame), cleared when one goes;
+// the ROM domain manager's Fault notes the package page it was faulting in
+// when the card came back - the package's store and id and the faulting
+// address's offset into it - which the host, having no domain manager
+// (declined), never does: fStore stays nil there.
+struct CardReinsertionTracker
+{
+	Boolean		fReinserted;		// +0x00  a card has come back since one went
+	TStore*		fStore;				// +0x04  the store of the package being faulted in when it did (nil: none)
+	ULong		fPackageId;			// +0x08  the package's object on it (a PSSId)
+	ULong		fOffset;			// +0x0c  the faulting address's offset into the package
+};
+extern CardReinsertionTracker	gCardReinsertionTracker;	// ROM 0x0c106820 gCardReinsertionTracker
+
+// Where in a package that page was (GetCardReinsertionInfo).  The DDK does
+// not declare it; the names are the reconstruction's, the layout the ROM's.
+struct TCardReinsertionInfo
+{
+	ULong		fPartIndex;			// +0x00  the part the address is in
+	ULong		fPartKind;			// +0x04  its kind (PartInfo's)
+	ULong		fPartData;			// +0x08  where its data is (PartInfo's data)
+	ULong		fPartSize;			// +0x0c  its size
+	ULong		fOffset;			// +0x10  the address's offset into the part's data
+};
+Boolean		GetCardReinsertionInfo(TCardReinsertionInfo* info);	// ROM 0x00322848 GetCardReinsertionInfo__FP20TCardReinsertionInfo
+
 void			ReinsertCard(int slot, const UniChar* reason, UChar ask);		// ROM 0x00155ba0 ReinsertCard__FiPCUsUc
 NewtonErr		InitializeCardStore(SPSSStoreInfo* info, UChar* formatted);	// ROM 0x0015582c InitializeCardStore__FP13SPSSStoreInfoPUc
 NewtonErr		StartPSSManager(void);											// (host: the world InitPSSManager starts)

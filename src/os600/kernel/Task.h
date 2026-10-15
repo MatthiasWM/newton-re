@@ -58,7 +58,8 @@ enum KernelObjectState
 												// TMonitor::Release never resumes it, the next request removes it
 	kTaskState_Unknown0008		= 0x00000008,	// ObjectSuspend refuses a task without it (kError_Cannot_Suspend_Blocked_Task);
 												// nothing found yet that sets it
-	kTaskState_StackFromNewStack= 0x02000000	// stack came from NewStack (freed via the stack manager), not malloc
+	kTaskState_StackFromNewStack= 0x02000000,	// stack came from NewStack (freed via the stack manager), not malloc
+	kTaskState_InUCTTable		= 0x00004000	// queued in a TUCTTable (UCTTable.h), which nothing in the ROM makes
 };
 
 const ULong kNumberOfPriorities = 32;			// priorities 0-31 select a TScheduler bucket
@@ -133,7 +134,7 @@ class TTask : public TKernelObject
 		VAddr			fStackBase;			// +0x8c  start of the allocation (nil when there is no stack)
 		TTaskContainer*	fContainer;			// +0x90  what the task is queued in (see TTaskQueue::Add)
 		TTaskQItem		fTaskQItem;			// +0x94  links in that queue
-		ULong			fUnknown9c;			// +0x9c  matched by TTaskQueue::FindAndRemove
+		ULong			fUnknown9c;			// +0x9c  matched by TTaskQueue::FindAndRemove; a TUCTTable's key
 		void*			fGlobals;			// +0xa0  the task's globals area (top of stack + 0x54)
 		Int64			fTaskTime;			// +0xa4  accumulated run time (Scheduler)
 		ULong			fStackSize;			// +0xac  fStackTop - fGlobalsBase
