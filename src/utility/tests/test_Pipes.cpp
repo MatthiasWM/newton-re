@@ -149,6 +149,42 @@ TestPipe()
 }
 
 
+// MemBufferPipe (MemoryPipe's twin, which nothing in the ROM makes): a
+// write that fills the segment starts it again from the top, Reset puts
+// the read position back to the start, FlushRead at the end, and
+// Underflow never says the end has come.
+static void
+TestMemBufferPipe()
+{
+	static UByte source[6] = { 1, 2, 3, 4, 5, 6 };
+	CBufferSegment* in = new CBufferSegment;
+	CBufferSegment* out = new CBufferSegment;
+	EXPECT(in->Init(source, 6, false) == noErr && out->Init(4) == noErr);
+	MemBufferPipe pipe;
+	pipe.Init(in, out, true);
+	pipe.Reset();							// the read position at the start
+	EXPECT(pipe.ReadPosition() == 0);
+	UByte got[4];
+	long count = 4;
+	Boolean eof = true;
+	pipe.ReadChunk(got, count, eof);
+	EXPECT(count == 4 && !eof && got[0] == 1 && got[3] == 4);
+	pipe.FlushRead();						// what is left skipped
+	EXPECT(pipe.ReadPosition() == 6);
+	pipe.Reset();
+	EXPECT(pipe.ReadPosition() == 0 && pipe.Get() == 1);
+	// six bytes into four: the fifth starts the segment again
+	static const UByte text[6] = { 'a', 'b', 'c', 'd', 'e', 'f' };
+	pipe.WriteChunk(text, 6, false);
+	EXPECT(pipe.WritePosition() == 2 && out->fBuffer[0] == 'e' && out->fBuffer[1] == 'f' && out->fBuffer[2] == 'c');
+	pipe.FlushWrite();
+	EXPECT(pipe.WritePosition() == 0);
+	eof = true;
+	pipe.Underflow(1, eof);
+	EXPECT(!eof);
+}
+
+
 // CStdioPipe (utility/StdioPipe.h) over a host file: written, read back,
 // seeked; a read past the end throws -3 with the count and eof set first
 // (the ROM's quirk); a file that is not there throws -1.
@@ -213,6 +249,7 @@ main()
 	InitHostStandaloneHeap();
 	TestSegment();
 	TestPipe();
+	TestMemBufferPipe();
 	TestStdioPipe();
 	if (failures == 0)
 		printf("test_Pipes: all passed\n");

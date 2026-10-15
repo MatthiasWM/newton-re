@@ -9,7 +9,8 @@
 				Overflow.  CBufferPipe is a pipe over two CBufferSegments (one
 				read, one written); CMemoryPipe and MemoryPipe are the pipes
 				over memory (the object streamer's and the frames part
-				handler's); PipeCallBack is what a pipe user gives to be told
+				handler's; MemBufferPipe the same again, which nothing
+				makes); PipeCallBack is what a pipe user gives to be told
 				of progress.
 
 				There is no DDK header for these (the Communications DDK's
@@ -195,6 +196,29 @@ public:
 					MemoryPipe();
 	virtual			~MemoryPipe();
 
+	virtual void	FlushRead(void);
+	virtual void	FlushWrite(void);
+	virtual void	Reset(void);
+	virtual void	Overflow(void);
+	virtual void	Underflow(long count, Boolean& eof);
+};
+
+
+/*------------------------------------------------------------------------------
+	M e m B u f f e r P i p e
+	MemoryPipe again, function for function (the same code at another
+	address, 0x00226a10-0x00228ffc): the write segment reused when full,
+	the read segment's position put at its end by FlushRead and at its
+	start by Reset, and reading past the end waiting for nothing.  Its
+	five functions are in the jump table, but nothing in the ROM makes
+	one: there is no constructor, and nothing refers to its vtable
+	(0x0001c854).  (Host: the implicit constructor stands in for the one
+	a maker would have inlined.)
+------------------------------------------------------------------------------*/
+
+class MemBufferPipe : public CBufferPipe
+{
+public:
 	virtual void	FlushRead(void);
 	virtual void	FlushWrite(void);
 	virtual void	Reset(void);
