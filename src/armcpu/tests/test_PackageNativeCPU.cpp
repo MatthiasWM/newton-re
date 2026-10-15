@@ -200,6 +200,118 @@ TestRuntimeForms(void)
 	failures += gSendFailures;
 }
 
+/*------------------------------------------------------------------------------
+	The public API the ROM does not call (uncited-categories.tsv's category),
+	through the public jump table.
+------------------------------------------------------------------------------*/
+
+// a CBufferList of the ARM code's for ComputeCRC: a vtable whose Seek
+// (+0x38) and Get (+0x10) slots are `ldr pc,[pc,#-4]` to a host trap
+// (the word after each slot), over "123456789"
+static uint32_t	gListPosition = 0;
+static int		gListSeeks = 0;
+static bool
+ListSeek(void*, ARMTrapContext& c)
+{
+	gListSeeks++;
+	gListPosition = c.Arg(1);
+	c.Return(gListPosition);
+	return true;
+}
+static bool
+ListGet(void*, ARMTrapContext& c)
+{
+	static const char kText[] = "123456789";
+	c.Return(gListPosition < 9 ? (uint32_t) (uint8_t) kText[gListPosition++] : (uint32_t) -1);
+	return true;
+}
+
+// FrameHasSlot and IsSubclass of RefArgs, inside an ARM call (refs cross by
+// the trap's context)
+static int	gArgFailures = 0;
+static bool
+TryRefArgForms(void*, ARMTrapContext& c)
+{
+	auto var = [&](Ref r) { return CallEntry("__ct__9RefStructFCl", { 0, c.RefToARM((intptr_t) r) }); };
+	RefVar frame(Eval("{a: 1}"));
+	uint32_t f = var(frame), a = var(Intern("a")), b = var(Intern("b"));
+	if (CallEntry("FrameHasSlot__FRC6RefVarT1", { f, a }) != 1 || CallEntry("FrameHasSlot__FRC6RefVarT1", { f, b }) != 0)
+		{ gArgFailures++; printf("FAIL: FrameHasSlot of RefArgs\n"); }
+	uint32_t sub = var(Intern("string.foo")), super = var(Intern("string"));
+	if (CallEntry("IsSubclass__FRC6RefVarT1", { sub, super }) != 1 || CallEntry("IsSubclass__FRC6RefVarT1", { super, sub }) != 0)
+		{ gArgFailures++; printf("FAIL: IsSubclass of RefArgs\n"); }
+	c.Return(0);
+	return true;
+}
+
+static void
+TestPublicAPI(void)
+{
+	// the bare returns: r0 back as it was given
+	static const char* kBare[] =
+	{
+		"__ct__10TIdleTimerFv", "Init__10TIdleTimerFUl9TimeUnitsN21", "Start__10TIdleTimerFv",
+		"Start__10TIdleTimerFP6TUPort", "Stop__10TIdleTimerFv", "Reset__10TIdleTimerFv",
+		"Reset__10TIdleTimerFUl9TimeUnits", "Reset__10TIdleTimerFUl9TimeUnitsP6TUPort",
+		"ResetIdle__14TAEventHandlerFUl9TimeUnitsP6TUPort", "DoCommand__5TViewFP8TCommand",
+		"RealDoCommand__5TViewFP8TCommand",
+		"CallService__21TEndpointEventHandlerFUlP14TUAsyncMessageP7TAEventlT3T4T1Uc",
+		"CallServiceBlocking__21TEndpointEventHandlerFUlP7TAEventlT2T3T1",
+		"GetPrivatePortId__21TEndpointEventHandlerFv", "GetSyncPortId__21TEndpointEventHandlerFv",
+	};
+	for (const char* n : kBare)
+		EXPECT(CallEntry(n, { 0x12340, 5, 6, 7 }) == 0x12340);
+	EXPECT(CallEntry("__ct__10TIdleTimerFv", { 0 }) == 0);					// (it does not allocate)
+	// placement new; a world state's error
+	EXPECT(CallEntry("__nw__FUiPv", { 16, 0x56780 }) == 0x56780);
+	uint32_t state = ARMAlloc(0x40, true);
+	ARMWrite32(state, (uint32_t) -10021);
+	EXPECT(CallEntry("GetError__14TAppWorldStateFv", { state }) == (uint32_t) -10021);
+	// RefToUniChar and RCHAR
+	uint32_t ch = CallEntry("__ct__9RefStructFCl", { 0, (uint32_t) MAKECHAR(0x20ac) });
+	EXPECT(CallEntry("RefToUniChar__FRC6RefVar", { ch }) == 0x20ac);
+	EXPECT(CallEntry("RCHAR__Fl", { (uint32_t) MAKECHAR('z') }) == 'z');
+	// FrameHasSlot and IsSubclass of RefArgs
+	gArgFailures = 0;
+	ARMCall(ARMHostTrap(TryRefArgForms, nil, "TryRefArgForms"), nil, 0);
+	failures += gArgFailures;
+	// ROMSoupBounds: the ROM's objects' start and size
+	uint32_t bounds = ARMAlloc(8, true), at = 0, size = 0;
+	CallEntry("ROMSoupBounds__FPPcT1", { bounds, bounds + 4 });
+	EXPECT(ARMRead32(bounds, &at) && at == 0x003afda8 && ARMRead32(bounds + 4, &size) && size == 0x002cfc98);
+	// HasDigits over the ARM code's UniChars
+	uint32_t word = ARMAlloc(16, true);
+	const char* text = "ab7";
+	for (int i = 0; i < 3; i++)
+		ARMWrite8(word + i * 2 + 1, (uint8_t) text[i]);
+	EXPECT(CallEntry("HasDigits__FPUs", { word }) == 1);
+	ARMWrite8(word + 5, '/');
+	EXPECT(CallEntry("HasDigits__FPUs", { word }) == 0);
+	// ComputeCRC over the ARM code's buffer list: from its start
+	uint32_t vtable = ARMAlloc(0x40, true), list = ARMAlloc(8, true), crc = ARMAlloc(8, true);
+	ARMWrite32(vtable + 0x10, 0xe51ff004);
+	ARMWrite32(vtable + 0x14, ARMHostTrap(ListGet, nil, "ListGet"));
+	ARMWrite32(vtable + 0x38, 0xe51ff004);
+	ARMWrite32(vtable + 0x3c, ARMHostTrap(ListSeek, nil, "ListSeek"));
+	ARMWrite32(list, vtable);
+	gListPosition = 5;
+	gListSeeks = 0;
+	CallEntry("ComputeCRC__6TCRC16FR11CBufferList", { crc, list });
+	uint32_t value = 0;
+	EXPECT(gListSeeks == 1 && ARMRead32(crc + 4, &value) && value == 0xBB3D);
+	// TUCTTable over ARM memory: two tasks under keys of one queue
+	uint32_t table = ARMAlloc(0x114, true), t1 = ARMAlloc(0x104, true), t2 = ARMAlloc(0x104, true), v = 0;
+	CallEntry("Add__9TUCTTableFP5TTaskUl", { table, t1, 0x120 });
+	CallEntry("Add__9TUCTTableFP5TTaskUl", { table, t2, 0x12f });
+	EXPECT(ARMRead32(table + 0x14 + 0x12 * 8, &v) && v == t1 && ARMRead32(table + 0x14 + 0x12 * 8 + 4, &v) && v == t2);
+	EXPECT(ARMRead32(t2 + 0x6c, &v) && v == 0x4000 && ARMRead32(t2 + 0x90, &v) && v == table);
+	EXPECT(CallEntry("HeldBy__9TUCTTableFP5TTaskUl", { table, t2, 0x12f }) == 1 && CallEntry("HeldBy__9TUCTTableFP5TTaskUl", { table, t2, 0x120 }) == 0);
+	EXPECT(CallEntry("Remove__9TUCTTableFUl", { table, 0x12f }) == t2 && CallEntry("Remove__9TUCTTableFUl", { table, 0x12f }) == 0);
+	EXPECT(ARMRead32(t2 + 0x6c, &v) && v == 0 && ARMRead32(t1 + 0x94, &v) && v == 0);
+	EXPECT(CallEntry("Remove__9TUCTTableFP5TTask", { table, t1 }) == table);
+	EXPECT(ARMRead32(table + 0x14 + 0x12 * 8, &v) && v == 0 && ARMRead32(t1 + 0x6c, &v) && v == 0);
+}
+
 int
 main()
 {
@@ -639,8 +751,22 @@ main()
 		"__GetErrNo__Fv", "__vec_new__FPviT2T1", "__vec_delete__FPviT2T1N22", "__ct__6RefVarFRC6RefVar",
 		"__ct__9RefStructFCl", "__ct__9RefStructFRC6RefVar", "__ct__9RefStructFRC9RefStruct",
 		"__ct__10TObjectPtrFRC9RefStruct",
+		// the public API the ROM does not call
+		"__ct__10TIdleTimerFv", "Init__10TIdleTimerFUl9TimeUnitsN21", "Start__10TIdleTimerFv",
+		"Start__10TIdleTimerFP6TUPort", "Stop__10TIdleTimerFv", "Reset__10TIdleTimerFv",
+		"Reset__10TIdleTimerFUl9TimeUnits", "Reset__10TIdleTimerFUl9TimeUnitsP6TUPort",
+		"ResetIdle__14TAEventHandlerFUl9TimeUnitsP6TUPort", "DoCommand__5TViewFP8TCommand",
+		"RealDoCommand__5TViewFP8TCommand",
+		"CallService__21TEndpointEventHandlerFUlP14TUAsyncMessageP7TAEventlT3T4T1Uc",
+		"CallServiceBlocking__21TEndpointEventHandlerFUlP7TAEventlT2T3T1",
+		"GetPrivatePortId__21TEndpointEventHandlerFv", "GetSyncPortId__21TEndpointEventHandlerFv",
+		"__nw__FUiPv", "GetError__14TAppWorldStateFv", "RefToUniChar__FRC6RefVar",
+		"FrameHasSlot__FRC6RefVarT1", "IsSubclass__FRC6RefVarT1", "ROMSoupBounds__FPPcT1",
+		"HasDigits__FPUs", "ComputeCRC__6TCRC16FR11CBufferList", "Add__9TUCTTableFP5TTaskUl",
+		"Remove__9TUCTTableFUl", "Remove__9TUCTTableFP5TTask", "HeldBy__9TUCTTableFP5TTaskUl",
 	};
 	TestRuntimeForms();
+	TestPublicAPI();
 	for (const char* n : kReached)
 		if (!PackageNativeCPUAnswers(n))
 		{

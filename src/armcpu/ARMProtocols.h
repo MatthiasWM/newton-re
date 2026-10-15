@@ -92,6 +92,14 @@ uint32_t	ARMCString(const char* s);
 class TAEventHandler;
 TAEventHandler*	ARMEventHandlerOf(uint32_t arm);
 
+// The newt world's port and root view, for GetNewtTaskPort and
+// GetNewtRootView (ARMKernelGlue.cpp): the newt library - above this one -
+// sets them (newt/NewtWorld.cpp); nil until it does (the glue answers nil).
+class TUPort;
+class TRootView;
+extern TUPort*		(*gARMNewtTaskPort)(void);
+extern TRootView*	(*gARMNewtRootView)(void);
+
 // An event whose body is not the bytes it is on both sides (it holds
 // pointers, or fields that are wider on the host): how it is widened from
 // the ARM's layout and narrowed back.  `matches` is asked with the event's

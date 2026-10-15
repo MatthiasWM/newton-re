@@ -263,6 +263,9 @@ TNewtWorld::MainConstructor()
 	// and a package's protocol parts that have no host stand-in
 	// (armcpu/ARMProtocols.h, armcpu/ARMCardHandler.h)
 	InstallARMProtocols();
+	// (GetNewtTaskPort and GetNewtRootView, as ARM code asks for them)
+	gARMNewtTaskPort = GetNewtTaskPort;
+	gARMNewtRootView = GetNewtRootView;
 	InstallARMCardHandlers();
 	InstallARMPSSManager();
 	InstallARMStores();

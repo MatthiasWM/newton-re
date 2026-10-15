@@ -72,13 +72,11 @@ performance variants	^BB[A-Z]|Slab|FastLine|FastPartiallyReal|PatExpand|LSeekMas
 
 # --- public API the ROM itself does not call -------------------------------
 # in the public jump table (0x01800000) for packages' native code, and
-# nowhere called, branched to or pointed at by the ROM (callgraph.py
-# --callers): a package's native code that calls one runs on armcpu, which
-# answers it by name or runs the ROM's own copy (docs/armcpu/README.md) -
-# the idle timer, the GC-safe lists and their collector procs, the
-# unicode task table, RefToUniChar and the other out-of-line copies of
-# inlines, TView's TCommand overloads, TEndpointEventHandler's services
-public API the ROM does not call	\d+TIdleTimer|ResetIdle__14TAEventHandler|TGCSafe(Sorted)?List|\d+TUCTTable|^RefToUniChar__|^RCHAR__|^IsSubclass__|^FrameHasSlot__|^HasDigits__|^ROMSoupBounds__|^GetNewtRootView__|^GetNewtTaskPort__|^SetVariableOrGlobal__|^__nw__FUiPv$|GetError__14TAppWorldState|ComputeCRC__6TCRC16FR11CBufferList|^GetCardReinsertionInfo__|DoCommand__5TViewFP8TCommand|(GetSyncPortId|GetPrivatePortId|CallService\w*)__21TEndpointEventHandler
+# (the public API the ROM does not call - the idle timer, the GC-safe
+# lists, TUCTTable, the out-of-line copies of inlines, TView's TCommand
+# overloads, TEndpointEventHandler's old services and the rest - is all
+# reconstructed now, each in its area and answered by armcpu for a
+# package's native code: docs/armcpu/README.md)
 
 # --- host stand-ins ----------------------------------------------------------
 # the text objects' TextWalker, which hands the layout and the drawing a
