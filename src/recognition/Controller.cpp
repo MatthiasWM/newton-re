@@ -239,15 +239,15 @@ TController::Initialize(void)
 
 // ROM 0x0020bdf4 SignalMemoryError__11TControllerFv
 // The controller is out of memory: it cannot be trusted to hold anything
-// more, so a clean-up is asked for at once, and the arbiter - if it has
-// something waiting - is asked to arbitrate first so that what has been
-// worked out so far still reaches the views.
+// more, so a clean-up is asked for at once, and the arbiter - if the
+// journal's units are being replayed (TArbiter::fReplaying) - is asked to
+// arbitrate first so that what has been worked out so far is measured.
 void
 TController::SignalMemoryError(void)
 {
 	SetFlags(kControllerError);
 	fCleanUpTime = GetTicks();
-	if (fArbiter->fWaiting)
+	if (fArbiter->fReplaying)
 	{
 		fArbitrateTime = GetTicks();
 		fArbiter->fArbitrateNow = true;
@@ -316,10 +316,10 @@ TController::NextIdleTime(void)
 		return 0;
 	}
 
-	if (fArbiter->fWaiting
+	if (fArbiter->fReplaying
 		&& fArbitrateTime == 0xffffffff && fClassifyTime == 0xffffffff && fGroupTime == 0xffffffff)
 	{
-		// the arbiter is waiting on units that will never come: let it go
+		// replaying, and nothing more is coming: arbitrate what there is
 		fArbiter->fArbitrateNow = true;
 	}
 	else if (!fArbiter->fArbitrateNow)

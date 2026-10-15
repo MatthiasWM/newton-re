@@ -10,6 +10,8 @@
 #include "Domain.h"
 #include "Controller.h"
 #include "Recognizer.h"
+#include "Arbiter.h"			// gArbiter->fReplaying
+#include "ReplayMetrics.h"		// HandleReplayUnit
 #include "RecConfig.h"
 #include "ROMConstants.h"
 #include "RSSymbols.h"
@@ -575,7 +577,7 @@ MakeCharArea(TController* controller, long base, long smallHeight, Rect* box)
 	SetBEHalf(grid.xSpace, 0);
 	info = ToObject(&grid);
 	SetFrameSlot(config, RefVar(RSSYMrcgridinfo), info);
-	gRecognition.fUnitHandler = HandleUnit;		// (the ROM's HandleReplayUnit while the arbiter replays - NOT YET, as in FindMatchingArea)
+	gRecognition.fUnitHandler = (gArbiter != nil && gArbiter->fReplaying) ? HandleReplayUnit : HandleUnit;	// (while the readings are measured: ReplayMetrics.h; DEVIATION: a host test may have no arbiter)
 	return MakeArea(controller, nil, 0, config);
 }
 
@@ -644,7 +646,7 @@ FindMatchingArea(TView* view, ULong inputMask)
 	}
 	if (found == nil)
 	{
-		gRecognition.fUnitHandler = HandleUnit;		// (NOT YET RECONSTRUCTED: the journal's replayed units, HandleReplayUnit - the host journal replays strokes only)
+		gRecognition.fUnitHandler = (gArbiter != nil && gArbiter->fReplaying) ? HandleReplayUnit : HandleUnit;	// (while the readings are measured: ReplayMetrics.h; DEVIATION: a host test may have no arbiter)
 		found = MakeArea(gController, view, inputMask);
 		if (found == nil)
 			return nil;

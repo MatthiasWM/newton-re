@@ -12,6 +12,7 @@
 #include "Recognizer.h"
 #include "ShapeDomain.h"		// TGeneralShapeUnit, GetAvgLength, gCurveFlag
 #include "WordUnit.h"		// TStdWordUnit
+#include "ReplayMetrics.h"	// TWordReplayUnit
 #include "Unicode.h"			// Ustrlen
 #include "host/RomBugs.h"
 #include <string.h>
@@ -41,7 +42,7 @@ TArbiter::IArbiter(TController* controller)
 	fLists[kArbiterUnitsB] = TDArray::Make(sizeof(ULong), 0);
 	fLists[kArbiterUnitsC] = TDArray::Make(sizeof(ULong), 0);
 	fArbitrateNow = false;
-	fWaiting = false;
+	fReplaying = false;
 	fCase = 0;
 	return 0;
 }
@@ -75,13 +76,30 @@ UnitInClass(ULong type, ULong classType)
 
 
 // ROM 0x0020830c SetCaseAndTime__FP6TArrayUl
-// NOT YET RECONSTRUCTED: the journal's replay of *units* (as opposed to
-// strokes, which testing/Journal.h replays), which marks each replayed
-// winner with the recognition case the session was recorded under and
-// the time it happened at.  Nothing replays units on the host.
+// While the recognisers' readings are being measured (fReplaying), the
+// replayed units ('WRPL', ReplayMetrics.h) that lead the winners are
+// stamped with the recognition case - the area's, read from the first one
+// the first time and kept in the arbiter from then on - and the first of
+// them with the time (DoArbitration gives 0).  The first winner that is
+// not a replayed unit ends it.
 void
-SetCaseAndTime(TArray* /*winners*/, ULong /*time*/)
-{ }
+SetCaseAndTime(TArray* winners, ULong time)
+{
+	TArrayIterator iter;
+	BestMatch first = *(BestMatch*) winners->GetIterator(&iter);
+	if (gArbiter->fCase == 0 && UnitInClass(first.fUnit->fType, kReplayUnit))
+		gArbiter->fCase = GetRecognitionCase(first.fUnit->GetArea());
+	BestMatch* entry = (BestMatch*) iter.GetCur();
+	for (ULong i = 0; i < (ULong) iter.fCount; i++, entry = (BestMatch*) iter.GetNext())
+	{
+		BestMatch match = *entry;
+		if (!UnitInClass(match.fUnit->fType, kReplayUnit))
+			return;
+		TWordReplayUnit* unit = (TWordReplayUnit*) match.fUnit;
+		unit->fRecCase = gArbiter->fCase;
+		unit->fTime = (i == 0) ? time : 0;
+	}
+}
 
 
 // ROM 0x00208104 ArbiterGetUnitStrokes__FP7TSIUnitP7TDArray
@@ -750,7 +768,7 @@ TraceArbitration(long recCase, TArray* gathered, TArray* winners)
 Boolean
 TArbiter::ArbitrateUnits(TRecArea* area)
 {
-	if (gController->fArbiter->fWaiting)
+	if (gController->fArbiter->fReplaying)
 	{
 		TArrayIterator iter;
 		BestMatch* entry = (BestMatch*) Gathered()->GetIterator(&iter);
@@ -794,7 +812,7 @@ TArbiter::ArbitrateUnits(TRecArea* area)
 		return false;
 	}
 
-	if (fWaiting)
+	if (fReplaying)
 	{
 		// replaying: whatever was gathered and not chosen wins too
 		TArrayIterator iter;
@@ -935,7 +953,7 @@ TArbiter::DoArbitration(void)
 				did = true;
 				BestMatch first = *(BestMatch*) Winners()->GetEntry(0);
 				fController->SetFlags(kControllerBusy);
-				if (gController->fArbiter->fWaiting)
+				if (gController->fArbiter->fReplaying)
 					SetCaseAndTime(Winners(), 0);
 				first.fAssoc.fHandler(Winners());
 				fController->UnsetFlags(kControllerBusy);
@@ -981,7 +999,7 @@ TArbiter::DoArbitration(void)
 		Winners()->CutToIndex(0);
 		Pending()->CutToIndex(0);
 	}
-	if (fWaiting && did)
+	if (fReplaying && did)
 		CleanUp();
 }
 
@@ -1075,7 +1093,7 @@ InitArbiterState(TArbiter* arbiter)
 	arbiter->fLists[kArbiterUnitsB] = TDArray::Make(sizeof(ULong), 0);
 	arbiter->fLists[kArbiterUnitsC] = TDArray::Make(sizeof(ULong), 0);
 	arbiter->fArbitrateNow = false;
-	arbiter->fWaiting = false;
+	arbiter->fReplaying = false;
 	arbiter->fCase = 0;
 	return 0;
 }
@@ -1094,7 +1112,7 @@ SaveArbiterState(TArbiter* arbiter, UChar* failed)
 		for (long i = 0; i < kArbiterListCount; i++)
 			state->fLists[i] = arbiter->fLists[i];
 		state->fArbitrateNow = arbiter->fArbitrateNow;
-		state->fWaiting = arbiter->fWaiting;
+		state->fReplaying = arbiter->fReplaying;
 		state->fCase = arbiter->fCase;
 		InitArbiterState(arbiter);
 		Boolean all = true;
@@ -1124,7 +1142,7 @@ RestoreArbiterState(TArbiter* arbiter, ArbiterState* state)
 		for (long i = 0; i < kArbiterListCount; i++)
 			arbiter->fLists[i] = state->fLists[i];
 		arbiter->fArbitrateNow = state->fArbitrateNow;
-		arbiter->fWaiting = state->fWaiting;
+		arbiter->fReplaying = state->fReplaying;
 		arbiter->fCase = state->fCase;
 		delete state;
 	}

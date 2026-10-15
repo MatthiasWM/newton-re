@@ -17,10 +17,14 @@
 				that lost, so that its strokes get another chance in
 				another shape.
 
-				`fWaiting` says an entry is waiting on units that have not
-				been made yet; `fArbitrateNow` is what the controller sets
-				when it will not wait any longer (it is out of memory, or
-				nothing else is going to happen).
+				`fReplaying` says the recognisers' readings are being
+				measured against what the journal says was written (the
+				replay metrics, ReplayMetrics.h): the replayed units
+				('WRPL') win beside everything gathered over the same
+				strokes, and everything goes to HandleReplayUnit;
+				`fArbitrateNow` is what the controller sets when it will
+				not wait any longer (it is out of memory, or nothing else
+				is going to happen).
 
 				The deciding goes: an entry whose type is arbitrated at
 				once (or whose area has exactly one such type) simply
@@ -39,9 +43,6 @@
 				`ArbitrateGraphicsWords` (rules first, `ArbitrateByRules`,
 				then the lower mean score), and `ArbitrateEarly` settles a
 				scrub or a sure shape without waiting.
-
-				NOT YET RECONSTRUCTED: `SetCaseAndTime` (the journal's
-				replay of units).
 
 	Reconstructed from the MP2x00 US ROM (0x00206bf0-0x00208ea0); each
 	function cites its origin.
@@ -106,7 +107,7 @@ public:
 	TController*		fController;	// +0x00
 	TArray*				fLists[kArbiterListCount];	// +0x04
 	Boolean				fArbitrateNow;	// +0x20  decide now, whatever is still coming
-	Boolean				fWaiting;		// +0x21  an entry is waiting on units not yet made
+	Boolean				fReplaying;		// +0x21  the journal's units are replayed and measured (FindMatchingArea: HandleReplayUnit)
 	ULong				fCase;			// +0x24  the recognition case the journal's replay was recorded under
 };
 
@@ -130,7 +131,7 @@ enum
 	kLastTypeNumber		= 3
 };
 
-void		SetCaseAndTime(TArray* winners, ULong time);	// ROM 0x0020830c SetCaseAndTime__FP6TArrayUl (NOT YET: the journal's replay of units)
+void		SetCaseAndTime(TArray* winners, ULong time);	// ROM 0x0020830c SetCaseAndTime__FP6TArrayUl - the replayed units at the front stamped with the recognition case and time
 
 extern long	gLastType;									// ROM 0x0c104c64 gLastType - what was recognised last: 1 a shape, 2 a word, 3 a number
 
@@ -143,7 +144,7 @@ struct ArbiterState			// 0x24 bytes in the ROM
 {
 	TArray*		fLists[kArbiterListCount];
 	Boolean		fArbitrateNow;
-	Boolean		fWaiting;
+	Boolean		fReplaying;
 	ULong		fCase;
 };
 long			InitArbiterState(TArbiter* arbiter);		// ROM 0x00206c28 InitArbiterState__FP8TArbiter - new, empty lists

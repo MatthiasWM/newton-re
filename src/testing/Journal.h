@@ -123,4 +123,11 @@ void	JournalAgentIdle(void);					// host: for the unit tests, which have no agen
 
 void	RegisterJournalNatives(void);				// JournalStartRecord, ..., and the tablet's natives
 
+// host (DEVIATION): JournalReplayWords(file, dx, dy), JournalReplayWordsBusy()
+// and JournalStopReplayWords() - a word journal (Journal.cpp: a stroke file
+// and what each word was) played with the recognisers' readings measured
+// (recognition/ReplayMetrics.h, WordReplay.h); put in the global functions
+// by the host's newton
+void	InstallJournalHostNatives(void);
+
 #endif	/* __JOURNAL_H */

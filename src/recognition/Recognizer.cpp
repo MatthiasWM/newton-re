@@ -41,6 +41,7 @@
 #include "ShapeDomain.h"		// SetContextUnitRoutine
 #include "WordRecognizer.h"	// InstallWordRecognizer
 #include "WordEngines.h"		// InstallHostWordEngines, SetUpHostEngine
+#include "WordReplay.h"		// InstallWordReplayRecognizer
 #include "WordRecog.h"		// FragmentLigatures
 #include "NewtonGestalt.h"
 #include "ROMConstants.h"
@@ -998,6 +999,9 @@ TRecognitionManager::InitRecognizers(void)
 		// DEVIATION (host): the host's own engines beside them, asleep
 		// (WordEngines.h)
 		InstallHostWordEngines(this);
+		// DEVIATION (host): the replayed units' recogniser, for the replay
+		// metrics (WordReplay.h: Apple's test tools had theirs)
+		InstallWordReplayRecognizer(this);
 	}
 	// the writer's recognition preferences put into force
 	ReadDomainOptions();
