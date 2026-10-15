@@ -347,7 +347,7 @@ regenerate, don't edit.  What the fixes are and how to switch them off: `docs/ro
 - fixed `recognition/WordRecog.cpp:1349` fixed): the reference's top and bottom are not gathered at all. Each stroke sets them afresh, as the
 - fixed `recognition/WordRecognizer.cpp:465` fixed): when there is no database the domain answers nought and AdjustParaSize takes the handle word
 - fixed `recognition/WordTails.cpp:126` fixed).** `WordTailDeleteRef` begins by answering straight away for `kWordTailNone`; this does not, 
-- fixed `recognition/Words.cpp:407` fixed): it makes a copy of the iterator and then never uses it - the new frame's `cursor` slot is se
+- fixed `recognition/Words.cpp:420` fixed): it makes a copy of the iterator and then never uses it - the new frame's `cursor` slot is se
 - fixed `recognition/XrAnswers.cpp:139` fixed): a letter read as a different one clears the variant and
 - fixed `recognition/XrAnswers.cpp:883` fixed): what follows the symbol is asked for by its sym (the symbol's first byte) where its type (+2
 - fixed `recognition/XrAnswers.cpp:992` fixed): the stretches (letters.parts) are not freed. The fix

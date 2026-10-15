@@ -11,7 +11,7 @@ the way are all in `docs/work-log.md`.
 
 ## State at 2026-10-15
 
-- The full `ctest`: 484 of 484 (several agents work in parallel, each
+- The full `ctest`: 488 of 488 (several agents work in parallel, each
   building in its own directory under `tmp/`).
 - The OS boots from the reconstructed data by default
   (`<build>/romsrc-objects.bin`, from the committed `romsrc/`); `--rom` is
@@ -22,8 +22,8 @@ the way are all in `docs/work-log.md`.
   no function is kept as bytecode (`docs/rom-free/README.md`, "Every
   binary as text"; `docs/work-log.md`, 2026-10-15).  What is left of that
   work is under "Open", "romsrc".
-- `analysis/coverage.py build/MP2x00US --check`: 18807 citations, 0 bad;
-  12833 of 16671 functions (77.0%).
+- `analysis/coverage.py build/MP2x00US --check`: 18914 citations, 0 bad;
+  12938 of 16671 functions (77.6%).
 - `analysis/natives.py --unbound`: 1284 of 1326 natives answered (96.8%).
   Left: comms 38 (AppleTalk and NBP, the online services and eWorld's
   `EW*`, the TV remote), intl 4 (the AppleTalk zones).
@@ -187,6 +187,15 @@ Nothing at present.
 
 ## Open
 
+### A test that passes without running
+
+`packages.PackageManager` prints "all passed" without running most of its
+scenarios: `ROMAt(kSetup)` now reads the romsrc objects' copy of the
+extension rather than the real package, `TestPackagePipe` throws an
+unhandled pipe exception, the world warm-reboots and main carries on.
+The scenarios want a package of their own (a fixture), and the test a
+failure it cannot pass over.
+
 ### What the uncited ROM is (2026-10-01, "other" worked down)
 
 `coverage.py build/MP2x00US --categories tools/newton-rom/analysis/uncited-categories.tsv`
@@ -195,28 +204,34 @@ rules (a regex on the mangled name per category) being that file's; a
 function's size is the distance to the next symbol, so the data behind a
 module is not counted as code, and a function that is nothing but a
 branch to a reconstructed one (followed through branches to branches) is
-counted as an alias of it.  By functions 77.0% is cited; by bytes of
-code, **88.0%**.  The rest, 357 KB in 3838 functions:
+counted as an alias of it.  By functions 77.6% is cited; by bytes of
+code, **88.4%**.  The rest, 347 KB in 3733 functions:
 
 | category | functions | KB | % of the code |
 |---|---:|---:|---:|
 | declined: AppleTalk (LocalTalk, DDP, ATP, NBP, ZIP, RTMP, AEP, ADSP, PAP, the zones) | 971 | 107.9 | 3.6 |
 | hardware: the MessagePad's own chips (Voyager, Cirrus battery and sound, 16450 UART, ADC, flash parts and the flash card alerts, card socket, resistive tablet, GPIO, interrupts, reserved flash blocks) - the host has its own behind `hal/` | 834 | 76.1 | 2.5 |
 | comms not asked for: eWorld and the online services, P3, the mux, the keyboard tool, the TV remote, `TCommToolProtocol`, the high ROM's driver packages | 597 | 37.8 | 1.3 |
-| memory system: MMU page tables, physical pages, the stack manager, domains - the host's memory is its own | 295 | 33.4 | 1.1 |
+| memory system: MMU page tables, physical pages, the stack manager, domains - the host's memory is its own | 296 | 33.4 | 1.1 |
 | declined: the ROM domain manager and XIP packages (with `RelocateFramesInPage`, a store package's page relocated where the domain maps it) | 184 | 31.5 | 1.1 |
 | debugger, test harness, diagnostics (the serial/GeoPort debug links, Hammer, ARM's RDP, the test agent's desktop server and C test cases, `TMsg`, the abort handler - `docs/testing/README.md`, "What is left") | 211 | 21.7 | 0.7 |
 | declined: the StyleWriter and LaserWriter LS drivers | 140 | 15.2 | 0.5 |
-| dead in the U.S. ROM (the math views, sixteen-bit dictionaries, French/German accent checks, TextArrow, the package validation driver, the ink codec's default point procs, `MemBufferPipe`) | 56 | 8.8 | 0.3 |
 | protocol glue (interface stubs not cited at a declaration) | 368 | 9.0 | 0.3 |
 | performance variants (the blitter's special cases; the host's blitter is its own) | 37 | 8.2 | 0.3 |
 | runtime (the compiler's C++ runtime - `__nw_v`, `__dl_v`, `__vc__`, `__pvfn__`, `__push_ddtor` - `ByteSwap`, and three one-line forms nothing on the host calls) | 11 | 0.9 | 0.0 |
 | unreferenced (nothing in the ROM refers to it, and it is not public: older text-layout helpers of the paragraph view, ink hit-testing of the edit view, `ShutDownUnicode`, string helpers, and five empty or nought-answering stubs) | 28 | 2.7 | 0.1 |
-| public API the ROM does not call (in the public jump table for packages' native code, which armcpu answers or runs the ROM's own copy of: the idle timer, the GC-safe lists, the unicode task table, out-of-line inlines) | 44 | 1.8 | 0.1 |
 | **other - what is left** | 2 | 0.0 | 0.0 |
 | system patches (the host has none) | 10 | 1.1 | 0.0 |
-| host stand-ins (DEVIATION: the text objects' TextWalker - the host's text layout takes the characters whole) | 5 | 0.9 | 0.0 |
-| aliases of reconstructed functions (one branch to one) | 39 | 0.2 | 0.0 |
+| host stand-ins (DEVIATION: the text objects' TextWalker - the host's text layout takes the characters whole) | 10 | 1.2 | 0.0 |
+| aliases of reconstructed functions (one branch to one) | 34 | 0.1 | 0.0 |
+
+Two categories are empty since 2026-10-15 (`docs/work-log.md`): the
+**public API the ROM does not call** (44 functions, all reconstructed and
+answered by armcpu) and the **dead in the U.S. ROM** (56: the math views,
+the sixteen-bit Airus walkers, the French/German accent checks,
+TextArrow, the package validation driver, the ink codec's default point
+procs, `MemBufferPipe` - each reconstructed and wired in where the ROM
+wires it).  The 28 "unreferenced" functions are the dead code still left.
 
 "Other" was 418 functions and 22.6 KB at the first count; it went down
 by reconstructing what the reconstructed code calls where the ROM calls
