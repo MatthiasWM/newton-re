@@ -38,13 +38,15 @@ comms: eWorld, online services, P3, mux, keyboard, TV remote	EWorld|OnlineServic
 
 # --- dead in the U.S. ROM ---------------------------------------------------
 # nothing in the U.S. ROM reaches these: the math views (no form makes one),
-# the sixteen-bit dictionaries, the French/German accent checks, text at an
-# angle and TextArrow, the package validation driver (never registered);
-# LengthOfTraj and CurvFromSquare are the accent check's alone; the ink
-# codec's default point sink and source, which DecoderOpen/EncoderOpen put
-# in a context and their only callers (Decode, GenericCSCompress) replace
-# before the run; MemBufferPipe, whose vtable (0x0001c854) nothing refers to,
-# so that none is ever made
+# the sixteen-bit dictionaries, the French/German accent checks, TextArrow,
+# the package validation driver (never registered); LengthOfTraj and
+# CurvFromSquare are the accent check's alone; the ink codec's default
+# point sink and source, which DecoderOpen/EncoderOpen put in a context and
+# their only callers (Decode, GenericCSCompress) replace before the run;
+# MemBufferPipe, whose vtable (0x0001c854) nothing refers to, so that none
+# is ever made.  All of them are reconstructed now (2026-10-15), so the
+# category is empty; the pattern stays so that a citation lost is put back
+# here rather than in "other".
 dead in the U.S. ROM	\d+MemBufferPipe|LengthOfTraj|CurvFromSquare|StorePointProcDefault|GetInputTraceDefault|TMath(Exp|Op|Line)View|A[EL]16_|DiacriticsDirection|TextArrow|ValidatePackageDriver|ValidateBackupPipe|IsFirstByteOf2Byte|SetLocale5
 
 # nothing in the ROM refers to these at all - no call, no branch, no

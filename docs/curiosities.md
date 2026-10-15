@@ -2468,3 +2468,28 @@ of a line is loaded with an unaligned `ldr` from `unicodeSpace + 2`: the
 StrongARM rotates the aligned word so that the halfword wanted lands in
 the low bits - a halfword load on a CPU the compiler would not trust with
 `ldrh`.
+
+
+## Code for machines that never shipped with it
+
+About nine kilobytes of the U.S. ROM are reached by nothing in it, and each
+piece says something about the Newton that was planned: views for a math
+recogniser (`views/MathViews.h`: an expression as a container of terms, an
+operator drawn as two or three lines, a fraction's bar - the recogniser
+itself is not in the ROM); an accent check for French and German
+handwriting that tells an acute from a grave, a circumflex's roof from an
+umlaut's two dots, and charges an e acute written the wrong way for the e
+grave it looks like (`CheckDiacriticsDirections`); dictionary walkers for
+two-byte characters; a package validation hook for signed packages
+(`TValidatePackageDriver`, the signature presumably in the last part of a
+package flagged 0x01000000); the ink codec's own buffer of points.
+
+The two-byte dictionary walkers were evidently never run.  They are the
+eight-bit ones copied out with the offsets moved on by one for the
+two-byte character - all but the sibling offset of the two small size
+classes, still read from `p[size]`, so that past the first node of a row
+nothing can be found (ROM BUG, fixed).  And `AE16_NextSet9` hands its
+callback each character as its two bytes taken low one first -
+byte-swapped - which its only callback, `AE16_NextSetCB`, puts right by
+writing it out low byte first: two mistakes that cancel, or a convention
+nobody else was meant to see.
