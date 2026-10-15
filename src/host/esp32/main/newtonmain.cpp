@@ -48,6 +48,7 @@
 #include "comms/host/HostCellProvider.h"
 #include "comms/host/HostMeshApp.h"
 #include "host/HostSettings.h"
+#include "host/HostQuickSheet.h"
 #include "host/HostDeveloper.h"
 #include "print/host/HostIPP.h"
 #include "host/HostFontProvider.h"
@@ -201,7 +202,7 @@ FDeviceMemory(RefArg /*rcvr*/)
 
 struct TDeviceEvalEvent : public TAEvent
 {
-	const char*	fSource;
+	const char*	fSource;		// (nil: the quick sheet pulled down - HostQuickSheetPulled, nothing printed)
 };
 
 class TDeviceEvalHandler : public TAEventHandler
@@ -210,6 +211,14 @@ public:
 	virtual void	AEHandlerProc(TUMsgToken* token, ULong* size, TAEvent* event)
 	{
 		TDeviceEvalEvent* eval = (TDeviceEvalEvent*) event;
+		if (eval->fSource == nil)
+		{
+			HostQuickSheetPulled();
+			SetReply(*size, event);
+			if (token != nil && token->GetReplyId() != 0)
+				ReplyImmed();
+			return;
+		}
 		long long t = HostDeviceMicroseconds();
 		newton_try
 		{
@@ -294,6 +303,8 @@ DevicePreMain(void)
 	HostMeshAppStart();					// (the LoRa radio's mesh node, for the Mesh application: comms/host/HostMeshApp.h)
 	HostInstallIPPPrinters();			// (print/host/HostIPP.h: the network's IPP printers, in the Print slip and the Network Printers panel; no PNG host printer on the board)
 	HostInstallSettings();				// (the Host preferences panel: the panel's quick updates and clean-ups)
+	HostQuickSheetSetLockHook(HostDeviceSetLocked);
+	HostInstallQuickSheet();			// (host/HostQuickSheet.h: the sheet pulled down from the top edge - tdeck_input.cpp - and the lock screen)
 	HostInstallDeveloper();				// (the Developer preferences panel: the profile to the console)
 }
 
@@ -332,8 +343,9 @@ SetClockFromBoard(void)
 
 
 // the kernel services task (gHostKernelServicesTask): the keyboard's keys
-// (host/HostKeyboard.cpp's queue, which tdeck_input.cpp fills) and the
-// console's lines to the world, a hundredth of a second at a time
+// (host/HostKeyboard.cpp's queue, which tdeck_input.cpp fills), the quick
+// sheet's pulls and the console's lines to the world, a hundredth of a
+// second at a time
 static void
 DeviceServices(void)
 {
@@ -357,6 +369,15 @@ DeviceServices(void)
 			SetClockFromBoard();
 		}
 		HostKeyboardSendKeys(&newtPort);
+		if (HostDeviceSheetPulled())
+		{
+			TDeviceEvalEvent pulled;
+			pulled.fAEventClass = 'host';
+			pulled.fAEventID = 'eval';
+			pulled.fSource = nil;
+			ULong replySize = 0;
+			newtPort.SendRPC(&replySize, &pulled, sizeof(pulled), &pulled, sizeof(pulled));
+		}
 		if (HostDeviceReadLine(line, sizeof(line)))
 		{
 			TDeviceEvalEvent eval;

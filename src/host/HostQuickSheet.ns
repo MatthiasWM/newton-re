@@ -1,0 +1,248 @@
+// The quick sheet and the lock screen (host/HostQuickSheet.h).  This file is
+// compiled into the program (HostQuickSheetSource.cpp, made by
+// src/cmake/EmbedText.cmake) and evaluated at boot by HostInstallQuickSheet;
+// it answers the frame kept in the global QuickSheet:host.
+//
+// The sheet: pulled down from the top of the screen (the T-Deck Pro's
+// finger, tdeck_input.cpp; HostQuickSheetPulled sends Pulled), a floating
+// view across the top - "Lock screen", and a checkbox for each of the
+// board's radios and receivers it can switch: the 4G module and the GPS
+// through the Host preferences panel's settings (cellPower, gpsPower: kept
+// there as if changed in the panel), the LoRa radio through the Mesh
+// application's switch (HostMeshSetPower: the board keeps it).  Pulled again
+// while it is open, it closes; so does its close box.
+//
+// The lock screen: a floating view over the whole screen - the time, the
+// date, and a slider whose knob is dragged from its left end to its right to
+// unlock.  A press that does not start on the knob does nothing, and a knob
+// let go short of the end goes back, so a tap anywhere (a pocket) cannot
+// unlock it.  The time is redrawn when the minute changes.  The host is told
+// (HostScreenLocked) so that it can leave the keyboard out meanwhile.
+
+{
+	kFont: 10240,							// the system font, 10 point
+	kBold: 1058816,							// ... bold (face 1: 1 << 20)
+	kBig: 1067008,							// ... 18 point, bold
+	kRowHeight: 22,
+
+	sheetView: nil,
+	lockView: nil,
+
+	Pulled: func()
+	begin
+		if lockView then return;
+		if sheetView then :CloseSheet() else :OpenSheet();
+	end,
+
+	// one of the Host preferences panel's settings as a switch: {label, Get,
+	// Set} - changed through the panel's frame, so that it keeps it
+	SettingSwitch: func(label, setting)
+	begin
+		{label: label,
+		 Get: func() begin
+			local on := nil;
+			foreach item in HostSettingsList() do
+				if item.setting = setting and item.value then on := true;
+			on;
+		 end,
+		 Set: func(on) begin
+			local settings := GetGlobalVar('|HostSettings:host|);
+			if settings then settings:Change(setting, on) else HostSetSetting(setting, on);
+		 end};
+	end,
+
+	// the board's switches, in the sheet's order
+	Switches: func()
+	begin
+		local switches := [];
+		local have := [];
+		foreach item in HostSettingsList() do AddArraySlot(have, item.setting);
+		if SetContains(have, 'cellPower) then AddArraySlot(switches, :SettingSwitch("4G module", 'cellPower));
+		if SetContains(have, 'gpsPower) then AddArraySlot(switches, :SettingSwitch("GPS", 'gpsPower));
+		if GetGlobalFn('HostMeshPowerSwitchable) and call GetGlobalFn('HostMeshPowerSwitchable) with () then
+			AddArraySlot(switches, {label: "LoRa radio",
+				Get: func() call GetGlobalFn('HostMeshPowered) with (),
+				Set: func(on) call GetGlobalFn('HostMeshSetPower) with (on)});
+		switches;
+	end,
+
+	OpenSheet: func()
+	begin
+		local root := GetRoot():LocalBox();
+		local width := root.right - root.left;
+		local children := [
+			{_proto: @218, viewBounds: {left: 10, top: 6, right: -10, bottom: 22}, viewJustify: 48,	// protoStaticText
+			 viewFont: kBold, text: "Quick settings"}];
+		local top := 28;
+		foreach s in :Switches() do begin
+			AddArraySlot(children,
+				{_proto: @164,												// protoCheckbox
+				 viewBounds: {left: 10, top: top, right: -10, bottom: top + 18},
+				 viewJustify: 48,
+				 text: s.label & " on",
+				 buttonValue: true,
+				 viewValue: nil,
+				 switch: s,
+				 viewSetupFormScript: func() begin
+					viewValue := call switch.Get with ();
+					inherited:?viewSetupFormScript();
+				 end,
+				 valueChanged: func() begin
+					call switch.Set with (viewValue);
+					// (what the board has now, whether or not it took it)
+					local now := call switch.Get with ();
+					if (now and true) <> (viewValue and true) then SetValue(self, 'viewValue, now);
+				 end});
+			top := top + kRowHeight;
+		end;
+		AddArraySlot(children,
+			{_proto: @226,													// protoTextButton
+			 viewBounds: {left: 10, top: top + 4, right: 110, bottom: top + 22},
+			 text: "Lock screen",
+			 sheetRole: 'lock,
+			 buttonClickScript: func() GetGlobalVar('|QuickSheet:host|):Lock()});
+		AddArraySlot(children, {_proto: @166,								// protoClosebox, at the top right
+			viewBounds: {left: -20, top: 6, right: -6, bottom: 20}, viewJustify: 32});	// (vjParentRightH)
+		local height := top + 34;
+		// (its edge a black rule inside it: a frame is drawn outside the
+		// bounds, off the screen at the top and the sides)
+		AddArraySlot(children, {viewClass: 74, viewFlags: 1, viewFormat: 5,	// black
+			viewBounds: {left: 0, top: height - 3, right: width, bottom: height}});
+		sheetView := BuildContext({
+			viewClass: 74,													// clView
+			viewFlags: 580,													// vApplication, vFloating, vClickable (not vVisible: Open shows it - a view visible already is not drawn, TView::Show)
+			viewFormat: 1,													// white
+			viewBounds: {left: 0, top: 0, right: width, bottom: height},
+			viewFont: kFont,
+			quickSheet: true,
+			stepChildren: children,
+			viewQuitScript: func() GetGlobalVar('|QuickSheet:host|).sheetView := nil});
+		sheetView:Open();
+		sheetView;
+	end,
+
+	CloseSheet: func()
+	begin
+		if sheetView then sheetView:Close();
+		sheetView := nil;
+	end,
+
+	Lock: func()
+	begin
+		:CloseSheet();
+		if lockView then return lockView;
+		local root := GetRoot():LocalBox();
+		local width := root.right - root.left;
+		local height := root.bottom - root.top;
+		local sliderTop := height - 70;
+		lockView := BuildContext({
+			viewClass: 74,
+			viewFlags: 580,
+			viewFormat: 1,													// white
+			viewBounds: {left: 0, top: 0, right: width, bottom: height},
+			viewFont: kFont,
+			lockScreen: true,
+			stepChildren: [
+				{_proto: @218, viewBounds: {left: 0, top: height div 4, right: width, bottom: height div 4 + 26},
+				 viewJustify: 2, viewFont: kBig, text: "", lockRole: 'time},
+				{_proto: @218, viewBounds: {left: 0, top: height div 4 + 30, right: width, bottom: height div 4 + 46},
+				 viewJustify: 2, viewFont: kFont, text: "", lockRole: 'date},
+				{_proto: slider, viewBounds: {left: 16, top: sliderTop, right: width - 16, bottom: sliderTop + 36}}],
+			viewSetupDoneScript: func() begin
+				:ShowTime();
+				:SetupIdle(1000);
+			end,
+			ShowTime: func() begin
+				local now := Time();
+				foreach c in :ChildViewFrames() do begin
+					if c.lockRole = 'time then SetValue(c, 'text, TimeStr(now, @66.shortTimeStrSpec));
+					if c.lockRole = 'date then SetValue(c, 'text, LongDateStr(now, @66.longDateStrSpec));
+				end;
+				shownMinute := now;
+			end,
+			shownMinute: nil,
+			// (once a second: the time redrawn only when the minute changes,
+			// which a panel that flashes to redraw wants)
+			viewIdleScript: func() begin
+				if Time() <> shownMinute then :ShowTime();
+				1000;
+			end,
+			viewQuitScript: func() GetGlobalVar('|QuickSheet:host|).lockView := nil});
+		lockView:Open();
+		HostScreenLocked(true);
+		lockView;
+	end,
+
+	Unlock: func()
+	begin
+		if lockView then lockView:Close();
+		lockView := nil;
+		HostScreenLocked(nil);
+	end,
+
+	// The slider: a frame with the knob in it at knobX (0 at the left end),
+	// "slide to unlock" in what is left of it.  A press on the knob drags it
+	// with the pen (its ink off); let go at the right end, the screen
+	// unlocks, short of it the knob goes back.
+	slider: {
+		viewClass: 74,
+		viewFlags: 513,														// vVisible, vClickable
+		viewFormat: 0,
+		lockRole: 'slider,
+		knobX: 0,
+		kKnobWidth: 44,
+		Travel: func() begin
+			local b := :LocalBox();
+			b.right - b.left - kKnobWidth - 4;
+		end,
+		viewDrawScript: func()
+		begin
+			local b := :LocalBox();
+			local w := b.right - b.left;
+			local h := b.bottom - b.top;
+			:DrawShape(MakeRoundRect(0, 0, w, h, 10), {penSize: 2, penPattern: 5, fillPattern: 1});
+			local left := 2 + knobX;
+			:DrawShape(MakeRoundRect(left, 2, left + kKnobWidth, h - 2, 8), {penPattern: 0, fillPattern: 5});
+			// the knob's arrow, in white
+			local cx := left + kKnobWidth div 2;
+			local cy := h div 2;
+			:DrawShape(MakePolygon([cx - 6, cy - 8, cx + 6, cy, cx - 6, cy + 8]), {penPattern: 0, fillPattern: 1});
+			local fh := FontHeight(10240);
+			local textLeft := left + kKnobWidth + 4;
+			if textLeft < w - 60 then
+				:DrawShape(MakeText("slide to unlock", textLeft, (h - fh) div 2 - 2, w - 4, (h + fh) div 2),
+					{font: 10240, justification: 'center});
+		end,
+		viewClickScript: func(unit)
+		begin
+			InkOff(unit);
+			local origin := (:GlobalBox()).left;
+			local grab := GetPoint(0, unit) - origin - 2 - knobX;			// (firstX)
+			if grab < -6 or grab > kKnobWidth + 6 then return true;			// not on the knob
+			local travel := :Travel();
+			local x := knobX;
+			loop begin
+				local wanted := GetPoint(4, unit) - origin - 2 - grab;		// (finalX)
+				if wanted < 0 then wanted := 0;
+				if wanted > travel then wanted := travel;
+				// (a few pixels at a time: each redraw is the panel's)
+				if Abs(wanted - x) >= 6 or (wanted = travel and x <> travel) then begin
+					x := wanted;
+					knobX := x;
+					:Dirty();
+					RefreshViews();
+				end;
+				if StrokeDone(unit) then break;
+				Sleep(1);
+			end;
+			local final := GetPoint(4, unit) - origin - 2 - grab;
+			if final >= travel - 4 then
+				GetGlobalVar('|QuickSheet:host|):Unlock()
+			else begin
+				knobX := 0;
+				:Dirty();
+			end;
+			true;
+		end,
+	},
+}

@@ -155,6 +155,11 @@
 	is its name until the Mesh application gives it another
 	(docs/host-tdeck-pro-mesh.md).
 
+	--quick-sheet installs the T-Deck Pro's quick sheet and lock screen
+	(host/HostQuickSheet.h) for testing: the board opens the sheet when
+	a finger is pulled down from the screen's top edge; here a script
+	does (GetGlobalVar('|QuickSheet:host|):Pulled(), demo/quicksheet.ns).
+
 	--ir-peer puts the Newton's built-in IR port on a TCP connection to
 	another newton (hal/host/HostIRChip.h), so the two can beam to each
 	other: one is given listen:PORT (0 picks a free port) and the other
@@ -193,6 +198,7 @@
 #include "HostPackages.h"
 #include "HostOrientation.h"
 #include "HostSettings.h"
+#include "HostQuickSheet.h"
 #include "HostDeveloper.h"
 #include "HostMapping.h"
 #include "ROMImport.h"
@@ -308,6 +314,7 @@ static long gSerialPort = kHostSerialPort;	// --serial-port: -1 none
 static long gCellPort = -1;					// --cell-port: -1 none
 static const char* gMeshAir = nil;			// --mesh-air: "lan[:port]"
 static const char* gMeshName = nil;			// --mesh-name
+static bool gQuickSheet = false;			// --quick-sheet
 static const char* gGPS = nil;				// --gps: the GPS receiver's source
 static const char* gGPSKind = nil;			// --gps-kind: nmea or tripmate
 static long gGPSPort = 2;					// --gps-port: 2 serial port 2 ('mdem'), 1 the external one
@@ -333,7 +340,7 @@ Usage(void)
 					"              [--package file.pkg]... [--card file] [--microphone-tone hz] [--tcp-echo port]\n"
 					"              [--serial-port port|none] [--ir-peer listen:port|host:port] [--print-dir dir]\n"
 					"              [--ir-lan [port]] [--ir-lan-interface address] [--cell-port port]\n"
-					"              [--mesh-air lan[:port]] [--mesh-name name]\n"
+					"              [--mesh-air lan[:port]] [--mesh-name name] [--quick-sheet]\n"
 					"              [--gps sim[:lat,lon[,knots]]|fixed:lat,lon[,alt]|nmea:file|tcp:host:port|gpsd[:host[:port]]|serial:device[@baud]]\n"
 					"              [--gps-kind nmea|tripmate] [--gps-port 1|2]\n"
 					"              [--ipp-printer uri]\n"
@@ -692,6 +699,8 @@ NewtonPreMain(void)
 	HostInstallSettings();				// (the Host preferences panel, after Network Printers)
 	HostInstallDeveloper();				// (the Developer preferences panel, after it: the Prefs list's last)
 	HostInstallWordEngines();			// (the host's handwriting engines in the Handwriting Recognition slip)
+	if (gQuickSheet)
+		HostInstallQuickSheet();		// (host/HostQuickSheet.h: the T-Deck Pro's quick sheet and lock screen, for testing)
 	InstallJournalHostNatives();		// (testing/Journal.h: JournalReplayWords, for the recognisers' replay metrics)
 	// the boot sound (TNotebook::InitToolbox), which may still be playing,
 	// kept out of what is counted as played, which is what the script's
@@ -1160,6 +1169,8 @@ main(int argc, char** argv)
 			gCellPort = strtol(argv[++i], nil, 0);
 		else if (strcmp(argv[i], "--mesh-air") == 0 && i + 1 < argc)
 			gMeshAir = argv[++i];
+		else if (strcmp(argv[i], "--quick-sheet") == 0)
+			gQuickSheet = true;
 		else if (strcmp(argv[i], "--mesh-name") == 0 && i + 1 < argc)
 			gMeshName = argv[++i];
 		else if (strcmp(argv[i], "--gps") == 0 && i + 1 < argc)

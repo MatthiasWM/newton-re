@@ -188,10 +188,20 @@ add_custom_command(
             -P ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/HostWordEngines.ns ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
     VERBATIM)
+# host/HostQuickSheet.ns, the quick sheet and the lock screen (the T-Deck
+# Pro's; here behind --quick-sheet), compiled in the same way
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/HostQuickSheetSource.cpp
+    COMMAND ${CMAKE_COMMAND} -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/HostQuickSheet.ns
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/HostQuickSheetSource.cpp -DNAME=gHostQuickSheetSource
+            -P ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/HostQuickSheet.ns ${CMAKE_SOURCE_DIR}/cmake/EmbedText.cmake
+    VERBATIM)
 add_executable(newton newton.cpp HostRestart.cpp HostKeyboard.cpp HostPackages.cpp HostOrientation.cpp HostSettings.cpp HostFontProvider.cpp
                ${CMAKE_CURRENT_BINARY_DIR}/HostSettingsSource.cpp HostDeveloper.cpp
                ${CMAKE_CURRENT_BINARY_DIR}/HostDeveloperSource.cpp HostWordEngines.cpp
-               ${CMAKE_CURRENT_BINARY_DIR}/HostWordEnginesSource.cpp HostHeapCheck.cpp)
+               ${CMAKE_CURRENT_BINARY_DIR}/HostWordEnginesSource.cpp HostHeapCheck.cpp
+               HostQuickSheet.cpp ${CMAKE_CURRENT_BINARY_DIR}/HostQuickSheetSource.cpp)
 target_link_libraries(newton PRIVATE newt host_views host_window hal_host_sound hal_timers hal_host_serial)
 target_compile_definitions(newton PRIVATE "NEWTON_DEFAULT_OBJECTS=\"${NEWTON_OBJECTS_FILE}\"")
 install(TARGETS newton DESTINATION bin)
@@ -1061,6 +1071,16 @@ add_test(NAME host.NewtonDeveloperPanel COMMAND newton --display 320x480 --headl
 set_tests_properties(host.NewtonDeveloperPanel PROPERTIES TIMEOUT 300
                      PASS_REGULAR_EXPRESSION "has Developer, has no AppleTalk.*profiling on.*the profile written to .*developer.store.nsprofile.txt.*profiling off.*developer: done"
                      FAIL_REGULAR_EXPRESSION "waited in vain|fell over|!!! Exception")
+# the T-Deck Pro's quick sheet and lock screen (HostQuickSheet.h,
+# demo/quicksheet.ns, behind --quick-sheet): pulled open and closed, the
+# screen locked from it, a tap at the slider's end and a short drag leaving
+# it locked, a drag to the end unlocking it
+add_test(NAME host.NewtonQuickSheet COMMAND newton --display 320x480 --headless 200 --erase --quick-sheet
+         --store ${CMAKE_CURRENT_BINARY_DIR}/quicksheet.store
+         --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/quicksheet.ns WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
+set_tests_properties(host.NewtonQuickSheet PROPERTIES TIMEOUT 300
+                     PASS_REGULAR_EXPRESSION "the sheet open, Lock screen.*pulled again, closed.*locked, the sheet closed.*pulled while locked, the sheet closed.*a tap at the slider's end leaves it locked.*half way and let go leaves it locked, the knob at 0.*dragged to the end, unlocked.*quicksheet: done"
+                     FAIL_REGULAR_EXPRESSION "waited in vain|fell over|!!! Exception|not installed")
 # the Host preferences panel (HostSettings.h, demo/hostsettings.ns): .set
 # turns beaming over the network on from Prefs with no restart and keeps it,
 # .kept boots the same store with it on and turns it off.  (Docking on a
