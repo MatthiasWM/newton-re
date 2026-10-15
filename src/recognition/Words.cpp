@@ -56,6 +56,19 @@ HasSpaces(const UniChar* word)
 }
 
 
+// ROM 0x00256498 HasDigits__FPUs
+// Whether there is a digit (an ASCII one) anywhere in it.  Public API:
+// nothing in the ROM calls it.
+Boolean
+HasDigits(const UniChar* word)
+{
+	for (; *word != 0; word++)
+		if (*word >= '0' && *word <= '9')
+			return true;
+	return false;
+}
+
+
 // ROM 0x002564d4 HasChars__FPUs
 // Whether there is a Roman letter anywhere in it: the ROM tests the two
 // ASCII ranges, so a word of nothing but accented letters has none.

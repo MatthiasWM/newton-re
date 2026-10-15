@@ -379,6 +379,16 @@ public:
 	NewtonErr			KillTimer(ULong refCon);
 	void				TerminateEventLoop(void);
 
+	// the public jump table's of an older interface, each a bare return in
+	// the ROM and called by nothing (the reconstruction's answer nothing;
+	// the ROM's caller found its handler in r0)
+	void				CallService(ULong msgType, TUAsyncMessage* asyncMsg, TAEvent* request, long requestSize,
+									TAEvent* reply, long replySize, ULong timeout, Boolean sync);	// ROM 0x000ac670 CallService__21TEndpointEventHandlerFUlP14TUAsyncMessageP7TAEventlT3T4T1Uc
+	void				CallServiceBlocking(ULong msgType, TAEvent* request, long requestSize,
+									TAEvent* reply, long replySize, ULong timeout);					// ROM 0x000ac674 CallServiceBlocking__21TEndpointEventHandlerFUlP7TAEventlT2T3T1
+	void				GetPrivatePortId(void);												// ROM 0x000acc28 GetPrivatePortId__21TEndpointEventHandlerFv
+	void				GetSyncPortId(void);												// ROM 0x000acc2c GetSyncPortId__21TEndpointEventHandlerFv
+
 	TEndpoint*			fEndpoint;			// +0x14
 	TUPort				fServicePort;		// +0x18  the comm tool's port
 	TPseudoSyncState	fSyncState;			// +0x20  what Block waits on

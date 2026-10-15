@@ -209,6 +209,15 @@ TestStructure()
 	EXPECT(RINT(Eval("ctxA:GlobalBox().right")) == 60 && RINT(Eval("ctxA:LocalBox().right")) == 50 && RINT(Eval("ctxA:LocalBox().top")) == 0);
 	EXPECT(RINT(Eval("ctxA:GlobalOuterBox().right")) == 60);
 
+	// the TCommand overloads (bare returns): nothing about the view changes
+	{
+		ULong flags = a->fFlags;
+		long children = a->fChildren->Count();
+		a->DoCommand((TCommand*) nil);
+		a->RealDoCommand((TCommand*) nil);
+		EXPECT(a->fFlags == flags && a->fChildren->Count() == children && BoundsAre(a, 10, 10, 60, 40));
+	}
+
 	// RemoveView takes the child out and deletes its view
 	Eval("RemoveView(ctxA, ctxA:ChildViewFrames()[0])");
 	EXPECT(a->fChildren == TView::gEmptyViewList && RINT(Eval("Length(templA.viewChildren)")) == 0);

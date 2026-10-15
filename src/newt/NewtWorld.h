@@ -206,6 +206,9 @@ public:
 };
 
 extern TUPort*			gNewtPort;							// ROM 0x0c1054a8 gNewtPort - the world's port
+class TRootView;
+TUPort*		GetNewtTaskPort(void);							// ROM 0x0030bb84 GetNewtTaskPort__Fv - gNewtPort (public API: nothing in the ROM calls it)
+TRootView*	GetNewtRootView(void);							// ROM 0x0030bb94 GetNewtRootView__Fv - gRootView (likewise)
 extern ULong			NewtAlarmName;						// ROM 0x0c10551c NewtAlarmName - the world's real-time clock alarm
 extern Boolean			gNewtIsAliveAndWell;				// ROM 0x0c105510 gNewtIsAliveAndWell (views/Application.cpp)
 extern TTime			gLastWakeupTime;					// ROM 0x0c104c4c gLastWakeupTime
