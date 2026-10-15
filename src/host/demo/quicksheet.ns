@@ -4,7 +4,8 @@
 //
 // Setup walked through, then the sheet pulled down (as the board does when
 // a finger is pulled from the screen's top edge) and pulled again, which
-// closes it; pulled once more and its "Lock screen" tapped, the lock screen
+// closes it; pulled again and its close box tapped, which closes it too;
+// pulled once more and its "Lock screen" tapped, the lock screen
 // covers the screen.  A tap at the slider's far end, and the knob dragged
 // half way and let go, leave it locked (the knob back at the left); the
 // knob dragged to the end unlocks it.  Pictures of the sheet and the lock
@@ -65,6 +66,11 @@ qsRun := func() begin
 		Print("quicksheet: pulled again, " & (if sheet.sheetView then "still open" else "closed"));
 		sheet:Pulled();
 		call waitFor with ("quicksheet: the sheet again", func() sheet.sheetView and sheet.sheetView.viewCObject, func() begin
+		call tapCentre with (call findView with (sheet.sheetView, func(v) v.sheetRole = 'close and v.viewCObject));
+		call waitFor with ("quicksheet: the close box", func() not sheet.sheetView, func() begin
+		Print("quicksheet: the close box closes it");
+		sheet:Pulled();
+		call waitFor with ("quicksheet: the sheet a third time", func() sheet.sheetView and sheet.sheetView.viewCObject, func() begin
 			call tapCentre with (call findView with (sheet.sheetView, func(v) v.sheetRole = 'lock and v.viewCObject));
 			call waitFor with ("quicksheet: the lock screen", func() sheet.lockView and sheet.lockView.viewCObject, func() begin
 				RefreshViews();
@@ -74,6 +80,8 @@ qsRun := func() begin
 				Print("quicksheet: pulled while locked, the sheet " & (if sheet.sheetView then "open" else "closed"));
 				call qsLocked with ();
 			end, 20);
+		end, 20);
+		end, 20);
 		end, 20);
 	end, 20);
 end;

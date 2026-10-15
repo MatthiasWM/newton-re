@@ -101,7 +101,7 @@
 			 text: "Lock screen",
 			 sheetRole: 'lock,
 			 buttonClickScript: func() GetGlobalVar('|QuickSheet:host|):Lock()});
-		AddArraySlot(children, {_proto: @166,								// protoClosebox, at the top right
+		AddArraySlot(children, {_proto: @166, sheetRole: 'close,				// protoClosebox, at the top right
 			viewBounds: {left: -20, top: 6, right: -6, bottom: 20}, viewJustify: 32});	// (vjParentRightH)
 		local height := top + 34;
 		// (its edge a black rule inside it: a frame is drawn outside the
@@ -115,6 +115,7 @@
 			viewBounds: {left: 0, top: 0, right: width, bottom: height},
 			viewFont: kFont,
 			quickSheet: true,
+			declareSelf: 'base,												// (the close box closes base)
 			stepChildren: children,
 			viewQuitScript: func() GetGlobalVar('|QuickSheet:host|).sheetView := nil});
 		sheetView:Open();

@@ -265,6 +265,8 @@ for its ctest `host.NewtonQuickSheet`).
   viewFlags: `TView::Show` (the ROM's) does nothing for a view visible
   already, so it is never drawn (found here: a template with 581 opened
   but stayed off the screen; 580, as the ROM's floaters have, is drawn).
+  And the ROM's protoClosebox closes `base`: a view of one's own that has
+  one must say `declareSelf: 'base`, or its close box does nothing.
 
 ## What it measured (2026-10-11, the owner's V1.0)
 
