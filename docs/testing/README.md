@@ -106,6 +106,69 @@ error and a test frame's start, reads them back from the queue, sets and
 splits the parameters and finds views with `debug`.
 
 
+## What is left of the debugging and test tools (2026-10-15)
+
+The uncited ROM's "debugger, test harness, diagnostics" category
+(`coverage.py --categories`, 239 functions, 31 KB) and the testing
+system's NOT YETs, gone through one by one - who reaches each
+(`analysis/callgraph.py --callers`) and what it would give the host.  The
+NTK Inspector, the one debugger a Newton developer used, is already done
+(`comms/NTK.h`, ctest `host.NewtonNTK`).
+
+**Worth doing:**
+
+- **The recogniser's replay metrics** (~8 KB: `HandleReplayUnit` 0x00090288,
+  `WriteTapStats`, `PrintMetrics`, the `Gather*Metrics` family,
+  `GetCorrespondingUnits`, `IsControlUnit`, `HandleControlString`,
+  `MaybeDoLearning`).  When the journal replays *units* rather than
+  strokes, the arbiter hands them to `HandleReplayUnit` (the unit handler
+  `Areas.cpp` leaves NOT YET), which matches what the recognisers made of
+  the ink against what the journal says was written (control strings in
+  it) and tallies words, shapes, scores and times - a recognition accuracy
+  harness.  On the host it would measure ParaGraph, Rosetta and the host's
+  own engines on the same recorded writing, which nothing does now
+  (`docs/recognition/engines.md`; "How well the recognisers read
+  synthetic writing" in `docs/next-steps.md`).  It needs the journal to
+  record and replay units as well as strokes.
+- **The NewtonScript function profiler's hooks** (`EnableFramesFunctionProfiling`
+  0x002d41f4, `InstallFramesFunctionProfiler` 0x002d424c, the interpreter's
+  `TInterpreter::Return(FramesProfilingKind)` and the hooks around the
+  collector that `GC.cpp` leaves NOT YET).  The ROM has the hooks - a
+  profiler a package or the debugger installs is called on every function
+  entry and return - but no profiler; a host one behind them (calls and
+  time per NewtonScript function, written out at the end) would serve the
+  T-Deck Pro's "NewtonScript's speed" work, where `tools/host/profile.py`
+  sees only the C++ under the interpreter.
+
+**Not worth doing on the host** (each kept in the uncited categories with
+this reason):
+
+- **The serial and GeoPort debug links** (`TAsyncDebugLink`,
+  `TGeoPortDebugLink`, the Hammer translators `PHammerIn/OutTranslator`,
+  `InformHammer`) and **ARM's remote debug protocol** (`DoRDP`, `rdpInfo`,
+  `rdpStop`, `StopWithStatus`, `ImageCommand`, reached from
+  `ReportException` with a debug card fitted): the link to Apple's Hammer
+  and ARM's armsd, neither of which exists outside Apple, over a debug
+  card the host has not got (`testing/SerialDebugger.cpp` answers
+  `kError_Call_Not_Implemented`, DEVIATION).  The host's own debuggers
+  see everything; packages' native code, if it ever needs stepping, would
+  want a GDB stub on `armcpu`, not RDP.  The task stack limits
+  (`GetTaskStackInfo` into `gNewtGlobals`, `InitInterpreter`'s NOT YET)
+  are only for these debuggers.
+- **The test server** (`TCommServer`, `ProcessTestServerCommand`,
+  `ConnectToTestServer`: Apple's desktop test server over AppleTalk ADSP)
+  and **the C test cases** (`TTestCaseTask`, a `'tstp` part's code,
+  `StartCTestCase`, `DoNewtCTestCase`) and **the tests kept on a store**
+  (`MakeTestStore`, `TTestStoreFileList`): Apple's test suites and server
+  are not to be had and no package carries a `'tstp` part; the test
+  manager on the machine itself already works, and the host's own tests
+  drive the OS through scripts.  A test server could be spoken over TCP,
+  as the dock is, if a use for one appears.
+- `TMsg` (printing to the debug link), the abort and unhandled-exception
+  handlers (`InstallAbortHandler`, `UnhandledException` - the host catches
+  and reports a fault itself), `StrHexDump`'s helper (the native,
+  `FStrHexDump`, is done), `dbprint`, `BlinkRect`.
+
 ## The journal (`testing/Journal.h`, ROM 0x000f8e08-0x000f9fd4)
 
 `gJournallingState` says what it is doing: 0 idle, 1 recording, 2 playing

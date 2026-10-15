@@ -244,13 +244,6 @@ where it has no browse.  Left there: a PCL printer's state is not asked
 Where the binaries-to-text work left off (`docs/rom-free/README.md`,
 "Every binary as text"):
 
-- **Editing a function that another names by path.**  A `same("...")`
-  definition or a `layout.tsv` alias names an object by the path it has
-  inside a compiled function (`literals[3]`); an edit that moves that
-  function's literals breaks it.  The builder says so and how to mend it
-  (point the `same()` at another function holding the object, correct
-  the alias), but a tool that re-derives the paths after an edit would
-  save doing it by hand - the NIE's Internet Setup edit needed it.
 - **The patch table's pages**: `--relayout` now moves the patch table's
   branches with ScreenBuffer and ScreenDrivers, but the page tables
   `ptpt`/`glpt` still name its old physical page (0x7ee000), and the
@@ -300,16 +293,29 @@ Where the binaries-to-text work left off (`docs/rom-free/README.md`,
   package (NativeEntry's fast path goes straight into the binary); a
   RefVar handle a native keeps past its call.
 
-### Testing (`docs/testing/README.md`)
+### Debugging and test tools (`docs/testing/README.md`, "What is left")
 
-- The test server (`TCommServer`, an AppleTalk endpoint), the C test
-  cases (`TTestCaseTask`, a `'tstp` part), the tests kept on a store
-  (`MakeTestStore` and its kin), the serial debugging natives.
+Gone through on 2026-10-15; the NTK Inspector is done.  Worth doing, for
+the owner to choose:
+
+- **The recogniser's replay metrics** (`HandleReplayUnit` and its
+  `Gather*Metrics`, ~8 KB): a recognition accuracy harness - recorded
+  writing replayed as units and scored against what was written - which
+  would compare ParaGraph, Rosetta and the host's engines.  Needs the
+  journal to record and replay units, not only strokes.
+- **The NewtonScript function profiler's hooks** (`EnableFramesFunctionProfiling`,
+  `InstallFramesFunctionProfiler`, `TInterpreter::Return(FramesProfilingKind)`)
+  with a host profiler behind them: per-function calls and time, for the
+  T-Deck Pro's NewtonScript speed.
+
+Not worth doing on the host (reasons in that page): the Hammer and
+GeoPort debug links and ARM's RDP (no Hammer, no armsd, no debug card;
+the task stack limits serve only them), the AppleTalk test server, C test
+cases and tests on a store (no Apple test suites, no `'tstp` parts),
+`TMsg` and the abort handlers.
 
 ### Frames and the rest
 
-- Reachable from developer settings or tools: the task stack limits, the
-  GC profiler's hooks.
 - `instance:Dispatch` on a protocol that is not a monitor: a host
   protocol's methods are C++ virtuals and need numbered thunks to be
   called by dispatch slot (a monitor's already work).  Nothing in the ROM
