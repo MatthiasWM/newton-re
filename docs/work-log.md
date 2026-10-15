@@ -9,6 +9,24 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-15: same() paths survive edits to functions
+
+A `same("...")` definition and the layout's alias lines name an object by
+the path a compiled function holds it at (`...literals[3]`), and an edit
+that moved a function's literals broke the build (Internet Setup's edit
+slip, changed for the T-Deck Pro, had to have its same() and alias
+mended by hand).  The builder now takes a same() object from wherever a
+compiled function still holds it - the same() path or any alias line's,
+the reading most of them agree on - drops one no function holds any more
+(unless something else names it), and finds a moved literal's alias by
+its contents among that function's own literals' aliases.  That last
+also put back a sharing the NIE's edit had lost: InetStartUp's nested
+function at a moved index was laid out a second time (the NIE package
+60 bytes smaller now).  ctest `tools.ROMSourceFunctionEdit`: Internet
+Setup with the paths from before its edit builds to the same bytes, and
+with the edit slip no longer using the shared function it builds with
+one copy of it.
+
 ## 2026-10-15: No `.origin` to go stale
 
 A protocol part's ARM source carried an `.origin` line - its offset in

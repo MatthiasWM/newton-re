@@ -355,6 +355,8 @@ def sorted_by_compiler(compiled, original):
 		and sorted(t.lower() for t in compiled) == sorted((t or "").lower() for t in original)
 
 
+# a path to a compiled function's literal: the literals array's path, the index
+LITERAL_PATH = re.compile(r"(.*\.literals)\[(\d+)\]\Z")
 CLOSURE_STUB = re.compile(r"romsrc:(?:closure|native):([0-9a-f]+)\Z")
 # a function's source naming an object it cannot hold the bytes of (native
 # code, nsdecompile.py's NATIVE_CODE_CLASSES): the symbol '|romsrc:object:<ref>|
@@ -2067,8 +2069,10 @@ class Builder:
 					self.defs[name] = value
 		self.read_layout()
 		self.compile_functions()
+		self.dropped = set()			# same() definitions no function holds any more
 		for name in list(self.defs):
-			self.resolve_same(name, set())
+			if name in self.defs:
+				self.resolve_same(name, set())
 		# every object by its path (a path the layout says is a named object
 		# - one the ROM shares, which a compiled function made afresh - is
 		# that object)
@@ -2080,6 +2084,8 @@ class Builder:
 		self.area_base = self.area_size = None
 		self.entries = []
 		self.aliases = {}
+		self.alias_paths = {}			# a name -> the paths inside compiled functions the layout says hold it
+		self.literal_aliases = {}		# a function's literals array's path -> the names its aliases give
 		with open(os.path.join(self.src, "layout.tsv"), encoding="utf-8") as f:
 			for line in f:
 				if line.startswith("#"):
@@ -2092,6 +2098,10 @@ class Builder:
 					continue
 				if fields[0] == "alias":
 					self.aliases[fields[1].lower()] = fields[2]
+					self.alias_paths.setdefault(fields[2], []).append(fields[1])
+					m = LITERAL_PATH.match(fields[1].lower())
+					if m:
+						self.literal_aliases.setdefault(m.group(1), []).append(fields[2])
 					continue
 				extra = dict(x.split("=", 1) for x in fields[3:])
 				self.entries.append((int(fields[0], 16), fields[1], int(fields[2], 16), extra))
@@ -2186,14 +2196,50 @@ class Builder:
 		if name in seen:
 			raise ValueError("same() goes round in a circle at %s" % name)
 		seen.add(name)
-		try:
-			self.defs[name] = self.at_path(v.data, seen)
-		except (ValueError, IndexError, AttributeError):
-			raise ValueError("%s := same(\"%s\"): nothing is at that path - a function on it was edited so that "
-							 "its literals moved; point it at another function that holds the object (layout.tsv's "
-							 "alias lines for %s name them), and correct the alias line of the edited one"
-							 % (name, v.data, name))
+		# (the object is wherever a compiled function holds it: the path
+		# same() gives, or any the layout's alias lines give for it.  An edit
+		# to a function can move its literals, so a path may now lead
+		# nowhere, or to another object: the reading most of the paths agree
+		# on is taken, the same() path's when they are as many)
+		paths = [v.data] + [p for p in self.alias_paths.get(name, []) if p.lower() != v.data.lower()]
+		found = []
+		for path in paths:
+			try:
+				found.append(self.at_path(path, set(seen)))
+			except (ValueError, IndexError, AttributeError, KeyError):
+				pass
+		if not found:
+			if self.names_anywhere(name):
+				raise ValueError("%s := same(\"%s\"): no function holds it any more at that path or at its "
+								 "alias lines' (layout.tsv), and it is named elsewhere: point the same() at a "
+								 "function that holds the object" % (name, v.data))
+			# (no function holds it now: an edit took it out - nothing to lay out)
+			del self.defs[name]
+			self.dropped.add(name)
+			return None
+		best = max(range(len(found)), key=lambda i: (sum(1 for f in found if self.same_value(found[i], f, set())), -i))
+		self.defs[name] = found[best]
 		return self.defs[name]
+
+	def names_anywhere(self, name):
+		"""Whether a definition or the magic-pointer table names name (not a
+		compiled function's alias)."""
+		seen = set()
+
+		def holds(v):
+			if isinstance(v, Name):
+				return v.name == name
+			if isinstance(v, Obj) and id(v) not in seen:
+				seen.add(id(v))
+				return any(holds(x) for x in v.items) or holds(v.cls)
+			return False
+		if any(holds(v) for n, v in self.defs.items() if n != name):
+			return True
+		magic = os.path.join(self.src, "magic.tsv")
+		if os.path.exists(magic):
+			with open(magic, encoding="utf-8") as f:
+				return any(line.rstrip("\n").split("\t")[-1] == name for line in f if not line.startswith("#"))
+		return False
 
 	def at_path(self, path, seen):
 		m = re.match(r"(\|(?:[^|\\]|\\.)*\||[A-Za-z_][A-Za-z0-9_]*)", path)
@@ -2215,6 +2261,8 @@ class Builder:
 			else:
 				v = v.cls
 			if isinstance(v, Name):
+				if v.name in self.dropped:
+					raise KeyError(v.name)
 				v = self.resolve_same(v.name, seen)
 		return v
 
@@ -2230,14 +2278,22 @@ class Builder:
 				raise ValueError("%s: a closure stub (romsrc:closure) with no alias in layout.tsv naming its "
 								 "native function's definition" % path)
 			return Name(self.aliases[path.lower()])
-		if path.lower() in self.aliases:
-			name = self.aliases[path.lower()]
+		name = self.aliases.get(path.lower())
+		if name is not None and name not in self.dropped:
 			if name not in self.defs:
 				raise ValueError("%s: the alias %s is not defined" % (path, name))
 			# (only while it is still the same: a function edited so that it
 			# compiles to other instructions or literals has its own)
 			if self.same_value(v, self.defs[name], set()):
 				return Name(name)
+		if v.compiled:
+			# (a literal of a compiled function whose literals an edit moved:
+			# the alias of one of that function's literals with the same
+			# contents - the object it was before the edit)
+			m = LITERAL_PATH.match(path.lower())
+			for candidate in self.literal_aliases.get(m.group(1), []) if m else []:
+				if candidate != name and candidate in self.defs and self.same_value(v, self.defs[candidate], set()):
+					return Name(candidate)
 		v.path = path
 		self.by_path[path.lower()] = v
 		if v.kind == "frame":

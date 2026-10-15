@@ -2546,6 +2546,12 @@ if(Python3_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/../romsrc/layout.tsv)
                      --rom ${NEWTON_ROM_BUILD_DIR} --newtonscript $<TARGET_FILE:newtonscript>
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     set_tests_properties(tools.NewtonPackageText PROPERTIES TIMEOUT 900)
+    # an edit to a function that moves its literals: same() and the alias
+    # lines still find the objects they name (romsrc.py's Builder)
+    add_test(NAME tools.ROMSourceFunctionEdit
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/../tools/newton-rom/tests/test_romsrc_function_edit.py
+                     --newtonscript $<TARGET_FILE:newtonscript>
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)
     # the WorldData package's store as text (tools/stores/newtonstore.py):
     # round trip, edits read back; host.NewtonStoreMount mounts an edited
     # copy in a package of its own and queries it

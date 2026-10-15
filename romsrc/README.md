@@ -104,7 +104,14 @@ python tools/newton-rom/analysis/romsrc.py build romsrc --relayout -o build/obje
 the copy still boots (ctests `host.ROMSourceEdit`,
 `host.ROMSourceEditValue`, `host.NewtonEditedSameScreen`).
 
-Nothing in `layout.tsv` needs changing by hand. Slots can be put in
+Nothing in `layout.tsv` needs changing by hand.  That includes an edit
+to a function that moves its literals: a `same("...")` definition and the
+layout's alias lines name an object by the path a compiled function holds
+it at (`...literals[3]`), and the builder takes the object from wherever
+a compiled function still holds it - that path or any alias line's, the
+reading most agree on - and finds a moved literal's alias by its contents
+(ctest `tools.ROMSourceFunctionEdit`).  An object no function holds any
+more is simply not laid out. Slots can be put in
 another order, elements inserted into an array, slots added, renamed or
 taken away, and new frames added; `--relayout` lays out what is there
 now. `layout.tsv` only keeps the unedited tree's addresses and the facts
