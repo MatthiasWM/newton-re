@@ -711,9 +711,27 @@ DecodeLongStroke(CICDecoder* decoder)
 ------------------------------------------------------------------------------*/
 
 // ROM 0x0028240c DecoderOpen__FUsUlT1T2T1
-// A context made ready.  (The ROM allocates one and hands back a
-// handle; the host is given the room to work in, the context never
-// leaving the codec.)
+// A context made ready, the default sink writing into the buffer given.
+// (The ROM allocates one and hands back a handle, nil when the data or
+// the buffer is missing; the host is given the room to work in, the
+// context never leaving the codec.)
+Boolean
+DecoderOpen(CICDecoder* decoder, const void* data, long size,
+			InkPoint* points, ULong pointsSize, ULong mode)
+{
+	memset(decoder, 0, sizeof(*decoder));
+	if (size == 0 || data == nil || pointsSize == 0 || points == nil)
+		return false;
+	DecoderOpen(decoder, data, size, StorePointProcDefault, decoder, mode);
+	decoder->fOutSize = pointsSize;
+	decoder->fOutPoints = points;
+	decoder->fSinkData = nil;
+	return true;
+}
+
+
+// (host) The context opened with the caller's own sink in it, as Decode
+// (ROM 0x001539c8) opens one and then puts its sink in.
 void
 DecoderOpen(CICDecoder* decoder, const void* data, long size,
 			InkPointProc sink, void* refCon, ULong mode)
@@ -725,6 +743,96 @@ DecoderOpen(CICDecoder* decoder, const void* data, long size,
 	decoder->fBitCount = (ULong) size * 8;
 	decoder->fMode = mode;
 	decoder->fFirst = 1;
+}
+
+
+// ROM 0x00282150 StorePointProcDefault__FsP6_POINTP4_DCC
+// The default sink.  Its working store (a CICPointSink) is made at the
+// begin, which writes a marker and holds the next place as a marker too;
+// a point goes where the index is, a stroke's end is a marker, and the
+// end two - after which the store goes and every call answers nought.  A
+// buffer of fewer than five points is refused at the begin (its store
+// kept, as the ROM keeps it).  Within five points of the end of the
+// buffer, a point or a stroke's end writes the end instead.
+short
+StorePointProcDefault(short what, const InkPoint* pt, void* refCon)
+{
+	CICDecoder* decoder = (CICDecoder*) refCon;
+	CICPointSink* list = (CICPointSink*) decoder->fSinkData;
+	InkPoint* points = list != nil ? list->fPoints : nil;
+	switch (what)
+	{
+	case kInkBegin:
+		list = (CICPointSink*) NewPtr(sizeof(CICPointSink));		// (HWRMemoryAlloc)
+		decoder->fSinkData = list;
+		if (list == nil)
+			return 0;
+		list->fIndex = 0;
+		list->fEnded = 1;
+		list->fDone = 0;
+		points = decoder->fOutPoints;						// (the ROM locks its handle)
+		if (points == nil)
+			return 0;
+		list->fPoints = points;
+		list->fCapacity = (UShort) ((UShort) decoder->fOutSize >> 2);
+		if (list->fCapacity < 5)
+			return 0;
+		points[list->fIndex].x = 0;
+		points[list->fIndex].y = kCICMarkerY;
+		points[list->fIndex + 1].x = 0;
+		points[list->fIndex + 1].y = kCICMarkerY;
+		list->fIndex++;
+		return 1;
+
+	case kInkEndStroke:
+		if (list == nil || points == nil)
+			return 0;
+		list->fEnded = 1;
+		if (list->fDone != 0)
+			return 1;
+		if ((long) list->fCapacity - 5 <= (long) list->fIndex)
+		{
+			StorePointProcDefault(kInkEnd, nil, refCon);
+			return 1;
+		}
+		points[list->fIndex].x = 0;
+		points[list->fIndex].y = kCICMarkerY;
+		list->fIndex++;
+		return 1;
+
+	case kInkPoint:
+		if (list == nil || points == nil)
+			return 0;
+		if (list->fDone != 0)
+			return 1;
+		if ((long) list->fCapacity - 5 <= (long) list->fIndex)
+		{
+			StorePointProcDefault(kInkEnd, nil, refCon);
+			return 1;
+		}
+		points[list->fIndex] = *pt;
+		list->fIndex++;
+		return 1;
+
+	case kInkEnd:
+		if (list == nil || points == nil)
+			return 0;
+		list->fEnded = 1;
+		if (list->fDone != 0)
+			return 1;
+		points[list->fIndex].x = 0;
+		points[list->fIndex + 1].x = 0;
+		points[list->fIndex].y = kCICMarkerY;
+		points[list->fIndex + 1].y = kCICMarkerY;
+		list->fIndex += 2;
+		list->fDone = 1;
+		DisposPtr((Ptr) list);								// (the handle unlocked, the store freed)
+		decoder->fSinkData = nil;
+		return 1;
+
+	default:
+		return 1;
+	}
 }
 
 
@@ -758,16 +866,20 @@ DecoderRun(CICDecoder* decoder)
 
 
 // ROM 0x002826a0 DecoderClose__FUlPl
-// The sink told the group is over and the code book let go of.  (The
-// ROM's second argument is told how many points its default sink stored;
-// its one caller, Decode, passes nil - and the host has no default sink,
-// Decode replacing it before any use as the ROM's does.)
+// The sink told the group is over and the code book let go of.  The
+// second argument is given the context's +0x10 - which nothing writes, so
+// it is not the count of points the default sink stored that it looks
+// meant to be; the one caller, Decode, passes nil.
 Boolean
-DecoderClose(CICDecoder* decoder)
+DecoderClose(CICDecoder* decoder, long* count)
 {
 	Boolean ok = false;
 	if (decoder->fSink != nil)
+	{
 		ok = decoder->fSink(kInkEnd, nil, decoder->fRefCon) != 0;
+		if (count != nil)
+			*count = decoder->fStoredCount;
+	}
 	if (decoder->fBookNumber == 1)
 		UnlockCodeBook(1);
 	if (decoder->fBookNumber == 3 || decoder->fBookNumber == 2)
