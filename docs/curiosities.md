@@ -2520,3 +2520,21 @@ callback each character as its two bytes taken low one first -
 byte-swapped - which its only callback, `AE16_NextSetCB`, puts right by
 writing it out low byte first: two mistakes that cancel, or a convention
 nobody else was meant to see.
+
+## Services with nothing in them, and a string read through pc
+
+Every comm service implementation in the ROM - `TAsyncService`,
+`TMNPService`, `TIrDAService`, `TModemService`, `TFaxService`, the IR
+probe and sniffer - answers 0x10 from its `Sizeof`: exactly the four words
+of `TProtocol`, not a byte of its own. A service is a class info, a name
+the comm manager looks up and a `Start` that spawns the tool; everything
+with state lives in the tool's task. The same is true of the
+endpoint-side translators (`PFlattenPtr`, `PScriptDataIn`, ...): their
+whole state is the context they are handed on each call.
+
+And each interface's `New(char*)` glue finds its own name without a
+literal pool: `bl` to a two-instruction routine `mov r0,pc; mov pc,lr`
+whose next words are the interface's name. On the ARM, `pc` reads as the
+instruction's address plus eight, which is just past the `mov pc,lr` - so
+`r0` comes back pointing at the string, and the glue passes it to
+`AllocInstanceByName`. (`docs/protocols/README.md`, "Citing the glue".)
