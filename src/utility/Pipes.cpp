@@ -662,6 +662,58 @@ MemoryPipe::Underflow(long /*count*/, Boolean& eof)
 
 
 /*------------------------------------------------------------------------------
+	M e m B u f f e r P i p e
+------------------------------------------------------------------------------*/
+
+// ROM 0x00226a10 FlushRead__13MemBufferPipeFv
+// The read segment's position to its end.
+void
+MemBufferPipe::FlushRead(void)
+{
+	if (fReadBuffer != nil)
+		fReadBuffer->Seek(0, kSeekFromEnd);
+}
+
+
+// ROM 0x00226a2c FlushWrite__13MemBufferPipeFv
+void
+MemBufferPipe::FlushWrite(void)
+{
+	if (fWriteBuffer != nil)
+		fWriteBuffer->Reset();
+}
+
+
+// ROM 0x00228fc8 Reset__13MemBufferPipeFv
+void
+MemBufferPipe::Reset(void)
+{
+	CBufferPipe::Reset();
+	if (fReadBuffer != nil)
+		fReadBuffer->Seek(0, kSeekFromBeginning);
+}
+
+
+// ROM 0x00227854 Overflow__13MemBufferPipeFv
+// The write segment written over again.
+void
+MemBufferPipe::Overflow(void)
+{
+	if (fWriteBuffer != nil)
+		fWriteBuffer->Reset();
+}
+
+
+// ROM 0x00228c50 Underflow__13MemBufferPipeFlRUc
+// Nothing more comes, but it is not the end.
+void
+MemBufferPipe::Underflow(long /*count*/, Boolean& eof)
+{
+	eof = false;
+}
+
+
+/*------------------------------------------------------------------------------
 	C P t r P i p e
 ------------------------------------------------------------------------------*/
 

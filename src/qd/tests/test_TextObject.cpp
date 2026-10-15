@@ -121,6 +121,13 @@ TestQuestions()
 	EXPECT(p.x == at.x + (options.fWidth - whole));
 	FPoint rightEdge = { at.x + options.fWidth - 0x8000, at.y };
 	EXPECT(PointToChar(text, rightEdge) == kLength);
+	// the arrow keys (operation 0x2000): a character on or back, held to
+	// the text
+	EXPECT(TextArrowOffset(text, 2, true) == 3 && TextArrowOffset(text, 2, false) == 1);
+	EXPECT(TextArrowOffset(text, 0, false) == 0 && TextArrowOffset(text, kLength, true) == kLength);
+	EXPECT(TextArrowOffset(text, kLength + 5, false) == kLength);
+	EXPECT((TextObj(text)->fFlags & kTextObjOpMask) == kTextObjOpTextArrow);
+	EXPECT(TQDLibraryDriver::TextArrowOffset(text, 1, true) == 2);
 	DisposeText(text);
 	DisposeStyleRecord(&style);
 }

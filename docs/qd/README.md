@@ -663,8 +663,13 @@ drawing.  So one proc sees all the text a port is asked about, which is
 how a printer or an open picture sees it: `StdText`'s drawing is
 `DoPutText` (recording, below) then `DrText` 0x0035c530.  On the host
 the caches are never made (DEVIATION: the layout is worked out afresh
-for each question, `TextLayout.h`); the layout's three numbers (0x400)
-and `TextArrow` (0x2000) are NOT YET.
+for each question, `TextLayout.h`).  `TextArrow` (0x2000:
+`TextArrowOffset` 0x00359f70 asks, `DoTextArrow` 0x00359fb8 answers) is
+where an arrow key takes the caret - one character on or back, held
+within the text; nothing in the ROM asks it but the QuickDraw library's
+protocol (`TQDLibraryDriver::TextArrowOffset` 0x00195cc4), whose callers
+are packages' code, so it is dead in the U.S. ROM itself (ctest
+`qd.TextObject`).
 The DDK's `TextObjProc` takes the object as a `long`; a sync patch makes
 it `Long`, the ARM's word, pointer-sized on a host.
 

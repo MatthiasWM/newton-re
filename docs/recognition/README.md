@@ -41,11 +41,12 @@ What is left, and why:
   nothing on the host depends on it).  (`SafeExceptionNotify` prints to
   stderr where the ROM puts a notify slip up - a DEVIATION the owner
   chose, 2026-09-29, to keep script errors easy to see.)
-* **Unreachable from the U.S. ROM**: `CheckDiacriticsDirections`
-  (0x0007c9a0) and `AnalyseDiacriticsDirection` - about 3.2 KB asked only
-  for a French or German letter set - and the sixteen-bit dictionary walks
-  (`AE16_Verify`, `AE16_NextSet9`, `AL16_NextSet`/`AL16_NextSet9`),
-  which only a UniChar dictionary would use; the machine's are all eight-bit.
+* **Unreachable from the U.S. ROM, reconstructed all the same**:
+  `CheckDiacriticsDirections` (0x0007c9a0) and `AnalyseDiacriticsDirection`
+  - about 3.2 KB asked only for a French or German letter set (a locale
+  with an `enabledLanguage`) - and the sixteen-bit dictionary walks
+  (`AE16_Verify`, `AE16_NextSet9`, `AL16_NextSet`/`AL16_NextSet9`), which
+  only a UniChar dictionary uses; the machine's are all eight-bit.
 * **Below the recogniser, in hardware**: the inker task (`TInker`,
   `InkerOff`, `TBCWakeUpInker`) and the tablet driver's calibration
   (`CheckTabletHWCalibration`); the host's `hal/host/HostTablet.h` and
@@ -948,13 +949,33 @@ its Handle holds no bytes of its own, which is what the kind byte's
 Three things, and each of them is wanted by something that is itself not
 reconstructed:
 
-* **the sixteen-bit walkers** — `AE16_Verify` (0x0002b2cc),
+* **the sixteen-bit walkers** (now done) — `AE16_Verify` (0x0002b2cc),
   `AE16_NextSet9`, `AE16_NextSetCB`, the two-byte-character mirrors of
-  the AE8 ones. Reading the kind byte of all 129 lexicons built into
-  this ROM gives kinds 1 and 7 only, so **no dictionary in the MP2x00 US
-  ROM is sixteen-bit**; they are there for a localisation that needs
-  them. `AEnum_Verify` answers "no match" for a sixteen-bit dictionary
-  until they are written.
+  the AE8 ones, and the lexicon's `AL16_NextSet`/`AL16_NextSet9`/
+  `AL16_NextSetCB`/`AL16_Shell`. Reading the kind byte of all 129
+  lexicons built into this ROM gives kinds 1 and 7 only, so **no
+  dictionary in the MP2x00 US ROM is sixteen-bit**; they are there for a
+  localisation that needs them, and a dictionary made of kind 5
+  (`NewDictionary`, a script's `AirusNew(5, ...)`) reaches them. A
+  sixteen-bit node is an eight-bit one with its character two bytes long,
+  high first, so its flags are at +2 - and the ROM's walkers, copied from
+  the eight-bit ones, still read the two small size classes' sibling
+  offsets from `p[size]`, a byte short (ROM BUG, fixed): every sibling a
+  small dictionary has is misread, so a sixteen-bit dictionary cannot be
+  walked past the first node of a row. `AE16_NextSet9`'s loop for a
+  dictionary without attributes also reads the next node's flags at +1
+  (ROM BUG, fixed), and `AL16_NextSet9` follows a leaf's first-child
+  offset, which a leaf does not have (ROM BUG, fixed). The character
+  `AE16_NextSet9` hands its callback is the node's two bytes taken low
+  first - byte-swapped - which `AE16_NextSetCB` undoes by writing it low
+  byte first (ROM QUIRK). On the way, two host mis-ports were found and
+  put right: `CopyBufferHack` did not copy a sixteen-bit word into the
+  adder's buffer (the ROM's `Ashortstrcpy`s it), so a word could not be
+  added to a sixteen-bit dictionary; and `AE8_NextSet9` cleared the
+  attribute for each node where the ROM keeps one register for the row -
+  0x80 to begin with in a plain enumerated dictionary - which a node with
+  no attribute is handed as it stands (ROM QUIRK). Tests: `recognition.Airus`
+  (`TestAE16`, `TestAL16NextSet`).
 * **the completions walk** — `AEnum_FirstLast` (0x0002a1f4) and
   `AEnum_NextPrevious` (0x0002a244), selectors 5 and 6, which step
   through a dictionary a word at a time *without* a cursor object; the
@@ -3044,13 +3065,39 @@ asks whether the two differ, does not: the xr it is given is one of the
 xrs the letter's elements index, so at its own element the bumped type
 is on both sides and they compare equal - the bump is an identity test.)
 
-NOT YET, deliberately: `CheckDiacriticsDirections` (0x0007c9a0, 684
-bytes, over `AnalyseDiacriticsDirection` 0x0007c130 - 2160 bytes -,
-`CurvFromSquare` and `LengthOfTraj`: about 3.2 KB), asked only for a
-letter set whose language (rc +6) has bit 2 or 3 - French or German -
-which the U.S. ROM's never do, so nothing can reach it; it answers
-nought.  (`MakeRecWordsFromGraph`/`MergeTwoRecWordsSets`, once listed
-here, are done - "A graph of alternatives" below.)
+The accent check: `CheckDiacriticsDirections` (0x0007c9a0, over
+`AnalyseDiacriticsDirection` 0x0007c130, `CurvFromSquare` 0x003078b0 and
+`LengthOfTraj` 0x003079b0, `XrPostEval.cpp`/`LowSide.cpp`; its tables
+`IndexDiacriticsLetter`, `xrsToFind`, `DiacrPresence` generated into
+`XrDiacriticsTables.cpp` by `regenerate.py diacritics`).
+`EvaluateCharQuality` asks it for a field whose language (rc +6) has bit 2
+or 3 - what the domain's parameter 0x20046 gives the field when the locale
+names an `enabledLanguage` (`gEnabledLanguage` 8) - and the U.S. ROM's
+locales never do, so nothing in it is reached.  For a letter of the graph
+that carries a mark (`DiacriticsLetter`), each xr of a mark (types `:`,
+`4`, `;`) it was read from is measured from its begin point to its end:
+which way it leans (the cosine of the line from its lower end up, against
+the horizontal), its length and its chord's, the area it closes and how
+much it bends overall and on each side of its furthest point; and the
+directions it could have been written in are listed best first as
+classes - 0 a dot, 1 an umlaut, 2 a circumflex, 3 a ring, 4 an acute, 5 a
+grave, 6 a tilde, 7 the end.  No bigger than a quarter of the line's
+height (rc +0xea) it is a dot; straight it is an accent leaning the way
+it leans (or, nearly flat, two dots run together); a roof is a
+circumflex; round on itself a ring (and sure: no later mark changes it);
+bent both ways a tilde; a second mark makes it an umlaut.  Then for each
+class until one is the letter's own (its row of `DiacrPresence`), the
+letters a mark that way would make in the field's languages (each entry's
+mask) are asked how much of this letter's xrs they claim in the graph
+(`RetOneIfLettersCompeteForXRs`, tenths), and a quarter of the most,
+rounded up, is charged to the letter.  ROM BUG (fixed): two of the lists -
+a roof of two straight halves, and a roof bent the one way throughout -
+are not ended, so the check reads on into whatever its eight-byte buffer
+held. Ctest `recognition.XrMatrix` (`TestDiacritics`: a dot, the accents,
+a bar, a roof both ways of the switch, a ring, a second mark; an e acute
+written as a grave in a German field charged for the e grave).
+(`MakeRecWordsFromGraph`/`MergeTwoRecWordsSets`, once listed here, are
+done - "A graph of alternatives" below.)
 
 What it does to the demos: `cursive.ns`'s two words are not scored - each
 is too far ahead of the next - so they read as the graph has them ("ton",

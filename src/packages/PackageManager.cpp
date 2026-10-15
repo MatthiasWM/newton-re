@@ -27,6 +27,8 @@
 #include "ROMImport.h"		// ROMAddressOf: a part in the ROM extension
 #include "LargeObjects.h"		// the ROM domain manager (a package on a store)
 #include "CardAlerts.h"		// SetCardReinsertReason
+#include "ValidatePackage.h"	// the validation driver
+#include "StorePackages.h"		// BackupPackage (a package on a store fed to the driver)
 
 extern const ExceptionName exPipeException;
 
@@ -328,14 +330,47 @@ TPackageEventHandler::InitValidatePackageDriver(void)
 
 
 // ROM 0x0015e25c ValidatePackage__20TPackageEventHandlerFP17TPkBeginLoadEventP16TPackageIterator
-// NOT YET RECONSTRUCTED: the validation driver's ValidateBegin and, for a
-// package on a store, the package backed up through a
-// CValidateBackupPipe to ValidateEnd.  There is never a driver on the
-// host (InitValidatePackageDriver answers nil), so nothing calls this.
+// The validation driver asked about the package before it goes in
+// (ValidatePackage.h).  A package in fixed memory (the ROM's own) is not
+// asked about.  The driver is told the package's name, where it lies when
+// it is mapped from a store (nil when it is streamed), its size, and -
+// the package flagged so and of more than one part - where its last
+// part's data lies.  What it answers is the verdict, unless it is neither
+// noErr nor kError_Bad_Package and the package is on a store: then the
+// package is backed up through a CValidateBackupPipe, each block going to
+// ValidateNextBlock, and ValidateEnd's answer to what that came to is the
+// verdict.  (Only BeginLoadPackage calls this, and only when the manager
+// has a driver - which none of the ROM's code registers.)
 NewtonErr
-TPackageEventHandler::ValidatePackage(TPkBeginLoadEvent* /*event*/, TPackageIterator* /*iter*/)
+TPackageEventHandler::ValidatePackage(TPkBeginLoadEvent* event, TPackageIterator* iter)
 {
-	return noErr;
+	NewtonErr err = noErr;
+	if (event->fSourceType.format == kFixedMemory)
+		return err;
+	char* package = nil;
+	char* lastPart = nil;
+	ULong size = fIter->PackageSize();
+	if (event->fSourceType.format == kRemovableMemory)
+	{
+		package = (char*) (uintptr_t) event->fSource.mem.buffer;
+		if ((iter->PackageFlags() & kValidateLastPartFlag) != 0)
+		{
+			ULong parts = iter->NumberOfParts();
+			if (parts > 1)
+				lastPart = package + iter->GetPartDataOffset(parts - 1);
+		}
+	}
+	err = fValidator->ValidateBegin(event->fPackageName, package, size, lastPart);
+	if (err != noErr && err != kError_Bad_Package && package != nil)
+	{
+		CValidateBackupPipe pipe;
+		RDMParams params;
+		pipe.Init(fValidator);
+		GetLargeObjectInfo(&params, (ULong) (uintptr_t) package);
+		NewtonErr backedUp = BackupPackage(&pipe, params.fStore, params.fObjectId, nil);
+		err = fValidator->ValidateEnd(backedUp);
+	}
+	return err;
 }
 
 

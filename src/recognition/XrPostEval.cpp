@@ -15,6 +15,7 @@
 #include "LowLevel.h"
 #include "ParaGraph.h"
 #include "WordSegment.h"
+#include "host/RomBugs.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -396,21 +397,352 @@ CalculateBoxes_Side_Result(short c, short prev, POST_PARAMS* pp)
 }
 
 
-// NOT YET RECONSTRUCTED: CheckDiacriticsDirections (0x0007c9a0, 684
-// bytes) - the directions of the strokes over letters that carry
-// diacritical marks, over AnalyseDiacriticsDirection (0x0007c130, 2160
-// bytes, thirteen arguments), CurvFromSquare (0x003078b0) and
-// LengthOfTraj (0x003079b0): about 3.2 KB in all.  EvaluateCharQuality
-// asks for it only for a field whose language (rc +6) has bit 2 or 3 set
-// - a French or German letter set - and the U.S. ROM's letter sets have
-// neither, so nothing in this reconstruction can reach it; it was left
-// rather than transcribed untestable against a real case.  Answers
-// nought (nothing to charge).
-long
-CheckDiacriticsDirections(POST_PARAMS*, rec_w_type*, xrdata_type*, short, short* result)
+/*------------------------------------------------------------------------------
+	T h e   a c c e n t s
+
+	A French or German letter set (the field's language, rc +6, with bit 2
+	or 3: what 0x20046 sets for a locale that names an enabledLanguage)
+	has letters that carry a mark over them, and a mark can be written in
+	several directions that make different letters - an acute or a grave,
+	a circumflex, an umlaut's two dots.  For such a letter of the graph,
+	each xr of a mark it was read from is measured, and the directions it
+	could be taken for listed best first; a letter that one of those
+	directions would make instead, and that is in the graph competing for
+	the same xrs, charges this one.  The U.S. ROM's letter sets are
+	English (1), so nothing in it gets here.
+------------------------------------------------------------------------------*/
+
+// What AnalyseDiacriticsDirection lists: the class of each direction.
+enum
 {
+	kDiacrDot = 0,
+	kDiacrUmlaut,
+	kDiacrCircumflex,
+	kDiacrRing,
+	kDiacrAcute,
+	kDiacrGrave,
+	kDiacrTilde,
+	kDiacrEnd
+};
+
+
+// ROM 0x0007c130 AnalyseDiacriticsDirection__FPsT1PUciT4UcT6T1PUisssT3
+// The mark from point b to point e: which way it leans (the cosine of the
+// line from its lower end to its upper one against the horizontal), the
+// area it closes, its length and its chord's, how much it bends overall
+// and on either side of its furthest point - and from those the classes
+// it may be, best first.  A mark no bigger than a quarter of the line's
+// height in both directions, or a short one, is a dot or a tick; a long
+// one that bends round on itself is a ring (and sure: `stop`); one that
+// does not bend is an accent leaning the way it leans; one bent into a
+// roof a circumflex; one bent both ways a tilde.  A second mark (the
+// count past nought) makes it an umlaut, unless one was sure.
+//
+// ROM BUG (fixed): two answers - the roof of a stroke that does not bend
+// either side of its top, and the roof of one that bends the same way
+// throughout - are left without the class that ends the list, so the
+// caller reads on into whatever its buffer held after them (on the host:
+// noughts, the dot).  The fix ends them.
+long
+AnalyseDiacriticsDirection(short* x, short* y, UByte* /*sym*/, long b, long e, UByte /*type*/, UByte /*band*/,
+						   short* count, ULong* stop, short height, short width, short boxHeight, UByte* out)
+{
+	long answer = 0;
+	if (x == nil || y == nil)
+		return answer;
+	long cosine;
+	if (y[b] > y[e])
+		cosine = cos_pointvect(x[b], y[b], x[e], y[e], x[b], y[b], x[b] + 100, y[b]);
+	else
+		cosine = cos_pointvect(x[e], y[e], x[b], y[b], x[e], y[e], x[e] + 100, y[e]);
+	short closedFlag;
+	long square = ClosedSquare(x, y, b, e, &closedFlag);
+	long chord;
+	short lengthFlag;
+	long length = LengthOfTraj(x, y, b, e, &chord, &lengthFlag);
+	long curv = (short) HWRAbs(CurvFromSquare(x, y, b + 1, e));
+	long far = (short) iMostFarFromChord(x, y, b, e);
+	long bend = CurvMeasure(x, y, b, e, far);
+	long bendBefore = CurvMeasure(x, y, b, far, -1);
+	long bendAfter = CurvMeasure(x, y, far, e, -1);
+	if (*stop != 0)
+		return answer;
+
+	// the two accents, the way it leans first
+	UByte lean = cosine >= 0 ? kDiacrAcute : kDiacrGrave;
+	UByte other = cosine >= 0 ? kDiacrGrave : kDiacrAcute;
+	long points = e - b + 1;
+	long quarter = (height < 0 ? height + 3 : height) >> 2;
+	Boolean big = (width > quarter || boxHeight > quarter);
+	if (points < 5 && width <= boxHeight * 2)
+		big = false;
+	if (!big)
+	{
+		// a dot or a tick
+		if (width > quarter || boxHeight > quarter)
+		{
+			out[0] = lean;
+			out[1] = other;
+			out[2] = kDiacrDot;
+		}
+		else
+		{
+			out[0] = kDiacrDot;
+			out[1] = lean;
+			out[2] = other;
+		}
+		out[3] = kDiacrRing;
+		out[4] = kDiacrUmlaut;
+		out[5] = kDiacrEnd;
+	}
+	else if (closedFlag == 0 && lengthFlag == 0)
+	{
+		long round = (4 * length + 1) / 3;
+		long top = y[b] <= y[e] ? y[b] : y[e];
+		if (curv > 100 && round > chord * 2 && HWRLAbs(square) > length * 4)
+		{
+			// round on itself: a ring
+			*stop = 1;
+			out[0] = kDiacrRing;
+			out[1] = kDiacrDot;
+			out[2] = kDiacrEnd;
+		}
+		else if (HWRAbs(bend) <= 1)
+		{
+			// straight
+			if (HWRAbs(cosine) > 90)
+			{
+				out[0] = kDiacrUmlaut;
+				out[1] = lean;
+				out[2] = other;
+				out[3] = kDiacrCircumflex;
+				out[4] = kDiacrEnd;
+			}
+			else
+			{
+				out[0] = lean;
+				out[1] = other;
+				out[2] = kDiacrDot;
+				out[3] = kDiacrEnd;
+			}
+		}
+		else if (HWRAbs(bendBefore) <= 1 && HWRAbs(bendAfter) <= 1)
+		{
+			// two straight halves
+			if (top > y[far])
+			{
+				// a roof
+				if (HWRAbs(cosine) > 90 && square > 450)
+					*stop = 1;
+				out[0] = kDiacrCircumflex;
+				out[1] = kDiacrDot;
+				out[2] = chord * 5 >= length * 2 ? kDiacrUmlaut : kDiacrRing;
+				out[3] = lean;
+				out[4] = other;
+				if (RomBugFixed())
+					out[5] = kDiacrEnd;
+			}
+			else if (chord * 5 < length * 2)
+			{
+				out[0] = kDiacrRing;
+				out[1] = kDiacrDot;
+				out[2] = kDiacrUmlaut;
+				out[3] = kDiacrEnd;
+			}
+			else if (HWRAbs(cosine) <= 80)
+			{
+				out[0] = lean;
+				out[1] = other;
+				out[2] = kDiacrDot;
+				out[3] = kDiacrEnd;
+			}
+			else
+			{
+				out[0] = kDiacrUmlaut;
+				out[1] = kDiacrRing;
+				out[2] = lean;
+				out[3] = other;
+				out[4] = kDiacrEnd;
+			}
+		}
+		else if ((bend >= 0) == (bendBefore >= 0) && (bend >= 0) == (bendAfter >= 0))
+		{
+			// bent the one way throughout
+			if (chord * 5 < length * 2)
+			{
+				out[0] = kDiacrRing;
+				out[1] = kDiacrDot;
+				out[2] = kDiacrEnd;
+			}
+			else if (top > y[far])
+			{
+				out[0] = kDiacrCircumflex;
+				out[1] = lean;
+				out[2] = other;
+				out[3] = kDiacrDot;
+				out[4] = (HWRLAbs(square) > length * 2 && round > chord * 2 && curv > 25) ? kDiacrRing : kDiacrUmlaut;
+				if (RomBugFixed())
+					out[5] = kDiacrEnd;
+			}
+			else if (HWRAbs(cosine) <= 80)
+			{
+				out[0] = lean;
+				out[1] = other;
+				out[2] = kDiacrDot;
+				out[3] = kDiacrRing;
+				out[4] = kDiacrEnd;
+			}
+			else if (HWRLAbs(square) > length * 2 && round > chord * 2 && curv > 25)
+			{
+				out[0] = kDiacrRing;
+				out[1] = kDiacrUmlaut;
+				out[2] = kDiacrEnd;
+			}
+			else
+			{
+				out[0] = kDiacrUmlaut;
+				out[1] = kDiacrRing;
+				out[2] = lean;
+				out[3] = other;
+				out[4] = kDiacrEnd;
+			}
+		}
+		else
+		{
+			// bent both ways: a tilde, if its ends are well below its middle
+			long fromStart = y[b] - y[far];
+			long fromEnd = y[e] - y[far];
+			if (fromStart > 0 && fromEnd > 0 && height > 0 && height < fromStart * 4 && height < fromEnd * 4)
+			{
+				out[0] = kDiacrCircumflex;
+				out[1] = kDiacrUmlaut;
+				out[2] = kDiacrRing;
+				out[3] = kDiacrTilde;
+				out[4] = kDiacrEnd;
+			}
+			else if (y[b] - y[e] > 0 && height > 0
+					 && (height < fromStart * 8 || height < (y[far] - y[e]) * 8))
+			{
+				out[0] = kDiacrTilde;
+				out[1] = kDiacrUmlaut;
+				out[2] = kDiacrRing;
+				out[3] = kDiacrEnd;
+				out[4] = kDiacrCircumflex;
+			}
+			else if (HWRLAbs(square) > length * 2 && round > chord * 2 && curv > 25)
+			{
+				out[0] = kDiacrRing;
+				out[1] = kDiacrUmlaut;
+				out[2] = kDiacrTilde;
+				out[3] = kDiacrEnd;
+				out[4] = kDiacrCircumflex;
+			}
+			else if (HWRLAbs(square) > length * 2 && round < chord * 2)
+			{
+				out[0] = lean;
+				out[1] = other;
+				out[2] = kDiacrUmlaut;
+				out[3] = kDiacrEnd;
+				out[4] = kDiacrCircumflex;
+			}
+			else
+			{
+				out[0] = kDiacrUmlaut;
+				out[1] = kDiacrRing;
+				out[2] = kDiacrTilde;
+				out[3] = kDiacrEnd;
+				out[4] = kDiacrCircumflex;
+			}
+		}
+	}
+	// a second mark: two dots, unless this one was sure of itself
+	if (*count != 0 && *stop == 0)
+	{
+		out[0] = kDiacrUmlaut;
+		out[1] = kDiacrEnd;
+	}
+	return answer;
+}
+
+
+// ROM 0x0007c9a0 CheckDiacriticsDirections__FP12_POST_PARAMSP10rec_w_typeP11xrdata_typesPs
+// For a letter of the graph that carries a mark (DiacriticsLetter), each
+// xr of a mark (xrsToFind) it was read from analysed for the directions
+// it may have been written in; then, for each of those, best first, until
+// one is the letter's own (its row of DiacrPresence) - the letters of the
+// field's language that a mark that way would have made, and how much
+// such a letter in the graph claims of this one's xrs
+// (RetOneIfLettersCompeteForXRs, in tenths).  The most any claims, a
+// quarter of it rounded up, goes into *result for EvaluateCharQuality to
+// charge.  ==> 1 for a letter with a mark, 0 for any other.  (The
+// reading and `which` are not looked at.)  The class buffer starts with
+// the end in its first byte only - host: the rest noughts, where the
+// ROM's is what the stack held.
+long
+CheckDiacriticsDirections(POST_PARAMS* pp, rec_w_type* /*reading*/, xrdata_type* xr, short /*which*/, short* result)
+{
+	RWS_type* rws = pp->rws;
+	short* px = pp->x;
+	short* py = pp->y;
+	short language = (short) RCGetH(pp->rc, 6);
+	short height = (short) RCGetH(pp->rc, 0xea);
+	long cur = pp->cur;
+	long answer = 0;
+	xrd_el_type* elements = (xrd_el_type*) xr->fElements;
 	*result = 0;
-	return 0;
+	if (cur < 0 || pp->rwg->size <= cur)
+		return answer;
+	RWS_type* sym = &rws[cur];
+	const char* letter = HWRStrChr((const char*) DiacriticsLetter, sym->realSym);
+	if (letter == nil)
+		return answer;
+	long letterIndex = letter - (const char*) DiacriticsLetter;
+	answer = 1;
+	short count = 0;
+	ULong stop = 0;
+	UByte classes[8];
+	memset(classes, 0, sizeof(classes));
+	classes[0] = kDiacrEnd;
+	short first = (short) sym->xrStart;
+	short end = (short) (first + (short) sym->xrLen);
+	for (short i = first; i < end; i = (short) (i + 1))
+	{
+		xrd_el_type* el = &elements[i];
+		if (HWRStrChr((const char*) xrsToFind, el->type) != nil)
+		{
+			AnalyseDiacriticsDirection(px, py, &sym->realSym, XrGetH(el->begpoint), XrGetH(el->endpoint),
+									   el->type, el->height, &count, &stop, height,
+									   (short) (XrGetH(el->box + kXrRight) - XrGetH(el->box + kXrLeft)),
+									   (short) (XrGetH(el->box + kXrBottom) - XrGetH(el->box + kXrTop)), classes);
+			count = (short) (count + 1);
+		}
+	}
+	const unsigned short* own = DiacrPresence + IndexDiacriticsLetter[letterIndex] * 14;
+	long best = 0;
+	for (long k = 0; k <= 7; k++)
+	{
+		UByte kind = classes[k];
+		if (kind >= kDiacrEnd)
+			break;
+		if (sym->realSym == (short) own[kind * 2 + 1])
+			break;
+		for (long j = 0; j < 14; j++)
+		{
+			const unsigned short* entry = DiacrPresence + j * 14 + kind * 2;
+			if (((short) entry[0] & language) != 0)
+			{
+				int err = 0;
+				long r = (long) RetOneIfLettersCompeteForXRs(OSToRec((short) entry[1]), 0, 0, &err, pp);
+				if (r > best)
+					best = r;
+			}
+		}
+	}
+	long q = best + 3;
+	if (q < 0)
+		q += 3;
+	*result = (short) ((UShort) *result + (q >> 2));
+	return answer;
 }
 
 

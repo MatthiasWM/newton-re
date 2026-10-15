@@ -947,8 +947,15 @@ fast loop off), and `HandleBreakPoints` enters `BreakLoop` at one - only
 the NTK's debugger calls the two, through the jump table.
 `NTKStackTrace` (`comms/NTKNub.cpp`) sends the stack over the NTK
 connection.  Not reachable, or reached another way: a native whose code is ARM code in a binary (a
-host limit), `IsFirstByteOf2Byte` (a two-byte script, not in the US ROM),
-and the ink words' own structure in `TRichString::Verify`.
+host limit), and the ink words' own structure in `TRichString::Verify`.
+`IsFirstByteOf2Byte` (0x002575ec, `utility/Unicode.h`) is asked of every
+byte the compiler's file reader takes (`TStdioInputStream::GetChar` and
+`UngetChar`): in Shift-JIS (encoding 6) a lead byte brings the next with
+it, in the three eight-bit encodings never, and the U.S. ROM's compiler
+encoding is always Mac Roman, so the two-byte answer is never given;
+on the host a two-byte character is its two bytes as one number
+(DEVIATION: the ROM converts it through an encoding table it does not
+have - it reads past its five eight-bit ones; ctest `frames.Compiler`).
 
 The heap dump is here: `Uriah` (`gPrintMaps`, `gUriahROM`,
 `gUriahPrintArrays`, `gUriahSaveOutput` as the ROM has them) and

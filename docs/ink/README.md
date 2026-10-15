@@ -105,6 +105,21 @@ finding its own working store hanging off it; here the caller's
 reference is passed as itself.  The points are in tablet units as 16.16
 values; `PGCDrawPointProc` divides by `gTabScale` (8.0) to get pixels.
 
+The CIC library has a fourth callback of its own and a source to match:
+`DecoderOpen` and `EncoderOpen`, as the ROM has them, are opened over a
+buffer of points and put `StorePointProcDefault` (0x00282150) or
+`GetInputTraceDefault` (0x0027fbac) in the context - the points written
+into the buffer with a marker point (0, -1) to begin, after each stroke
+and twice at the end, five points' room kept (a point within five of the
+end writes the end instead), and read back the same way, a run of the
+same point read as one.  Their only callers, `Decode` and
+`GenericCSCompress`, put their own procs in before the run, so neither is
+reached in the ROM; here they are the `DecoderOpen`/`EncoderOpen` forms
+that take a buffer (`CICCodec.h`), and a block decoded into a buffer and
+encoded from it again gives the bits a source of the caller's own does
+(ctest `ink.Ink`, `TestDefaultPointProcs`).  `DecoderClose`'s count is
+the context's +0x10, which nothing writes.
+
 What cannot be swapped is the *reading* of ink already written: a note
 written on a real Newton is in the CIC format for ever, so that decoder
 has to stay whatever else is added.  `GetInkFormat` (0x00280950) reads a

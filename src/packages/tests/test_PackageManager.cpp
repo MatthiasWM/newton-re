@@ -40,6 +40,7 @@
 #include "PackageStore.h"
 #include "StorePackages.h"
 #include "PackageArchivalPipe.h"
+#include "ValidatePackage.h"
 #include "host/HostStore.h"
 #include "Soups.h"
 #include "Compression.h"
@@ -811,6 +812,226 @@ TestOnStore(void)
 }
 
 
+/*------------------------------------------------------------------------------
+	T h e   v a l i d a t i o n   d r i v e r
+------------------------------------------------------------------------------*/
+
+// What the test's driver was told, and what it answers.
+struct ValidateLog
+{
+	long		begins, blocks, ends;
+	UniChar		name[64];
+	char*		package;
+	ULong		size;
+	char*		lastPart;
+	UByte		fed[0x4000];
+	ULong		fedSize;
+	long		endErr;
+	NewtonErr	beginAnswer, endAnswer;
+};
+static ValidateLog gValidate;
+
+// The implementation the manager makes by name ("TValidatePackage" of
+// TValidatePackageDriver) - which nothing in the ROM registers.
+class TValidatePackage : public TValidatePackageDriver
+{
+public:
+	PROTOCOL_IMPL_HEADER_MACRO(TValidatePackage);
+	TValidatePackage*	New() { return this; }
+	void				Delete() { }
+	NewtonErr	ValidateBegin(UniChar* name, char* package, ULong size, char* lastPart)
+	{
+		gValidate.begins++;
+		Ustrncpy(gValidate.name, name, 63);
+		gValidate.package = package;
+		gValidate.size = size;
+		gValidate.lastPart = lastPart;
+		return gValidate.beginAnswer;
+	}
+	NewtonErr	ValidateNextBlock(char* data, ULong size)
+	{
+		gValidate.blocks++;
+		if (gValidate.fedSize + size <= sizeof(gValidate.fed))
+			memcpy(gValidate.fed + gValidate.fedSize, data, size);
+		gValidate.fedSize += size;
+		return noErr;
+	}
+	NewtonErr	ValidateEnd(long err)
+	{
+		gValidate.ends++;
+		gValidate.endErr = err;
+		return gValidate.endAnswer;
+	}
+};
+PROTOCOL_IMPL_SOURCE_MACRO(TValidatePackage)
+PROTOCOL_CLASSINFO(TValidatePackage, "TValidatePackageDriver", "", 0x10000, 0, nil)
+
+static void
+ResetValidateLog(NewtonErr beginAnswer, NewtonErr endAnswer)
+{
+	memset(&gValidate, 0, sizeof(gValidate));
+	gValidate.beginAnswer = beginAnswer;
+	gValidate.endAnswer = endAnswer;
+}
+
+
+// A package of two raw parts, flagged so that the validator is told
+// where the second's data is.
+static UByte*
+TwoPartPackage(ULong* packageSize)
+{
+	const ULong kHeader = 0x34, kEntry = 0x20;
+	const char* name = "two:TEST";
+	ULong nameBytes = (strlen(name) + 1) * 2;
+	ULong directorySize = (kHeader + 2 * kEntry + nameBytes + 3) & ~3u;
+	ULong size = directorySize + 16 + 8;
+	UByte* package = (UByte*) calloc(size, 1);
+	memcpy(package, "package1", 8);
+	PutBigEndianWord(package + 0x08, 'xxxx');
+	PutBigEndianWord(package + 0x0c, 0x10000000 | kValidateLastPartFlag);
+	PutBigEndianWord(package + 0x10, 1);
+	PutBigEndianWord(package + 0x18, nameBytes);
+	PutBigEndianWord(package + 0x1c, size);
+	PutBigEndianWord(package + 0x2c, directorySize);
+	PutBigEndianWord(package + 0x30, 2);
+	for (ULong i = 0; i < 2; i++)
+	{
+		UByte* entry = package + kHeader + i * kEntry;
+		PutBigEndianWord(entry + 0x00, i == 0 ? 0 : 16);
+		PutBigEndianWord(entry + 0x04, i == 0 ? 16 : 8);
+		PutBigEndianWord(entry + 0x08, i == 0 ? 16 : 8);
+		PutBigEndianWord(entry + 0x0c, i == 0 ? 'raw ' : 'sign');
+		PutBigEndianWord(entry + 0x14, 0x02);					// raw
+	}
+	UByte* data = package + kHeader + 2 * kEntry;
+	for (ULong i = 0; name[i] != 0; i++)
+		data[i * 2 + 1] = (UByte) name[i];
+	memcpy(package + directorySize + 16, "SIGNATUR", 8);
+	*packageSize = size;
+	return package;
+}
+
+
+// TPackageEventHandler::ValidatePackage with a driver registered (the
+// ROM's manager makes one by name at its start, and none is ever there):
+// a package in fixed memory is not asked about; one being streamed is
+// asked about with no address; one on a store is asked about with its
+// address, and when the driver's first answer is neither yes nor
+// kError_Bad_Package it is fed the package, a block at a time, through a
+// CValidateBackupPipe, and its last answer is the verdict.  The flag
+// 0x01000000 on a package of two parts hands it the last part's data.
+static void
+TestValidator(void)
+{
+	TValidatePackage::ClassInfo()->Register();
+	TPackageEventHandler* handler = new TPackageEventHandler;
+	EXPECT(handler->fValidator != nil);
+	if (handler->fValidator == nil)
+		return;
+
+	// the pipe on its own: positions nought, writes to the driver
+	{
+		ResetValidateLog(noErr, noErr);
+		CValidateBackupPipe pipe;
+		EXPECT(pipe.fDriver == nil);
+		pipe.Init(handler->fValidator);
+		pipe.WriteChunk("abc", 3, true);
+		EXPECT(gValidate.blocks == 1 && gValidate.fedSize == 3 && memcmp(gValidate.fed, "abc", 3) == 0);
+		EXPECT(pipe.ReadPosition() == 0 && pipe.WritePosition() == 0 && pipe.ReadSeek(5, 0) == 0 && pipe.WriteSeek(5, 0) == 0);
+		long count = 4;
+		Boolean eof = false;
+		char back[4];
+		pipe.ReadChunk(back, count, eof);
+		EXPECT(count == 4 && !eof);
+	}
+
+	// a package on a store, mapped as the manager would load it
+	ULong size;
+	UByte* ntk = TwoPartPackage(&size);
+	PutBigEndianWord(ntk + 0x0c, 0x10000000);		// (not flagged: no last part handed over)
+	TStore* store = (TStore*) THostStore::ClassInfo()->New();
+	EXPECT(store != nil && store->Init(nil, 0x100000, 0, 0, kStoreIsInternal, nil) == noErr);
+	store->Format();
+	InitializeStoreDecompressors();
+	ULong id = 0;
+	{
+		CTestPipe in(size + 16);
+		in.WriteChunk(ntk, size, false);
+		in.Rewind();
+		EXPECT(StorePackage(&in, store, nil, &id) == noErr && id != 0);
+	}
+	ULong address = 0;
+	EXPECT(MapLargeObject(&address, store, id, true) == noErr && address != 0);
+	TPackageIterator iter((void*) address);
+	EXPECT(iter.Init() == noErr);
+	handler->fIter = &iter;
+	PartSource source;
+	source.mem.buffer = (VAddr) address;
+	source.mem.size = size;
+	SourceType onStore = { kRemovableMemory, kStoreDevice, 0, 0 };
+	TPkBeginLoadEvent event(onStore, source, 0, 0, true);
+	Ustrncpy(event.fPackageName, iter.PackageName(), kMaxPackageNameSize);
+
+	// asked, and settled at once
+	ResetValidateLog(noErr, -1);
+	EXPECT(handler->ValidatePackage(&event, &iter) == noErr);
+	EXPECT(gValidate.begins == 1 && gValidate.blocks == 0 && gValidate.ends == 0);
+	EXPECT(gValidate.package == (char*) address && gValidate.size == size && gValidate.lastPart == nil);
+	EXPECT(Ustrcmp(gValidate.name, iter.PackageName()) == 0);
+	ResetValidateLog(kError_Bad_Package, noErr);
+	EXPECT(handler->ValidatePackage(&event, &iter) == kError_Bad_Package);
+	EXPECT(gValidate.begins == 1 && gValidate.blocks == 0 && gValidate.ends == 0);
+
+	// asked for the package itself: fed the bytes BackupPackage writes,
+	// and the last answer is the one that counts
+	ResetValidateLog(-1, -12345);
+	EXPECT(handler->ValidatePackage(&event, &iter) == -12345);
+	EXPECT(gValidate.begins == 1 && gValidate.ends == 1 && gValidate.endErr == noErr);
+	EXPECT(gValidate.blocks >= 1 && gValidate.fedSize == size);
+	// (bar the modify date StorePackage sets)
+	EXPECT(memcmp(gValidate.fed, ntk, 0x24) == 0 && memcmp(gValidate.fed + 0x28, ntk + 0x28, size - 0x28) == 0);
+	ResetValidateLog(-1, noErr);
+	EXPECT(handler->ValidatePackage(&event, &iter) == noErr && gValidate.ends == 1);
+
+	// streamed: no address, so never fed
+	SourceType streamed = { kStream, kSerialDevice, 0, 0 };
+	TPkBeginLoadEvent streamEvent(streamed, source, 0, 0, true);
+	ResetValidateLog(-1, noErr);
+	EXPECT(handler->ValidatePackage(&streamEvent, &iter) == -1);
+	EXPECT(gValidate.begins == 1 && gValidate.package == nil && gValidate.ends == 0);
+
+	// in fixed memory (the ROM's own): not asked at all
+	SourceType fixed = { kFixedMemory, kNoDevice, 0, 0 };
+	TPkBeginLoadEvent fixedEvent(fixed, source, 0, 0, true);
+	ResetValidateLog(-1, -1);
+	EXPECT(handler->ValidatePackage(&fixedEvent, &iter) == noErr && gValidate.begins == 0);
+	UnmapLargeObject(address);
+	store->Delete();
+	free(ntk);
+
+	// two parts and the flag: told where the last part's data lies
+	ULong twoSize;
+	UByte* two = TwoPartPackage(&twoSize);
+	TPackageIterator twoIter(two);
+	EXPECT(twoIter.Init() == noErr && twoIter.NumberOfParts() == 2);
+	handler->fIter = &twoIter;
+	source.mem.buffer = (VAddr) (uintptr_t) two;
+	TPkBeginLoadEvent twoEvent(onStore, source, 0, 0, true);
+	ResetValidateLog(noErr, noErr);
+	EXPECT(handler->ValidatePackage(&twoEvent, &twoIter) == noErr);
+	EXPECT(gValidate.size == twoSize && gValidate.lastPart != nil && memcmp(gValidate.lastPart, "SIGNATUR", 8) == 0);
+	// without the flag, not
+	PutBigEndianWord(two + 0x0c, 0x10000000);
+	TPackageIterator plainIter(two);
+	EXPECT(plainIter.Init() == noErr);
+	ResetValidateLog(noErr, noErr);
+	EXPECT(handler->ValidatePackage(&twoEvent, &plainIter) == noErr && gValidate.lastPart == nil);
+	handler->fIter = nil;
+	free(two);
+	TValidatePackage::ClassInfo()->DeRegister();
+}
+
+
 // A package archived as chunk entries in a soup (packages/
 // PackageArchivalPipe.h): written through the pipe's write side - a new
 // entry each time the 4K buffer fills, its unique id added to the keys -
@@ -929,6 +1150,7 @@ public:
 	}
 	virtual long		PreMain()
 	{
+		TestValidator();
 		EXPECT(ROMAt(kCardfile) != nil);
 		if (ROMAt(kCardfile) != nil)
 		{

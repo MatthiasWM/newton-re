@@ -31,7 +31,29 @@ progress callback); the 1.x packages; the host's way in (`newton
 | XIP packages (`TXIPPackageStore`, `TXIPStoreCompander`, `TXIPPackageIterator::StoreXIP`, `CXIPObjectPipe` and the ROM domain manager's `XIPFault`/`XIPMapInPackageSection`/`XIPAddPackage`: 0x00277d54-0x0027aa00, about 11 KB) - a package executed in place from flash | the ROM domain manager's page faulting (the host keeps a mapped object whole: `stores/host/HostLargeObjects.cpp`); until then an XIP-flagged package picks the unregistered `TXIPStoreCompander` and storing it answers `kError_Bad_Parameters`.  Reach: only a package whose directory flags carry 0x08000000 is stored this way (`StorePackage`); moving a package to a card duplicates its large object through its own allocator (`DuplicateLargeObject`), so it becomes XIP only if it already was, and none of the 59 packages in `fixtures/` carries the flag |
 | relocating a page to a base other than the host's (`RelocateFramesInPage`) | recorded DEVIATION: the host maps a package unrelocated at base 0, as `BackupPackage` reads it |
 | `BackupPackage`'s progress callback | nothing calls it with one (`LOWrite`'s callers pass nil) |
-| the validation driver (`ValidatePackage`), system patches (`CheckAndInstallPatch`), `SetCardReinsertReason` | nothing on the host reaches them |
+| system patches (`CheckAndInstallPatch`), `SetCardReinsertReason` | nothing on the host reaches them |
+
+## The validation driver (`src/packages/ValidatePackage.h`)
+
+The package manager can have a package vetted before it goes in.  At its
+start it makes a `TValidatePackageDriver` by name
+(`NewByName("TValidatePackageDriver", "TValidatePackage")`,
+`InitValidatePackageDriver` 0x0015e20c), and when there is one
+`BeginLoadPackage` asks `ValidatePackage` (0x0015e25c) about every package
+not in fixed memory: `ValidateBegin` is told the package's name, where it
+lies when it is mapped from a store (nil when it is streamed), its size,
+and - for a package of more than one part whose flags carry 0x01000000,
+the only reader of that bit - where its last part's data lies (a
+signature, presumably).  Its answer is the verdict, unless it is neither
+`noErr` nor `kError_Bad_Package` and the package is on a store: then the
+package is backed up (`BackupPackage`) through a `CValidateBackupPipe`
+(0x0015dc14-0x0015fe48), a pipe that only writes and hands each block to
+`ValidateNextBlock`, and `ValidateEnd`'s answer to what the backup came to
+is the verdict.  It is a hook for a security add-on: nothing in the U.S.
+ROM or its extension registers an implementation, so the manager's driver
+is always nil.  A protocol part registering a `TValidatePackage` before the
+manager starts would reach it; ctest `packages.PackageManager`
+(`TestValidator`) registers one and drives `ValidatePackage` directly.
 
 ## The package directory (`src/packages/PackageIterator.h`)
 

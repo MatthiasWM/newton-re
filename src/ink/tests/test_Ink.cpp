@@ -913,6 +913,142 @@ TestEncodeStroke()
 }
 
 
+// The ink codec's own point sink and source (StorePointProcDefault,
+// GetInputTraceDefault), which DecoderOpen and EncoderOpen put in a
+// context and the ROM's only callers replace: points in a buffer, a
+// marker (0, -1) to begin, after each stroke, and twice at the end.  What
+// the sink writes the source reads, so a block decoded into a buffer and
+// encoded from it again is the same ink.
+static long		gSourceAt = 0;
+static const InkPoint*	gSourcePoints = nil;
+
+// a source of the caller's own over the same form, a stroke at a time
+static short
+ArraySource(short what, InkPoint* pt, void* /*refCon*/)
+{
+	if (what == kInkAskBegin)
+	{
+		gSourceAt = 1;
+		return 1;
+	}
+	if (gSourcePoints[gSourceAt].y != kCICMarkerY)
+	{
+		*pt = gSourcePoints[gSourceAt++];
+		return kInkPoint;
+	}
+	gSourceAt++;
+	return gSourcePoints[gSourceAt].y != kCICMarkerY ? kInkEndStroke : kInkEnd;
+}
+
+static Boolean
+IsMarker(const InkPoint& p)		{ return p.x == 0 && p.y == kCICMarkerY; }
+
+static void
+TestDefaultPointProcs()
+{
+	InitializeParagraphCompression();
+	// two strokes, written by hand as TestEncodeStroke does
+	UByte bytes[256];
+	memset(bytes, 0, sizeof(bytes));
+	CICEncoder e;
+	memset(&e, 0, sizeof(e));
+	e.fOut = bytes;
+	e.fBitLimit = sizeof(bytes) * 8;
+	e.fBookNumber = 1;
+	e.fFirst = 1;
+	EXPECT(EcdrSelectCodeBook(&e));
+	e.fTrace[0].x = 10 * 1024;	e.fTrace[0].y = 10 * 1024;
+	e.fTrace[1].x = 20 * 1024;	e.fTrace[1].y = 10 * 1024;
+	e.fPointCount = 2;
+	EXPECT(WriteNewStroke(&e, kCICShortStroke) && WriteShortStroke(&e));
+	e.fTrace[0].x = 100 * 1024;	e.fTrace[0].y = 50 * 1024;
+	e.fTrace[1].x = 100 * 1024;	e.fTrace[1].y = 70 * 1024;
+	e.fPointCount = 2;
+	EXPECT(WriteNewStroke(&e, kCICShortStroke) && WriteShortStroke(&e));
+	EXPECT(WriteNewStroke(&e, kCICEndOfGroup));
+	long size = (long) ((e.fBitPos + 7) / 8);
+
+	// decoded into a buffer by the default sink
+	InkPoint buffer[32];
+	memset(buffer, 0x55, sizeof(buffer));
+	CICDecoder d;
+	EXPECT(!DecoderOpen(&d, bytes, size, (InkPoint*) nil, sizeof(buffer), 1));
+	EXPECT(DecoderOpen(&d, bytes, size, buffer, sizeof(buffer), 1));
+	EXPECT(d.fSink == StorePointProcDefault && d.fRefCon == &d);
+	EXPECT(DecoderRun(&d));
+	EXPECT(d.fSinkData != nil);
+	long count = -1;
+	EXPECT(DecoderClose(&d, &count) && count == 0);
+	EXPECT(d.fSinkData == nil);
+	EXPECT(IsMarker(buffer[0]) && IsMarker(buffer[3]) && IsMarker(buffer[6]) && IsMarker(buffer[7]) && IsMarker(buffer[8]));
+	EXPECT(buffer[1].x == 10 && buffer[1].y == 10 && buffer[2].x == 20 && buffer[2].y == 10);
+	EXPECT(buffer[4].x == 100 && buffer[4].y == 50 && buffer[5].x == 100 && buffer[5].y == 70);
+	// once the end is written the sink has nothing more to say
+	InkPoint late = { 1, 1 };
+	EXPECT(StorePointProcDefault(kInkPoint, &late, &d) == 0);
+
+	// a buffer with room for six: within five of its end, a point writes
+	// the end instead, and the end afterwards answers nought
+	InkPoint small[6];
+	EXPECT(DecoderOpen(&d, bytes, size, small, sizeof(small), 1));
+	DecoderRun(&d);
+	EXPECT(!DecoderClose(&d));
+	EXPECT(IsMarker(small[0]) && IsMarker(small[1]) && IsMarker(small[2]));
+	// ... and one with room for fewer than five is refused at the start
+	EXPECT(DecoderOpen(&d, bytes, size, small, 4 * sizeof(InkPoint), 1));
+	EXPECT(!DecoderRun(&d));
+	DisposPtr((Ptr) d.fSinkData);		// (kept, as the ROM keeps it)
+
+	// the buffer encoded again by the default source: the same bits as a
+	// source of the caller's own over the same points gives, and the same
+	// points read back
+	UByte again[256];
+	memset(again, 0, sizeof(again));
+	EXPECT(!EncoderOpen(&e, (const InkPoint*) nil, sizeof(buffer), again, sizeof(again), 1));
+	EXPECT(EncoderOpen(&e, buffer, 9 * sizeof(InkPoint), again, sizeof(again), 1));
+	EXPECT(e.fSource == GetInputTraceDefault && e.fRefCon == &e);
+	EXPECT(EncoderRun(&e));
+	EXPECT(e.fTraceList == nil);		// let go of at the end
+	long bits = 0;
+	EncoderClose(&e, &bits);
+	EXPECT(bits > 0);
+	UByte theirs[256];
+	memset(theirs, 0, sizeof(theirs));
+	gSourcePoints = buffer;
+	EXPECT(EncoderOpen(&e, ArraySource, nil, theirs, sizeof(theirs), 1) && EncoderRun(&e));
+	long theirBits = 0;
+	EncoderClose(&e, &theirBits);
+	EXPECT(theirBits == bits && memcmp(again, theirs, (bits + 7) / 8) == 0);
+	gPointCount = 0;
+	gStrokeEnds = 0;
+	EXPECT(gCICInkCodec.Decode(again, (bits + 7) / 8, 1, CollectAll, nil));
+	// (the encoder writes each stroke as a curve, which reads back as
+	// points along it: the first stroke's two ends, the second's start)
+	EXPECT(gStrokeEnds == 2 && gPointCount == 15);
+	EXPECT(gPoints[0].x == 10 && gPoints[0].y == 10 && gPoints[5].x == 20 && gPoints[5].y == 10);
+	EXPECT(gPoints[6].x == 100 && gPoints[6].y == 50 && gPoints[14].x == 100);
+
+	// the source on its own: a run of the same point is one; a marker
+	// ends a stroke, two end it all, and then there is nothing
+	InkPoint trace[8] = { { 0, -1 }, { 1, 1 }, { 1, 1 }, { 2, 2 }, { 0, -1 }, { 3, 3 }, { 0, -1 }, { 0, -1 } };
+	memset(&e, 0, sizeof(e));
+	e.fTracePoints = trace;
+	InkPoint pt;
+	EXPECT(GetInputTraceDefault(kInkAskBegin, &pt, &e) == 1);
+	EXPECT(GetInputTraceDefault(kInkAskNext, &pt, &e) == kInkPoint && pt.x == 1);
+	EXPECT(GetInputTraceDefault(kInkAskNext, &pt, &e) == kInkPoint && pt.x == 2);
+	EXPECT(GetInputTraceDefault(kInkAskNext, &pt, &e) == kInkEndStroke);
+	EXPECT(GetInputTraceDefault(kInkAskNext, &pt, &e) == kInkPoint && pt.x == 3);
+	EXPECT(GetInputTraceDefault(kInkAskNext, &pt, &e) == kInkEnd && e.fTraceList == nil);
+	EXPECT(GetInputTraceDefault(kInkAskNext, &pt, &e) == 0);
+	// ink with no strokes: the first marker is not stepped over
+	InkPoint none[3] = { { 0, -1 }, { 0, -1 }, { 0, -1 } };
+	e.fTracePoints = none;
+	EXPECT(GetInputTraceDefault(kInkAskBegin, &pt, &e) == 1);
+	EXPECT(GetInputTraceDefault(kInkAskNext, &pt, &e) == kInkEnd);
+}
+
+
 // The trace the encoder builds a stroke up in, and the pieces that work
 // over it.
 static void
@@ -2132,6 +2268,7 @@ main()
 	TestDecodeRun();
 	TestEncodeWord();
 	TestEncodeStroke();
+	TestDefaultPointProcs();
 	TestTrace();
 	TestTransform();
 	TestRepar();

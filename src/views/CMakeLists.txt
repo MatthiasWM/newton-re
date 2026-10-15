@@ -30,6 +30,7 @@ add_library(views STATIC
     PictureView.cpp
     DataView.cpp
     ContainerView.cpp
+    MathViews.cpp
     EditView.cpp
     SortInk.cpp
     ListView.cpp

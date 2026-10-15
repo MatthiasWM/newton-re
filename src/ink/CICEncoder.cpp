@@ -7,6 +7,7 @@
 
 #include "CICCodec.h"
 #include "ByteOrder.h"
+#include "NewtonMemory.h"
 #include "host/RomBugs.h"
 
 #include <string.h>
@@ -1164,10 +1165,31 @@ WriteLongStroke(CICEncoder* encoder)
 ------------------------------------------------------------------------------*/
 
 // ROM 0x0027f938 EncoderOpen__FUsUlT1T2T1
-// A context made ready.  (The ROM allocates one; the host is given the
-// room to work in, as with the decoder.)  The four numbers that bend a
-// segment start at a million, which is far enough out that the first try
-// of the fitting always counts as having moved.
+// A context made ready, the points read from the buffer given through the
+// default source.  (The ROM allocates one, nil when the points or the
+// room are missing; the host is given the room to work in, as with the
+// decoder.)
+Boolean
+EncoderOpen(CICEncoder* encoder, const InkPoint* points, ULong pointsSize,
+			UByte* out, long size, ULong book)
+{
+	memset(encoder, 0, sizeof(*encoder));
+	if (pointsSize == 0 || points == nil || out == nil || size == 0)
+		return false;
+	if (!EncoderOpen(encoder, GetInputTraceDefault, encoder, out, size, book))
+		return false;
+	encoder->fTracePoints = points;
+	encoder->fTraceSize = pointsSize;
+	encoder->fTraceList = nil;
+	return true;
+}
+
+
+// (host) The context opened with the caller's own source in it, as
+// GenericCSCompress (ROM 0x0015362c) opens one and then puts its source
+// in.  The four numbers that bend a segment start at a million, which is
+// far enough out that the first try of the fitting always counts as
+// having moved.
 Boolean
 EncoderOpen(CICEncoder* encoder, InkPointSource source, void* refCon,
 			UByte* out, long size, ULong book)
@@ -1184,6 +1206,62 @@ EncoderOpen(CICEncoder* encoder, InkPointSource source, void* refCon,
 	encoder->fCoefY[3] = 1000000;
 	encoder->fBookNumber = book;
 	return EcdrSelectCodeBook(encoder);
+}
+
+
+// ROM 0x0027fbac GetInputTraceDefault__FsP6_POINTP4_CDC
+// The default source.  Asked to begin, it makes its working store (a
+// CICPointSource) and steps over the buffer's first marker - unless a
+// second follows it, which is ink with no strokes.  Asked for a point: a
+// run of the same point is the last of them; a marker is a stroke's end,
+// and a second marker after it the end of it all, at which the store goes
+// and every later ask answers nought.
+short
+GetInputTraceDefault(short what, InkPoint* pt, void* refCon)
+{
+	CICEncoder* encoder = (CICEncoder*) refCon;
+	if (what == kInkAskBegin)
+	{
+		CICPointSource* list = (CICPointSource*) NewPtr(sizeof(CICPointSource));	// (HWRMemoryAlloc)
+		encoder->fTraceList = list;
+		if (list == nil)
+			return 0;
+		const InkPoint* points = encoder->fTracePoints;		// (the ROM locks its handle)
+		if (points == nil)
+			return 0;
+		list->fPoints = points;
+		list->fDone = 0;
+		list->fIndex = 0;
+		if (points[list->fIndex].y == kCICMarkerY)
+		{
+			list->fIndex++;
+			if (points[list->fIndex].y == kCICMarkerY)
+				list->fIndex--;
+		}
+		return 1;
+	}
+	CICPointSource* list = (CICPointSource*) encoder->fTraceList;
+	if (list == nil)
+		return 0;
+	if (list->fDone != 0)
+		return kInkEnd;
+	const InkPoint* points = list->fPoints;
+	if (points[list->fIndex].y != kCICMarkerY)
+	{
+		while (points[list->fIndex].x == points[list->fIndex + 1].x
+			   && points[list->fIndex].y == points[list->fIndex + 1].y)
+			list->fIndex++;
+		*pt = points[list->fIndex];
+		list->fIndex++;
+		return kInkPoint;
+	}
+	list->fIndex++;
+	if (points[list->fIndex].y != kCICMarkerY)
+		return kInkEndStroke;
+	list->fDone = 1;
+	DisposPtr((Ptr) list);									// (the handle unlocked, the store freed)
+	encoder->fTraceList = nil;
+	return kInkEnd;
 }
 
 

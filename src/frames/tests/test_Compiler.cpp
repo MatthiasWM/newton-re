@@ -468,6 +468,61 @@ TestFiles()
 	result = ParseFile("test_Compiler.tmp.ns");
 	EXPECT(strstr(Printed(), "!!! Exception: evt.ex.fr.comp;type.ref.frame") != nil);
 	remove("test_Compiler.tmp.ns");
+	// the file reader in a two-byte encoding (Shift-JIS, 6: no ROM's
+	// compiler is set to one): a lead byte takes the next with it, the
+	// pair put back second byte first; one at the end is an error.  An
+	// eight-bit encoding has none (IsFirstByteOf2Byte, utility/Unicode.h).
+	{
+		f = fopen("test_Compiler.tmp.ns", "wb");
+		fputs("a\x82\xa0" "b\x81", f);
+		fclose(f);
+		long encoding = gNewtonScriptCompilerCharacterEncoding;
+		gNewtonScriptCompilerCharacterEncoding = kShiftJISEncoding;
+		FILE* in = fopen("test_Compiler.tmp.ns", "rb");
+		TStdioInputStream stream(in, "test_Compiler.tmp.ns");
+		EXPECT(stream.GetChar() == 'a');
+		UniChar two = stream.GetChar();
+		EXPECT(two == 0x82a0);
+		stream.UngetChar(two);
+		EXPECT(stream.GetChar() == 0x82a0 && stream.GetChar() == 'b');
+		Boolean threw = false;
+		newton_try
+		{
+			stream.GetChar();
+		}
+		newton_catch_all
+		{
+			threw = true;
+		}
+		end_try;
+		EXPECT(threw);
+		fclose(in);
+		gNewtonScriptCompilerCharacterEncoding = encoding;
+		// Mac Roman: the same bytes one at a time
+		in = fopen("test_Compiler.tmp.ns", "rb");
+		TStdioInputStream roman(in, "test_Compiler.tmp.ns");
+		EXPECT(roman.GetChar() == 'a' && roman.GetChar() == U_CONST_CHAR(0x82) && roman.GetChar() == U_CONST_CHAR(0xa0));
+		fclose(in);
+		remove("test_Compiler.tmp.ns");
+		EXPECT(!IsFirstByteOf2Byte(0x81, kMacRomanEncoding) && !IsFirstByteOf2Byte(0xe0, 3));
+		EXPECT(IsFirstByteOf2Byte(0x81, kShiftJISEncoding) && IsFirstByteOf2Byte(0x9f, kShiftJISEncoding)
+			   && IsFirstByteOf2Byte(0xe0, kShiftJISEncoding) && IsFirstByteOf2Byte(0xef, kShiftJISEncoding)
+			   && IsFirstByteOf2Byte(0xf0, kShiftJISEncoding) && IsFirstByteOf2Byte(0xfb, kShiftJISEncoding));
+		EXPECT(!IsFirstByteOf2Byte(0x80, kShiftJISEncoding) && !IsFirstByteOf2Byte(0xa0, kShiftJISEncoding)
+			   && !IsFirstByteOf2Byte(0xdf, kShiftJISEncoding) && !IsFirstByteOf2Byte(0xfc, kShiftJISEncoding)
+			   && !IsFirstByteOf2Byte('a', kShiftJISEncoding));
+		threw = false;
+		newton_try
+		{
+			IsFirstByteOf2Byte('a', kASCIIEncoding);		// not an encoding it knows
+		}
+		newton_catch_all
+		{
+			threw = true;
+		}
+		end_try;
+		EXPECT(threw);
+	}
 	// the natives
 	{
 		RefVar fn(NSCallGlobalFn(RefVar(SYMBOL("Compile")), RefVar(MakeString("3 * 3"))));
