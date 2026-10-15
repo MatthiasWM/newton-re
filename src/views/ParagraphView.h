@@ -236,6 +236,8 @@ public:
 	virtual void	DrawHilitedData(void);								// ROM 0x0016a270 DrawHilitedData__14TParagraphViewFv - the selected text alone (a drag's picture)
 	virtual void	DrawHilites(Boolean on);							// ROM 0x0016aecc DrawHilites__14TParagraphViewFUc - each hilite's area filled black (false), nothing for true
 	virtual void	SimpleOffset(Point delta, Boolean inChildren);		// ROM 0x0017e5a4 SimpleOffset__14TParagraphViewF6TPointl - and the lines brought up to date
+	void			SimpleOffset(Point delta);							// ROM 0x0017e594 SimpleOffset__14TParagraphViewF6TPoint - empty (nothing in the ROM calls it)
+	void			RegisterIdler(void);								// ROM 0x00180244 RegisterIdler__14TParagraphViewFv - empty (nothing in the ROM calls it)
 	virtual void	SetBounds(const Rect& bounds);						// ROM 0x0017e3e8 SetBounds__14TParagraphViewFRC5TRect
 	virtual void	SetCaretOffset(long* offset, long* length);			// ROM 0x0017efd8 SetCaretOffset__14TParagraphViewFPlT1
 	virtual Ref		GetValue(RefArg slot, RefArg type);					// ROM 0x0018024c GetValue__14TParagraphViewFRC6RefVarT1
@@ -303,6 +305,10 @@ public:
 	void		OffsetCachedBounds(Point& delta);						// ROM 0x0016991c OffsetCachedBounds__14TParagraphViewFR6TPoint
 	void		UpdateCachedBounds(void);								// ROM 0x00169788 UpdateCachedBounds__14TParagraphViewFv - the lines laid out again when the view has come into sight with some not cached
 	long		FindLineContainingCharOffset(long offset);				// ROM 0x001786f8 FindLineContainingCharOffset__14TParagraphViewFl (host: the line's index, -1 for none)
+	// The first line a box covers at least `percent` per cent of, the
+	// line's box first let out a thousand pixels each side (`wide`) and
+	// raised by half its height (`halfUp`).  Nothing in the ROM calls it.
+	long		FindLineContainingRect(const Rect& box, const long percent, Boolean wide, Boolean halfUp);	// ROM 0x0017862c FindLineContainingRect__14TParagraphViewFRC5TRectClUcT3 (host: the line's index, -1 for none)
 	void		OffsetToBounds(long offset, Rect* bounds);				// ROM 0x00177f20 OffsetToBounds__14TParagraphViewFlP5TRect
 	// The character offset at a point: the line by FindLineContainingPoint
 	// (margin: 0 the line's box, 1 or 2 any distance to its sides - 2 also
@@ -346,6 +352,15 @@ public:
 						RefArg info, long* outOffset);		// ROM 0x00172eb4 AddWord__14TParagraphViewFP6FinderPCUsUlRC6RefVarPl
 	// A word written at a tab snapped to a stop or made one.
 	void		AddTabStop(Rect& box);					// ROM 0x00173b34 AddTabStop__14TParagraphViewFR5TRect
+	// How many tab stops a gap from one position to another spans (see the
+	// definition), and whether a word written at the end of the line the
+	// offset is on goes there rather than on a line of its own.  Neither
+	// is called by anything in the ROM.
+	long		CountTabStops(long from, long to);		// ROM 0x00173d5c CountTabStops__14TParagraphViewFlT1
+	Boolean		WordFitsAtEndOfLine(const UniChar* word, ULong length, ULong offset, Rect& box);	// ROM 0x00173270 WordFitsAtEndOfLine__14TParagraphViewFPCUsUlT2R5TRect
+	// The ROM's answers nought and does nothing else; nothing calls it.
+	long		PlaceAndAddWord(const UniChar* text, ULong length, const Rect& box, const Point& base,
+								ULong a, ULong b, RefArg info, long* outOffset, TUnitPublic* unit, long flags);	// ROM 0x00172e60 PlaceAndAddWord__14TParagraphViewFPCUsUlRC5TRectRC6TPointN22RC6RefVarPlP11TUnitPublicl
 	// Where a word written on the page goes in the text.
 	void		FindWordInParagraph(Finder* finder);		// ROM 0x0017348c FindWordInParagraph__14TParagraphViewFP6Finder
 	Boolean		FindWordInRun(Finder* finder);				// ROM 0x00173668 FindWordInRun__14TParagraphViewFP6Finder
@@ -498,6 +513,18 @@ public:
 // Text with its tabs and returns made single spaces (a run of them one
 // space, one at the end none); nil when there are none.
 long		LengthSansTabsAndCRs(const UniChar* text, Boolean* found);	// ROM 0x0017aefc LengthSansTabsAndCRs__FPUsPUc
+// Three text helpers nothing in the ROM calls (but WordFitsAtEndOfLine,
+// which nothing calls either, IsBullet): whether there is a tab or a
+// return before the text's nought; whether a character is a hyphen or a
+// bullet (one written on its own is taken to start a list item); and the
+// end of the word the text starts with, by the word break table.
+Boolean		ContainsTabsOrCRs(UniChar* text);						// ROM 0x0017ae80 ContainsTabsOrCRs__FPUs
+Boolean		IsBullet(UniChar c);									// ROM 0x0017a288 IsBullet__FUs
+ULong		FindEndOfWord(UniChar* text, RefArg breakTable);		// ROM 0x0017a498 FindEndOfWord__FPUsRC6RefVar
+// Whether a caret point is close enough to a line to be put on it, and if
+// so the point moved to the line's middle (and its height given back).
+// Nothing in the ROM calls it.
+Boolean		ValidateCaretPoint(Point* pt, LineInfo** lines, long above, long below, long* outHeight);	// ROM 0x001756a4 ValidateCaretPoint__FP6TPointPP8LineInfolT3Pl
 UniChar*	RemoveTabsAndCRs(const UniChar* text, RefArg styles);		// ROM 0x0017ad6c RemoveTabsAndCRs__FPUsRC6RefVar
 
 // The insert areas (ParagraphInsertAreas.cpp).

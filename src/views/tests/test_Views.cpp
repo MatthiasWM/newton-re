@@ -4923,6 +4923,115 @@ TestStrokeAndInkNatives()
 }
 
 
+// The paragraph's helpers that nothing in the ROM calls: called here
+// directly, over a paragraph of three lines (one per return) in a wide
+// view and over lines made by hand.
+static void
+TestParagraphUnreferenced()
+{
+	// the text helpers
+	EXPECT(IsBullet('-') && IsBullet(0x2022) && !IsBullet('a') && !IsBullet(0xa5));
+	UniChar plain[] = { 'a', 'b', 0 };
+	UniChar tabbed[] = { 'a', '\t', 'b', 0 };
+	UniChar returned[] = { 'a', '\r', 0 };
+	UniChar late[] = { 'a', 0, '\t', 0 };
+	EXPECT(!ContainsTabsOrCRs(plain) && ContainsTabsOrCRs(tabbed) && ContainsTabsOrCRs(returned) && !ContainsTabsOrCRs(late));
+
+	// ValidateCaretPoint over two lines made by hand: 10-30 and 30-50,
+	// each with its baseline five above its bottom
+	LineInfo first, second;
+	memset(&first, 0, sizeof(first));
+	memset(&second, 0, sizeof(second));
+	SetRect(&first.fBounds, 20, 10, 100, 30);
+	first.fHeight = 5;
+	SetRect(&second.fBounds, 20, 30, 100, 50);
+	second.fHeight = 5;
+	LineInfo* lines[3] = { &first, &second, nil };
+	Point pt = MakePoint(50, 40);
+	long height = 0;
+	EXPECT(ValidateCaretPoint(&pt, lines, 100, 0, &height) && pt.v == 40 && pt.h == 50 && height == 20);	// the second line's middle
+	pt = MakePoint(50, 35);											// in the first line let down by half the second's height
+	EXPECT(ValidateCaretPoint(&pt, lines, 100, 0, nil) && pt.v == 20);
+	pt = MakePoint(50, 58);											// under the last line, within half its height
+	EXPECT(ValidateCaretPoint(&pt, lines, 100, 0, &height) && pt.v == 40);
+	pt = MakePoint(50, 40);
+	EXPECT(!ValidateCaretPoint(&pt, lines, 2, 0, &height) && pt.v == 40);	// five over the baseline, two allowed
+	pt = MakePoint(50, 5);
+	EXPECT(!ValidateCaretPoint(&pt, lines, 100, 0, &height));			// above the lines
+	pt = MakePoint(200, 40);
+	EXPECT(!ValidateCaretPoint(&pt, lines, 100, 0, &height));			// beside them
+
+	TParagraphView* p = (TParagraphView*) ViewOf("ctxPU := AddView(GetRoot(), {viewClass: 81, viewFlags: 3, viewBounds: {left: 20, top: 10, right: 300, bottom: 100}, viewJustify: 0, viewFont: espy12, text: \"Hello\\nWorld\\nagain\"})");
+	Eval("ctxPU:Dirty()");
+	Refresh();
+	EXPECT(p != nil && p->LineCount() == 3);
+	if (p == nil || p->LineCount() != 3)
+		return;
+	const Rect& line1 = p->Line(1).fBounds;
+
+	// FindEndOfWord: the first word's end
+	UniChar words[] = { 'H', 'e', 'l', 'l', 'o', ' ', 'y', 'o', 'u', 0 };
+	EXPECT(FindEndOfWord(words, RefVar(p->fWordBreakTable)) == 5);
+
+	// FindLineContainingRect
+	Rect box = line1;
+	EXPECT(p->FindLineContainingRect(box, 50, false, false) == 1);
+	SetRect(&box, line1.right + 50, line1.top, line1.right + 60, line1.bottom);	// beside the text
+	EXPECT(p->FindLineContainingRect(box, 50, false, false) == -1 && p->FindLineContainingRect(box, 50, true, false) == 1);
+	SetRect(&box, line1.left, line1.top - 3, line1.left + 10, line1.top + 3);	// across the two lines' boundary
+	EXPECT(p->FindLineContainingRect(box, 60, false, false) == -1 && p->FindLineContainingRect(box, 60, false, true) == 1);
+
+	// WordFitsAtEndOfLine: room at the end of the first line (the view is
+	// far wider than "Hello")
+	UniChar ab[] = { 'a', 'b', 0 };
+	UniChar spaced[] = { 'a', ' ', 'b', 0 };
+	UniChar hyphen[] = { '-', 0 };
+	Rect empty;
+	SetRect(&empty, 0, -32768, 0, -32768);
+	Rect wide;
+	SetRect(&wide, 30, 60, 280, 75);
+	EXPECT(p->WordFitsAtEndOfLine(ab, 2, 2, empty));
+	EXPECT(!p->WordFitsAtEndOfLine(ab, 2, 2, wide));					// 250 wide: no room
+	EXPECT(p->WordFitsAtEndOfLine(hyphen, 1, 2, wide));					// a lone bullet goes anywhere
+	EXPECT(p->WordFitsAtEndOfLine(spaced, 3, 2, wide));					// so does more than one word
+	EXPECT(!p->WordFitsAtEndOfLine(ab, 2, (ULong) -1, empty));			// on no line
+	// the word last added to this view, on the line above the box, ends
+	// too near the right edge
+	TView* lastView = gLastAddedWordView;
+	Rect lastBox = gLastAddedWordBox;
+	gLastAddedWordView = p;
+	SetRect(&gLastAddedWordBox, 20, 40, 280, 55);
+	Rect below;
+	SetRect(&below, 30, 60, 40, 75);
+	EXPECT(!p->WordFitsAtEndOfLine(ab, 2, 2, below));
+	SetRect(&gLastAddedWordBox, 20, 40, 60, 55);
+	EXPECT(p->WordFitsAtEndOfLine(ab, 2, 2, below));
+	gLastAddedWordView = lastView;
+	gLastAddedWordBox = lastBox;
+
+	// CountTabStops: one with no tabs, nought for no gap
+	EXPECT(p->CountTabStops(50, 40) == 0 && p->CountTabStops(40, 50) == 1);
+	Eval("ctxPU.tabs := [60, 100, 140]");
+	EXPECT(p->CountTabStops(50, 105) == 2);							// 100 within ten of the end
+	EXPECT(p->CountTabStops(50, 130) == 3);							// 140 within ten
+	EXPECT(p->CountTabStops(50, 120) == 3);							// 140 past the end, its half-way (80) before it
+	EXPECT(p->CountTabStops(30, 35) == 0);							// 60 past the end, its half-way (40) past it too
+	EXPECT(p->CountTabStops(30, 45) == 1);
+	EXPECT(p->CountTabStops(50, 300) == 4);							// past them all: to the end
+	EXPECT(p->CountTabStops(10, 65) == 1);
+	EXPECT(p->CountTabStops(150, 300) == 1);						// none past the start
+
+	// the empty ones
+	p->SimpleOffset(MakePoint(5, 5));
+	p->RegisterIdler();
+	EXPECT(p->viewBounds.left == 20 && p->viewBounds.top == 10);
+	Point base = MakePoint(0, 0);
+	long offset = 7;
+	EXPECT(p->PlaceAndAddWord(ab, 2, wide, base, 0, 0, RefVar(NILREF), &offset, nil, 0) == 0 && offset == 7);
+	Eval("ctxPU:Close()");
+}
+
+
 // stands in for that script and looks at what it is handed.
 static void
 TestInkOnThePage()
@@ -8196,6 +8305,7 @@ main()
 		TestLineGesture();
 		TestEffects();
 		TestInkOnThePage();
+		TestParagraphUnreferenced();
 		TestStrokeAndInkNatives();
 		TestInkWordOnThePage();
 		TestInkWordAtTheCaret();
