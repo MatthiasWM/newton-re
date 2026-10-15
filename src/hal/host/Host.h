@@ -16,6 +16,10 @@ void			HostAdvanceClock(ULong ticks);
 void			HostSetClock(const Int64* time);
 void			HostUseRealClock(Boolean real);		// the host's steady clock instead of the controllable one
 void			HostSleepUntil(const Int64* time);	// real clock: sleep; controllable clock: jump to `time`
+// the host's monotonic clock in nanoseconds, whichever clock the Newton's
+// timer is on (what the host's measurements - the NewtonScript profiler,
+// frames/FunctionProfiler.h - time by)
+unsigned long long	HostMonotonicNanoseconds(void);
 extern Boolean	gHostAlarmArmed;
 extern Int64	gHostAlarmTime;
 extern Boolean	gHostRTCAlarmArmed;		// the real-time clock's alarm (hal/RealTimeClock.h)

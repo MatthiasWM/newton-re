@@ -94,6 +94,7 @@ const char*	BakedObjectsStamp(const void* data, ULong size, ULong* length);
 long		ROMObjectCount(void);
 void		ROMObjectAreaBounds(char** start, char** end);	// where the imported ROM objects lie (both nil: none) - Uriah's gUriahROM
 Ref			TranslateROMRef(ULong32 ref);		// a ROM ref as a host ref (nil: a pointer that is not a ROM object's)
+ULong32		ROMSourceRef(Ref r);				// the other way: an imported object's ROM ref (layout.tsv's address + 1), 0 for none
 
 // The ROM's own bytes, with ROM address 0 at the start (an AIF image's
 // header already stepped over); nil when nothing has been imported.  The

@@ -16,6 +16,7 @@
 #include "OSErrors.h"
 #include "NewtonMemory.h"
 #include "REPTranslators.h"		// gREPout, where the verbose report goes
+#include "Interpreter.h"			// the frames function profiler's hooks
 
 #include <stdio.h>
 
@@ -337,11 +338,23 @@ TObjectHeap::SweepAndCompact(void)
 	GC
 ------------------------------------------------------------------------------- */
 
+// The function arguments of the profiler's GC calls: the ROM passes null
+// references (0); DEVIATION: here a RefVar of nil, a null reference being
+// undefined in C++ (and a profiler that looked at one would fault).
+static RefHandle	gNoRefHandle = { NILREF, 0 };
+static RefHandle*	gNoRef = &gNoRefHandle;
+static inline const RefVar&
+NoRefVar(void)
+{
+	return *(const RefVar*) &gNoRef;
+}
+
+
 // ROM 0x002e3af4 GC__11TObjectHeapFv
 // Mark from the RefHandle table, the roots and the DIY markers; the symbol
 // table root is marked last, after GCTWA has dropped the symbols nothing
-// else reached.  NOT YET RECONSTRUCTED: the frames function profiler's
-// hooks around the collection (gFramesFunctionProfilingEnabled).  The
+// else reached.  The frames function profiler is told of the collection
+// (kProfileGC: depth 0 as it starts, 1 once the heap is compacted).  The
 // verbose report (gVerboseGC) goes to the REP's out translator.
 void
 TObjectHeap::GC(void)
@@ -349,6 +362,8 @@ TObjectHeap::GC(void)
 	if (fInGC)
 		Throw(exFrames, (void*) kNSErrGCDuringGC, nil);
 	fInGC = true;
+	if (FramesProfiling())
+		gFramesFunctionProfiler(NoRefVar(), NoRefVar(), 0, FramesProfilingGeneration(), kProfileGC, gFramesFunctionProfilerData);
 	gCacheObjPtrRef = 0;
 	gCacheLengthObj = 0;
 	FindOffsetCacheClear();
@@ -388,6 +403,8 @@ TObjectHeap::GC(void)
 	CleanUpWeakChain();
 	SweepAndCompact();
 	DeclawRefsInRegisteredRanges();
+	if (FramesProfiling())
+		gFramesFunctionProfiler(NoRefVar(), NoRefVar(), 1, FramesProfilingGeneration(), kProfileGC, gFramesFunctionProfilerData);
 	fInGC = false;
 	// ValidateHeap(GetCurrentHeap(), -1) - the ROM's ValidateHeap (0x002eb584) does nothing
 	if (gGCProcEntries != nil)

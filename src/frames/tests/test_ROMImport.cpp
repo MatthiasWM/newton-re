@@ -67,9 +67,12 @@ main()
 	EXPECT(Intern((char*) "_proto") == RSSYM_proto && Intern((char*) "_PROTO") == RSSYM_proto);
 	EXPECT(Intern((char*) "frozenEntry") != NILREF && InROMObjectArea(Intern((char*) "frozenEntry")));
 	EXPECT(SymbolHash(RSSYMstring) == SymbolHashFunction("string"));
+	// (InitObjects has interned the host's own names already - the
+	// profiler's natives, frames/FunctionProfiler.h - so count from here)
+	long symbolsBefore = gNumSymbols;
 	Ref fresh = Intern((char*) "notInTheROMAtAll");
 	EXPECT(gHeap->InHeap(fresh) && Intern((char*) "notInTheROMAtAll") == fresh);
-	EXPECT(gNumSymbols == 1);
+	EXPECT(gNumSymbols == symbolsBefore + 1);
 	EXPECT(EQ(RSSYMstring, Intern((char*) "string")) && !EQ(RSSYMstring, RSSYMsymbol));
 
 	// the built-in functions frame and its map

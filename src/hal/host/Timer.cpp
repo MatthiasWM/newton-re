@@ -78,6 +78,13 @@ HostSteadyClock()
 	return t;
 }
 
+unsigned long long
+HostMonotonicNanoseconds(void)
+{
+	return (unsigned long long) std::chrono::duration_cast<std::chrono::nanoseconds>(
+		std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 void
 HostUseRealClock(Boolean real)
 {

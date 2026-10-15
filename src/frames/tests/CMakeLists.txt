@@ -25,6 +25,12 @@ target_link_libraries(test_Compiler PRIVATE frames)
 target_compile_definitions(test_Compiler PRIVATE "NEWTON_OBJECTS=\"${NEWTON_OBJECTS_FILE}\"")
 add_test(NAME frames.Compiler COMMAND test_Compiler)
 
+# the frames function profiler's hooks, and the host's profiler behind them
+add_executable(test_Profiler test_Profiler.cpp)
+target_link_libraries(test_Profiler PRIVATE frames)
+target_compile_definitions(test_Profiler PRIVATE "NEWTON_OBJECTS=\"${NEWTON_OBJECTS_FILE}\"")
+add_test(NAME frames.Profiler COMMAND test_Profiler)
+
 add_executable(test_Strings test_Strings.cpp)
 target_link_libraries(test_Strings PRIVATE frames)
 target_compile_definitions(test_Strings PRIVATE "NEWTON_OBJECTS=\"${NEWTON_OBJECTS_FILE}\"")

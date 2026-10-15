@@ -13,12 +13,14 @@
 	two compute the same (FastRun1 and its Fast... helpers, 0x002ecca0-
 	0x002ef8a8, follow SlowRun).
 
-	Two things of the ROM's are not a host's: native functions in binary
-	objects (ARM code) cannot be run, and the frames function profiler
-	(gFramesFunctionProfiler) is not reconstructed.
+	One thing of the ROM's is not a host's: native functions in binary
+	objects (ARM code) cannot be run.  The frames function profiler's hooks
+	(gFramesFunctionProfiler) are the ROM's; the ROM has no profiler to
+	install in them, the host has one (FunctionProfiler.h).
 */
 
 #include "Interpreter.h"
+#include "FunctionProfiler.h"
 #include "NarrowRef.h"
 #include "PackageNatives.h"
 #include "NativeFunctions.h"
@@ -31,6 +33,7 @@
 #include "RichString.h"		// aref/setAref read strings through TRichString
 
 #include "host/TaskRuntime.h"
+#include "host/RomBugs.h"
 
 #include "REPTranslators.h"
 
@@ -46,6 +49,9 @@ Ref				gFreqFuncs = NILREF;
 Ref				gConstantsFrame = NILREF;
 Ref				gFramesBreakPoints = NILREF;
 Boolean			gFramesBreakPointsEnabled = false;
+ULong					gFramesFunctionProfilingEnabled = 0;		// 0x0c10535c  kFramesFunctionProfilingOn or 0
+FramesFunctionProfiler	gFramesFunctionProfiler = nil;				// 0x0c105360
+void*					gFramesFunctionProfilerData = nil;			// 0x0c105364
 long			gAccurateStackTrace = 0;
 Boolean			gUseCFunctionDocStrings = false;
 Ref				gCFunctionPrototype = NILREF;
@@ -465,11 +471,14 @@ TInterpreter::SetSendEnv(RefArg receiver, RefArg implementor)
 
 // ROM 0x002f1cec SetFastLoopFlag__12TInterpreterFv
 // FastRun may run when nothing wants SlowRun: no stack-trace accuracy,
-// tracing, breakpoints or profiling, and instructions that stay put.
+// tracing, breakpoints or profiling (on, with a profiler installed - the
+// fast loop returns from a function without Return, which the profiler
+// would not see), and instructions that stay put.
 void
 TInterpreter::SetFastLoopFlag(void)
 {
-	fFastLoop = gAccurateStackTrace == 0 && fTraceLevel == 0 && !gFramesBreakPointsEnabled && fInstructionsFixed;
+	fFastLoop = gAccurateStackTrace == 0 && fTraceLevel == 0 && !gFramesBreakPointsEnabled && fInstructionsFixed
+			 && !FramesProfiling();
 }
 
 
@@ -514,10 +523,14 @@ StackFrameWord(long base, long flags)
 // Start running fn (no arguments) at the top of the control stack: a
 // NewtonScript function's locals go on the value stack, its argFrame (if
 // it has one) is cloned for its closure; a 1.x CodeBlock's cloned argFrame
-// holds everything.  Other function kinds are ignored.
+// holds everything.  Other function kinds are ignored.  The profiler hears
+// of the call first (kProfileCall), whatever the function's kind.
 void
 TInterpreter::TopLevelCall(RefArg fn, RefArg /*receiver*/)
 {
+	if (FramesProfiling())
+		gFramesFunctionProfiler(StateVar(fVMState->fFunction), fn, ControlPosition(), FramesProfilingGeneration(),
+								kProfileCall, gFramesFunctionProfilerData);
 	Ref theClass = GetArraySlotRef(fn, kFunctionClassSlot);
 	if (theClass == kFuncClass)
 	{
@@ -566,10 +579,16 @@ TInterpreter::TopLevelCall(RefArg fn, RefArg /*receiver*/)
 // Call fn with numArgs arguments on the value stack.  A NewtonScript
 // function becomes the current one (answers false: the loop runs it); a
 // native one is called here, its result replacing the arguments, and the
-// caller's state restored (answers true).
+// caller's state restored (answers true).  The profiler hears of the call
+// first and, for a native with its code in a binary, of the return here
+// (a plain native's CallPlainCFunction tells it; a NewtonScript function's
+// return is the bytecode's, Return).
 Boolean
 TInterpreter::Call(RefArg fn, long numArgs)
 {
+	if (FramesProfiling())
+		gFramesFunctionProfiler(StateVar(fVMState->fFunction), fn, ControlPosition(), FramesProfilingGeneration(),
+								kProfileCall, gFramesFunctionProfilerData);
 	StateRef(fVMState->fPC) = MAKEINT(fPC);
 	Ref theClass = GetArraySlotRef(fn, kFunctionClassSlot);
 	if ((theClass & 0xff) == kFuncClass)
@@ -608,15 +627,22 @@ TInterpreter::Call(RefArg fn, long numArgs)
 	fPC = RINT(StateRef(fVMState->fPC));
 	if (StateRef(fVMState->fFunction) != NILREF && fPC != -1)
 		SetFlags();
+	if (FramesProfiling())
+		gFramesFunctionProfiler(StateVar(fVMState->fFunction), fn, ControlPosition(), FramesProfilingGeneration(),
+								kProfileReturn, gFramesFunctionProfilerData);
 	return true;
 }
 
 
 // ROM 0x002f477c Send__12TInterpreterFRC6RefVarN21l
-// As Call, with the receiver and implementor of the message.
+// As Call, with the receiver and implementor of the message (the
+// profiler told kProfileSend).
 Boolean
 TInterpreter::Send(RefArg receiver, RefArg implementor, RefArg fn, long numArgs)
 {
+	if (FramesProfiling())
+		gFramesFunctionProfiler(StateVar(fVMState->fFunction), fn, ControlPosition(), FramesProfilingGeneration(),
+								kProfileSend, gFramesFunctionProfilerData);
 	StateRef(fVMState->fPC) = MAKEINT(fPC);
 	fVMState = fCtrlStack.NewState();
 	StateRef(fVMState->fReceiver) = receiver;
@@ -651,6 +677,9 @@ TInterpreter::Send(RefArg receiver, RefArg implementor, RefArg fn, long numArgs)
 	fPC = RINT(StateRef(fVMState->fPC));
 	if (StateRef(fVMState->fFunction) != NILREF && fPC != -1)
 		SetFlags();
+	if (FramesProfiling())
+		gFramesFunctionProfiler(StateVar(fVMState->fFunction), fn, ControlPosition(), FramesProfilingGeneration(),
+								kProfileReturn, gFramesFunctionProfilerData);
 	return true;
 }
 
@@ -824,7 +853,8 @@ TInterpreter::CallPackageNative(RefArg code, ULong offset, long numArgs)
 
 // ROM 0x002f4f8c CallPlainCFunction__12TInterpreterFRC6RefVarl
 // A native function: called with the arguments on the value stack, its
-// result replacing them; then back to the caller's state.
+// result replacing them; then back to the caller's state, and the
+// profiler told of the return.
 void
 TInterpreter::CallPlainCFunction(RefArg fn, long numArgs)
 {
@@ -846,6 +876,9 @@ TInterpreter::CallPlainCFunction(RefArg fn, long numArgs)
 	fPC = RINT(StateRef(fVMState->fPC));
 	if (StateRef(fVMState->fFunction) != NILREF && fPC != -1)
 		SetFlags();
+	if (FramesProfiling())
+		gFramesFunctionProfiler(StateVar(fVMState->fFunction), fn, ControlPosition(), FramesProfilingGeneration(),
+								kProfileReturn, gFramesFunctionProfilerData);
 }
 
 
@@ -934,9 +967,11 @@ TInterpreter::CallCFuncPtr(void* funcPtr, long numArgs)
 // ROM 0x002f52c8 Return__12TInterpreterF19FramesProfilingKind
 // Return from the current function: its result (the top of the value
 // stack) replaces its frame when the locals were on the stack; back to the
-// caller's state, dropping the exception handlers of the frames left.
+// caller's state, dropping the exception handlers of the frames left.  The
+// profiler is told of it as kind (the one caller, SlowRun's return
+// bytecode, passes kProfileReturn) once the caller's state is back.
 void
-TInterpreter::Return(FramesProfilingKind /*kind*/)
+TInterpreter::Return(FramesProfilingKind kind)
 {
 	RefVar fn(StateRef(fVMState->fFunction));
 	if (fTraceLevel != 0)
@@ -951,6 +986,9 @@ TInterpreter::Return(FramesProfilingKind /*kind*/)
 	}
 	fVMState = fCtrlStack.PrevState();
 	fPC = RVALUE(StateRef(fVMState->fPC));
+	if (FramesProfiling())
+		gFramesFunctionProfiler(StateVar(fVMState->fFunction), fn, ControlPosition(), FramesProfilingGeneration(),
+								kind, gFramesFunctionProfilerData);
 	if (ControlPosition() < fExceptionStackIndex)
 		PopHandlers();
 	if (StateRef(fVMState->fFunction) != NILREF && fPC != -1)
@@ -2925,7 +2963,9 @@ ForgetDeveloperNotified(char* name)
 // one: the stacks unwind to it, its frame's state is restored and the
 // function resumes at the handler's pc with the exception translated into
 // the handler record; answers whether one was found - else the stacks are
-// reset to the state Run started with.
+// reset to the state Run started with.  With profiling on, the profiler is
+// told of each function the unwinding leaves (kProfileUnwind), the states
+// popped one at a time first.
 Boolean
 TInterpreter::HandleException(Exception* exception, long baseDepth, StackState& state)
 {
@@ -2961,6 +3001,18 @@ TInterpreter::HandleException(Exception* exception, long baseDepth, StackState& 
 				{
 					Long valueDepth = RINT(GetArraySlotRef(handler, kHandlerValueDepth));
 					fValueStack.fTop -= ValuePosition() - valueDepth;
+					if (FramesProfiling())
+					{
+						long generation = FramesProfilingGeneration();
+						VMState* handlerState = fCtrlStack.StateAt(depth / kVMStateSize);
+						while (fVMState != handlerState)
+						{
+							VMState* leaving = fVMState;
+							fVMState = fCtrlStack.PrevState();
+							gFramesFunctionProfiler(StateVar(fVMState->fFunction), StateVar(leaving->fFunction), ControlPosition(),
+													generation, kProfileUnwind, gFramesFunctionProfilerData);
+						}
+					}
 					fCtrlStack.fTop -= ControlPosition() - depth;
 					fVMState = fCtrlStack.StateAt(ControlPosition() / kVMStateSize);
 					StateRef(fVMState->fFunction) = GetArraySlotRef(handler, kHandlerFunction);
@@ -2978,8 +3030,39 @@ TInterpreter::HandleException(Exception* exception, long baseDepth, StackState& 
 		}
 		handler = GetArraySlotRef(handler, kHandlerNext);
 	}
+	// nothing handles it: the functions back to Run's caller unwound (the
+	// state below the one Run started with - the function Run was running)
+	Boolean unwound = false;
+	if (FramesProfiling())
+	{
+		long generation = FramesProfilingGeneration();
+		VMState* callerState = fCtrlStack.StateAt(state.fControlDepth / kVMStateSize - 1);
+		long position = ControlPosition();
+		while (fVMState != callerState)
+		{
+			VMState* leaving = fVMState;
+			fVMState = fCtrlStack.PrevState();
+			position -= kVMStateSize;
+			gFramesFunctionProfiler(StateVar(fVMState->fFunction), StateVar(leaving->fFunction), position,
+									generation, kProfileUnwind, gFramesFunctionProfilerData);
+		}
+		unwound = true;
+	}
 	ResetStack(state);
-	fVMState = fCtrlStack.PrevState();
+	// ROM BUG (fixed): with profiling on, the loop above has already popped
+	// the state Run started with, so the control stack is below the depth
+	// ResetStack puts it back to (which it never raises), and the PrevState
+	// that follows - meant to pop that state - pops Run's caller's as well:
+	// an exception nothing handles, thrown while a profiler is installed,
+	// left the interpreter a call short (its next return read the state
+	// below its caller's; with NEWTON_ROM_BUGS=1 a host NSCall's RunCall,
+	// unwinding to the state it saved, passes it).  The fix takes the
+	// caller's state the loop left on top; without profiling the two are
+	// the same.
+	if (unwound && RomBugFixed())
+		fVMState = fCtrlStack.StateAt(ControlPosition() / kVMStateSize);
+	else
+		fVMState = fCtrlStack.PrevState();
 	fPC = RVALUE(StateRef(fVMState->fPC));
 	if (ControlPosition() < fExceptionStackIndex)
 		PopHandlers();
@@ -3410,6 +3493,42 @@ TInterpreter::EnableBreakPoints(Boolean enable)
 	Boolean was = gFramesBreakPointsEnabled;
 	gFramesBreakPointsEnabled = enable;
 	SetFastLoopFlag();
+	return was;
+}
+
+
+/* -------------------------------------------------------------------------------
+	The frames function profiler (Interpreter.h): switched on and off, and
+	installed.  The ROM has no profiler of its own; the host's is
+	FunctionProfiler.h.
+------------------------------------------------------------------------------- */
+
+// ROM 0x002d41f4 EnableFramesFunctionProfiling__FUc
+// Profiling on ('ffpe') or off (0); the current interpreter's fast loop
+// flag set again (the fast loop does not call the profiler).  ==> whether
+// it was on.
+Boolean
+EnableFramesFunctionProfiling(Boolean enable)
+{
+	Boolean was = gFramesFunctionProfilingEnabled == kFramesFunctionProfilingOn;
+	gFramesFunctionProfilingEnabled = enable ? kFramesFunctionProfilingOn : 0;
+	gInterpreter->SetFastLoopFlag();
+	return was;
+}
+
+
+// ROM 0x002d424c InstallFramesFunctionProfiler__FPFRC6RefVarT1lT319FramesProfilingKindPv_vPv
+// The profiler and its data put in place; ==> the ones there before.  (It
+// does not set the fast loop flag again: EnableFramesFunctionProfiling,
+// called after, does.)
+FramesFunctionProfilerInfo
+InstallFramesFunctionProfiler(FramesFunctionProfiler profiler, void* data)
+{
+	FramesFunctionProfilerInfo was;
+	was.fProfiler = gFramesFunctionProfiler;
+	was.fData = gFramesFunctionProfilerData;
+	gFramesFunctionProfiler = profiler;
+	gFramesFunctionProfilerData = data;
 	return was;
 }
 
@@ -3995,6 +4114,9 @@ InitInterpreter(void)
 	gFramesBreakPointsEnabled = false;
 	AddGCRoot(gFramesBreakPoints);
 	gFramesBreakPoints = NILREF;
+	// Host: the host's NewtonScript profiler - its natives, and profiling
+	// from here on when NEWTON_NS_PROFILE asks for it (FunctionProfiler.h)
+	NSProfilerInit();
 }
 
 

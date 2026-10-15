@@ -107,6 +107,7 @@ set(NEWTON_SOURCES
     frames/Compiler.cpp
     frames/DebugAPI.cpp
     frames/FramesPart.cpp
+    frames/FunctionProfiler.cpp
     frames/GC.cpp
     frames/HostOrder.cpp
     frames/Interpreter.cpp
@@ -1105,6 +1106,7 @@ set(NEWTON_GROUP_11_SOURCES
     frames/Compiler.cpp
     frames/DebugAPI.cpp
     frames/FramesPart.cpp
+    frames/FunctionProfiler.cpp
     frames/GC.cpp
     frames/HostOrder.cpp
     frames/Interpreter.cpp

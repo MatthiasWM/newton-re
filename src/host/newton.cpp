@@ -226,6 +226,7 @@
 #include "HostObjectsFile.h"
 #include "HostRestart.h"
 #include "HostCStack.h"
+#include "FunctionProfiler.h"
 #include "Colour.h"
 #include "os600/kernel/host/TaskRuntime.h"
 #include "REPTranslators.h"
@@ -716,6 +717,7 @@ HeadlessTimer(void)
 		HostSendAskedOrientation();
 		Sleep(100 * kMilliseconds);
 	}
+	NSProfilerFinish();				// (NEWTON_NS_PROFILE's report, written while a task can still read the heap)
 	HostStopTasks();
 }
 

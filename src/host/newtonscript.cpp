@@ -70,6 +70,7 @@
 #include "HostNatives.h"
 #include "HostStores.h"
 #include "HostObjectsFile.h"
+#include "FunctionProfiler.h"
 
 #ifndef NEWTON_DEFAULT_OBJECTS
 #define NEWTON_DEFAULT_OBJECTS "romsrc-objects.bin"
@@ -266,5 +267,6 @@ main(int argc, char** argv)
 		gREPout->Print("\r");
 	}
 	gREPout->Flush();
+	NSProfilerFinish();				// (NEWTON_NS_PROFILE's report: frames/FunctionProfiler.h)
 	return 0;
 }

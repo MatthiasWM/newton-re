@@ -433,10 +433,11 @@ main()
 
 	// every ROM entry the fixtures' native code reaches (gluetable.py --package
 	// over inetenbl, modmsup, Mahjongg, newthack and nethopper) that the host has a
-	// function for; not answered, for want of one: Debugger,
-	// EnableFramesFunctionProfiling, GetGlobals (a host pointer), PublicFiller_236
+	// function for; not answered, for want of one: Debugger, GetGlobals (a
+	// host pointer), PublicFiller_236
 	static const char* kReached[] =
 	{
+		"EnableFramesFunctionProfiling__FUc",
 		"AddArraySlot__FRC6RefVarT1", "AddExceptionHandler", "AllocateArray__FRC6RefVarl",
 		"AllocateBinary__FRC6RefVarl", "AllocateFrameWithMap__FRC6RefVar", "AllocateFrame__Fv",
 		"AllocateRefHandle__Fl", "ArrayMunger__FRC6RefVarlT2T1N22", "ArrayPosition__FRC6RefVarT1lT1",
