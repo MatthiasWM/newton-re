@@ -137,7 +137,10 @@ Reconstructed in `src/os600/kernel/` (with host tests): `TDoubleQItem` /
 `GiveObject` / `AcceptObject` (KernelObjects.*), and the first HAL interface,
 `hal/Atomic.h` (EnterAtomic & co., host implementation in `hal/host`);
 `TTaskQItem` / `TTaskQueue` / `TTaskContainer` and the `TTask` layout
-(Task.*), `TScheduler` with `ScheduleTask` / `UnScheduleTask` /
+(Task.*) - and `TUCTTable` (UCTTable.*: 32 task queues a task is filed in
+by a key kept at its +0x9c, the one `FindAndRemove` matches, state bit
+0x4000; public API only - nothing in the ROM makes one, so its purpose and
+name are not known; ctest `os600.kernel.UCTTable`), `TScheduler` with `ScheduleTask` / `UnScheduleTask` /
 `WantSchedule` / `StartScheduler` / `StopScheduler` (Scheduler.*), and
 `hal/Interrupts.h` (interrupt enable/disable and the time-slice alarm);
 `TSemaphore` / `TSemaphoreGroup` / `TSemaphoreOpList` with `DoSemaphoreOp`
