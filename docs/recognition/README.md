@@ -41,11 +41,12 @@ What is left, and why:
   nothing on the host depends on it).  (`SafeExceptionNotify` prints to
   stderr where the ROM puts a notify slip up - a DEVIATION the owner
   chose, 2026-09-29, to keep script errors easy to see.)
-* **Unreachable from the U.S. ROM**: `CheckDiacriticsDirections`
-  (0x0007c9a0) and `AnalyseDiacriticsDirection` - about 3.2 KB asked only
-  for a French or German letter set - and the sixteen-bit dictionary walks
-  (`AE16_Verify`, `AE16_NextSet9`, `AL16_NextSet`/`AL16_NextSet9`),
-  which only a UniChar dictionary would use; the machine's are all eight-bit.
+* **Unreachable from the U.S. ROM, reconstructed all the same**:
+  `CheckDiacriticsDirections` (0x0007c9a0) and `AnalyseDiacriticsDirection`
+  - about 3.2 KB asked only for a French or German letter set (a locale
+  with an `enabledLanguage`) - and the sixteen-bit dictionary walks
+  (`AE16_Verify`, `AE16_NextSet9`, `AL16_NextSet`/`AL16_NextSet9`), which
+  only a UniChar dictionary uses; the machine's are all eight-bit.
 * **Below the recogniser, in hardware**: the inker task (`TInker`,
   `InkerOff`, `TBCWakeUpInker`) and the tablet driver's calibration
   (`CheckTabletHWCalibration`); the host's `hal/host/HostTablet.h` and
@@ -3064,13 +3065,39 @@ asks whether the two differ, does not: the xr it is given is one of the
 xrs the letter's elements index, so at its own element the bumped type
 is on both sides and they compare equal - the bump is an identity test.)
 
-NOT YET, deliberately: `CheckDiacriticsDirections` (0x0007c9a0, 684
-bytes, over `AnalyseDiacriticsDirection` 0x0007c130 - 2160 bytes -,
-`CurvFromSquare` and `LengthOfTraj`: about 3.2 KB), asked only for a
-letter set whose language (rc +6) has bit 2 or 3 - French or German -
-which the U.S. ROM's never do, so nothing can reach it; it answers
-nought.  (`MakeRecWordsFromGraph`/`MergeTwoRecWordsSets`, once listed
-here, are done - "A graph of alternatives" below.)
+The accent check: `CheckDiacriticsDirections` (0x0007c9a0, over
+`AnalyseDiacriticsDirection` 0x0007c130, `CurvFromSquare` 0x003078b0 and
+`LengthOfTraj` 0x003079b0, `XrPostEval.cpp`/`LowSide.cpp`; its tables
+`IndexDiacriticsLetter`, `xrsToFind`, `DiacrPresence` generated into
+`XrDiacriticsTables.cpp` by `regenerate.py diacritics`).
+`EvaluateCharQuality` asks it for a field whose language (rc +6) has bit 2
+or 3 - what the domain's parameter 0x20046 gives the field when the locale
+names an `enabledLanguage` (`gEnabledLanguage` 8) - and the U.S. ROM's
+locales never do, so nothing in it is reached.  For a letter of the graph
+that carries a mark (`DiacriticsLetter`), each xr of a mark (types `:`,
+`4`, `;`) it was read from is measured from its begin point to its end:
+which way it leans (the cosine of the line from its lower end up, against
+the horizontal), its length and its chord's, the area it closes and how
+much it bends overall and on each side of its furthest point; and the
+directions it could have been written in are listed best first as
+classes - 0 a dot, 1 an umlaut, 2 a circumflex, 3 a ring, 4 an acute, 5 a
+grave, 6 a tilde, 7 the end.  No bigger than a quarter of the line's
+height (rc +0xea) it is a dot; straight it is an accent leaning the way
+it leans (or, nearly flat, two dots run together); a roof is a
+circumflex; round on itself a ring (and sure: no later mark changes it);
+bent both ways a tilde; a second mark makes it an umlaut.  Then for each
+class until one is the letter's own (its row of `DiacrPresence`), the
+letters a mark that way would make in the field's languages (each entry's
+mask) are asked how much of this letter's xrs they claim in the graph
+(`RetOneIfLettersCompeteForXRs`, tenths), and a quarter of the most,
+rounded up, is charged to the letter.  ROM BUG (fixed): two of the lists -
+a roof of two straight halves, and a roof bent the one way throughout -
+are not ended, so the check reads on into whatever its eight-byte buffer
+held. Ctest `recognition.XrMatrix` (`TestDiacritics`: a dot, the accents,
+a bar, a roof both ways of the switch, a ring, a second mark; an e acute
+written as a grave in a German field charged for the e grave).
+(`MakeRecWordsFromGraph`/`MergeTwoRecWordsSets`, once listed here, are
+done - "A graph of alternatives" below.)
 
 What it does to the demos: `cursive.ns`'s two words are not scored - each
 is too far ahead of the next - so they read as the graph has them ("ton",

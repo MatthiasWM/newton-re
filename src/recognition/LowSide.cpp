@@ -105,6 +105,80 @@ ClosedSquare(short* x, short* y, long i, long j, short* flag)
 }
 
 
+// ROM 0x003078b0 CurvFromSquare__FPsT1iT3
+// How much the trace from i to j bends, from the area it closes with its
+// chord against the chord's length squared: in thousandths (at most a
+// thousand), signed as the area is, nought when the area cannot be had
+// (a pen-up on the way, or i after j) or i is j.  (The accent check's
+// alone.)
+long
+CurvFromSquare(short* x, short* y, long i, long j)
+{
+	if (i == j)
+		return 0;
+	short flag;
+	Long32 square = (Long32) ClosedSquare(x, y, i, j, &flag);
+	if (flag != 0)
+		return 0;
+	Long32 sign = 1;
+	if (square < 0)
+	{
+		sign = -1;
+		square = -square;
+	}
+	Long32 d = (Long32) DistanceSquare(i, j, x, y);
+	Long32 r = 1000;
+	if (d != 0)
+	{
+		Long32 t = (square * 100 + (d >> 1)) / d;
+		r = (square * t * 5 + d) / (d * 2);
+		if (r > 1000)
+			r = 1000;
+	}
+	return (short) (sign * r);
+}
+
+
+// ROM 0x003079b0 LengthOfTraj__FPsT1iT3PlT1
+// The length of the trace from i to j, a step at a time, and the length
+// of its chord (1 when there is none to measure).  flag says why there is
+// no length: 1 i after j, 2 a pen-up at i or on the way.
+long
+LengthOfTraj(short* x, short* y, long i, long j, long* chord, short* flag)
+{
+	*flag = 0;
+	*chord = 1;
+	if (i > j)
+	{
+		*flag = 1;
+		return 0;
+	}
+	if (y[i] == -1)
+	{
+		*flag = 2;
+		return 0;
+	}
+	if (i == j)
+		return 0;
+	Long32 length = 0;
+	for (long k = i, m = i + 1; k < j; k++, m++)
+	{
+		if (y[m] == -1)
+		{
+			*flag = 2;
+			return 0;
+		}
+		Long32 dy = y[m] - y[k];
+		Long32 dx = x[m] - x[k];
+		length += (Long32) HWRMathILSqrt(dx * dx + dy * dy);
+	}
+	Long32 dy = y[i] - y[j];
+	Long32 dx = x[i] - x[j];
+	*chord = HWRMathILSqrt(dx * dx + dy * dy);
+	return length;
+}
+
+
 // ROM 0x00306524 IsTriangledPath__FPsT1iN23
 // Whether the trace from i to j, round k (the point furthest from the
 // chord when k < 1), is a corner: the triangle i, k, j is big for the

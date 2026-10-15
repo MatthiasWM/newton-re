@@ -16,6 +16,7 @@
 #include "NewtErrors.h"
 #include "memory/host/KernelHeap.h"
 #include "toolbox/ByteOrder.h"
+#include "host/RomBugs.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -560,6 +561,163 @@ TestPost(void)
 }
 
 
+// The French/German accent check (CheckDiacriticsDirections over
+// AnalyseDiacriticsDirection, CurvFromSquare and LengthOfTraj), which a
+// field whose language has bit 2 or 3 asks for - nothing in the U.S. ROM
+// is one - on traces drawn by hand: a dot, the two accents, a bar, a
+// roof, a ring, a second mark; then a letter with a mark whose stroke
+// leans the wrong way, charged for the letter it would rather be.
+static short	gDiacrX[32];
+static short	gDiacrY[32];
+
+static long
+Diacritic(const short* xs, const short* ys, long n, short height, UByte* out, short count = 0, ULong* stop = nil)
+{
+	short minX = 0x7fff, maxX = -0x7fff, minY = 0x7fff, maxY = -0x7fff;
+	for (long i = 0; i < n; i++)
+	{
+		gDiacrX[i] = xs[i];
+		gDiacrY[i] = ys[i];
+		if (xs[i] < minX) minX = xs[i];
+		if (xs[i] > maxX) maxX = xs[i];
+		if (ys[i] < minY) minY = ys[i];
+		if (ys[i] > maxY) maxY = ys[i];
+	}
+	ULong noStop = 0;
+	memset(out, 0x55, 8);
+	return AnalyseDiacriticsDirection(gDiacrX, gDiacrY, nil, 0, n - 1, 0x3a, 0, &count, stop != nil ? stop : &noStop,
+									  height, (short) (maxX - minX), (short) (maxY - minY), out);
+}
+
+static void
+TestDiacritics(void)
+{
+	// the trace measures
+	short lineX[] = { 0, 10, 20, 30, 40 };
+	short lineY[] = { 0, 0, 0, 0, 0 };
+	long chord = 0;
+	short flag = 9;
+	EXPECT(LengthOfTraj(lineX, lineY, 0, 4, &chord, &flag) == 40 && chord == 40 && flag == 0);
+	EXPECT(LengthOfTraj(lineX, lineY, 4, 0, &chord, &flag) == 0 && flag == 1 && chord == 1);
+	EXPECT(LengthOfTraj(lineX, lineY, 2, 2, &chord, &flag) == 0 && flag == 0);
+	EXPECT(CurvFromSquare(lineX, lineY, 0, 4) == 0 && CurvFromSquare(lineX, lineY, 2, 2) == 0);
+	short brokenY[] = { 0, 0, -1, 0, 0 };
+	EXPECT(LengthOfTraj(lineX, brokenY, 0, 4, &chord, &flag) == 0 && flag == 2);
+	EXPECT(CurvFromSquare(lineX, brokenY, 0, 4) == 0);
+	// a half circle: an area of 140 against a chord of 20 squared -
+	// (140 * 35 * 5 + 400) / 800 thousandths, 35 being 140 * 100 / 400
+	// rounded; the other way round, the other sign
+	short arcX[] = { 0, 3, 10, 17, 20 };
+	short arcY[] = { 10, 3, 0, 3, 10 };
+	long bent = CurvFromSquare(arcX, arcY, 0, 4);
+	EXPECT(bent == 31);
+	short arcY2[] = { 10, 17, 20, 17, 10 };
+	EXPECT(CurvFromSquare(arcX, arcY2, 0, 4) == -bent);
+
+	UByte out[8];
+	// a dot: a dot first, then the two accents, the way it leans first
+	short dotX[] = { 100, 101 };
+	short dotY[] = { 50, 50 };
+	Diacritic(dotX, dotY, 2, 40, out);
+	EXPECT(out[0] == 0 && out[1] == 5 && out[2] == 4 && out[3] == 3 && out[4] == 1 && out[5] == 7);
+	// an acute: from lower left to upper right, straight
+	short acuteX[] = { 0, 3, 6, 9, 12 };
+	short acuteY[] = { 20, 15, 10, 5, 0 };
+	Diacritic(acuteX, acuteY, 5, 40, out);
+	EXPECT(out[0] == 4 && out[1] == 5 && out[2] == 0 && out[3] == 7);
+	// a grave: from upper left to lower right
+	short graveY[] = { 0, 5, 10, 15, 20 };
+	Diacritic(acuteX, graveY, 5, 40, out);
+	EXPECT(out[0] == 5 && out[1] == 4 && out[2] == 0 && out[3] == 7);
+	// a bar: the two dots of an umlaut run together, first
+	short barX[] = { 0, 5, 10, 15, 20 };
+	short barY[] = { 10, 10, 10, 10, 10 };
+	Diacritic(barX, barY, 5, 40, out);
+	EXPECT(out[0] == 1 && out[1] == 5 && out[2] == 4 && out[3] == 2 && out[4] == 7);
+	// a roof: a circumflex, its list not ended in the ROM (ROM BUG)
+	short roofX[] = { 0, 5, 10, 15, 20 };
+	short roofY[] = { 20, 15, 10, 15, 20 };
+	Diacritic(roofX, roofY, 5, 40, out);
+	EXPECT(out[0] == 2 && out[1] == 0 && out[2] == 1 && out[3] == 5 && out[4] == 4 && out[5] == 7);
+	SetRomBugFixed(false);
+	Diacritic(roofX, roofY, 5, 40, out);
+	EXPECT(out[0] == 2 && out[4] == 4 && out[5] == 0x55);
+	SetRomBugFixed(true);
+	// a ring: round on itself, and sure of it
+	short ringX[] = { 10, 9, 5, 0, -5, -9, -10, -9, -5, 0, 5, 9, 9 };
+	short ringY[] = { 0, -5, -9, -10, -9, -5, 0, 5, 9, 10, 9, 5, 2 };
+	ULong stop = 0;
+	Diacritic(ringX, ringY, 13, 40, out, 0, &stop);
+	EXPECT(out[0] == 3 && out[1] == 0 && out[2] == 7 && stop == 1);
+	// once sure, no more is said
+	Diacritic(acuteX, acuteY, 5, 40, out, 0, &stop);
+	EXPECT(out[0] == 0x55);
+	// a second mark: two dots
+	Diacritic(acuteX, acuteY, 5, 40, out, 1);
+	EXPECT(out[0] == 1 && out[1] == 7);
+
+	// the check over a graph of one letter, e acute (Mac Roman 0x8e),
+	// read from one xr of a mark; a German field (language 8), the
+	// competition switched off so that a rival claims ten tenths
+	static xrd_el_type els[2];
+	memset(els, 0, sizeof(els));
+	els[0].type = 0x3a;
+	XrSetH(els[0].begpoint, 0);
+	XrSetH(els[0].endpoint, 4);
+	XrSetH(els[0].box + kXrLeft, 0);
+	XrSetH(els[0].box + kXrRight, 12);
+	XrSetH(els[0].box + kXrTop, 0);
+	XrSetH(els[0].box + kXrBottom, 20);
+	xrdata_type xr;
+	xr.fLength = 1;
+	xr.fSize = 2;
+	xr.fElements = els;
+	RWS_type rws[2];
+	memset(rws, 0, sizeof(rws));
+	rws[0].sym = rws[0].realSym = 0x8e;
+	rws[0].type = 1;
+	rws[0].xrStart = 0;
+	rws[0].xrLen = 1;
+	RWG_type rwg;
+	memset(&rwg, 0, sizeof(rwg));
+	rwg.size = 1;
+	rwg.rws = rws;
+	rc_type rc;
+	memset(&rc, 0, sizeof(rc));
+	RCSetH(&rc, 6, 8);
+	RCSetH(&rc, 0xea, 40);
+	POST_PARAMS pp;
+	memset(&pp, 0, sizeof(pp));
+	pp.rc = &rc;
+	pp.xr = &xr;
+	pp.rwg = &rwg;
+	pp.rws = rws;
+	pp.cur = 0;
+	pp.competeOn = 0;
+	pp.x = gDiacrX;
+	pp.y = gDiacrY;
+	for (long i = 0; i < 5; i++)
+	{
+		gDiacrX[i] = acuteX[i];
+		gDiacrY[i] = acuteY[i];
+	}
+	// written as an acute: its own mark, nothing to charge
+	short charge = 99;
+	EXPECT(CheckDiacriticsDirections(&pp, nil, &xr, 0, &charge) == 1 && charge == 0);
+	// written as a grave: e grave (0x8f) is a German letter's, so it is
+	// charged a quarter of the ten tenths it claims, rounded up
+	for (long i = 0; i < 5; i++)
+		gDiacrY[i] = graveY[i];
+	EXPECT(CheckDiacriticsDirections(&pp, nil, &xr, 0, &charge) == 1 && charge == 3);
+	// a letter with no mark is not looked at, nor a symbol past the graph
+	rws[0].realSym = 'e';
+	EXPECT(CheckDiacriticsDirections(&pp, nil, &xr, 0, &charge) == 0 && charge == 0);
+	rws[0].realSym = 0x8e;
+	pp.cur = 1;
+	EXPECT(CheckDiacriticsDirections(&pp, nil, &xr, 0, &charge) == 0 && charge == 0);
+}
+
+
 // The prototype data's rules (XrRules.cpp): the bit-set arithmetic by
 // hand, then the ROM's own rules walked - every character the main header
 // names has a header, every variant its character's header names has one,
@@ -633,6 +791,7 @@ main()
 	TestXrlv();
 	TestIdealWords();
 	TestPost();
+	TestDiacritics();
 	if (failures == 0)
 		printf("test_XrMatrix: all passed\n");
 	return failures == 0 ? 0 : 1;

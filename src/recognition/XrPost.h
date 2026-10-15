@@ -150,7 +150,14 @@ long	EvaluateWordUsingSideReasoning(const UByte* word, xrdata_type* xr);	// ROM 
 long	EvaluateLetterUsingSideReasoning(UByte c, POST_PARAMS* pp);		// ROM 0x00336934 EvaluateLetterUsingSideReasoning__FUcP12_POST_PARAMS
 long	EvaluateMissingCross(POST_PARAMS* pp, long from, long count);		// ROM 0x003373c8 EvaluateMissingCross__FP12_POST_PARAMSiT2
 long	CalculateBoxes_Side_Result(short c, short prev, POST_PARAMS* pp);	// ROM 0x0033b920 CalculateBoxes_Side_Result__FsT1P12_POST_PARAMS
-long	CheckDiacriticsDirections(POST_PARAMS* pp, rec_w_type* reading, xrdata_type* xr, short which, short* result);	// NOT YET (0x0007c9a0): answers nought
+long	CheckDiacriticsDirections(POST_PARAMS* pp, rec_w_type* reading, xrdata_type* xr, short which, short* result);	// ROM 0x0007c9a0 CheckDiacriticsDirections__FP12_POST_PARAMSP10rec_w_typeP11xrdata_typesPs - ==> whether the letter carries a mark (and *result what a rival letter claims of its xrs)
+// The directions a mark (an xr of a dot, a tick, a bar - xrsToFind) from
+// point b to point e of the trace may be read as, best first, into `out`
+// (classes 0 a dot, 1 an umlaut, 2 a circumflex, 3 a ring, 4 an acute, 5
+// a grave, 6 a tilde; 7 ends them); `stop` set when the mark is sure.
+long	AnalyseDiacriticsDirection(short* x, short* y, UByte* sym, long b, long e, UByte type, UByte band,
+								   short* count, ULong* stop, short height, short width, short boxHeight, UByte* out);	// ROM 0x0007c130 AnalyseDiacriticsDirection__FPsT1PUciT4UcT6T1PUisssT3
+intptr_t	RetOneIfLettersCompeteForXRs(intptr_t a, intptr_t b, intptr_t c, int* err, POST_PARAMS* pp);	// ROM 0x003395f8 RetOneIfLettersCompeteForXRs__FlN21PiP13PS_point_typesPsT7P8ppd_typeUiP11xrdata_type (XrPostCalc.cpp)
 long	CheckDigitsLine(rec_w_type* reading, xrdata_type* xr, short* result);	// ROM 0x002af648 CheckDigitsLine__FP10rec_w_typeP11xrdata_typePs
 
 // tables (XrPostTables.cpp, generated)
@@ -163,5 +170,12 @@ extern const char* const	kXrToLetters1[3];
 extern const unsigned char	kXrToLetters1Tail[4];
 extern const char* const	kLettersToXr[3];			// LETTERS_TO_XR: the letters, the xrs they need, the xrs that make them unnecessary
 extern const unsigned char	kLettersToXrTail[4];
+// the accents' tables (XrDiacriticsTables.cpp, generated): the row of
+// DiacrPresence each of DiacriticsLetter's letters is in; the xr types of
+// a mark; and fourteen rows of seven (a mask of the languages, a letter):
+// the letter a base letter becomes with a mark of each class
+extern const unsigned char	IndexDiacriticsLetter[52];
+extern const unsigned char	xrsToFind[4];
+extern const unsigned short	DiacrPresence[196];
 
 #endif	/* __XRPOST_H */
