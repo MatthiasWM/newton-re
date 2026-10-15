@@ -98,6 +98,15 @@ i/o passes to the serial debugger through (DEVIATION: the host's stdio
 is its console regardless).  `HobbleTablet` sends the inker its command
 0x1d (NOT YET: the host has no inker port).
 
+The frames function profiler is done: the ROM's hooks
+(`EnableFramesFunctionProfiling` 0x002d41f4, `InstallFramesFunctionProfiler`
+0x002d424c, the calls in the interpreter and around the collector) are
+reconstructed, and the host installs a profiler of its own behind them -
+`NEWTON_NS_PROFILE=<file>` or `HostNSProfileStart`/`Stop`/`Report` from a
+script, a report of calls and inclusive and exclusive time per
+NewtonScript function, read with `tools/host/nsprofile.py`
+(`docs/frames/README.md`, "Profiling NewtonScript").
+
 ### Tests
 
 ctest `host.NewtonTestAgent` (`src/host/demo/testagent.ns`) activates

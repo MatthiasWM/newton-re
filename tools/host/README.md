@@ -380,6 +380,39 @@ so that it outlasts the profile, then
 
     python tools/host/profile.py <pid> --walk --seconds 90 --interval 1 --save tmp/walk.json --callees "TView::Draw" --callers FindOffset1
 
+## nsprofile.py - which NewtonScript functions the time goes to
+
+`profile.py` samples the C++; this reads the report of the host's
+NewtonScript profiler (`src/frames/FunctionProfiler.h`, installed in the
+ROM's frames function profiler hooks - `docs/frames/README.md`,
+"Profiling NewtonScript"): each function's calls and inclusive and
+exclusive time, and the collector's.
+
+**Purpose:** to find slow NewtonScript - on a desktop, or on the T-Deck,
+whose console report this reads as well.
+
+**Getting a report:** `NEWTON_NS_PROFILE=<file>` in the environment of
+`newton` or `newtonscript` profiles the whole run and writes the file
+when it ends; or from NewtonScript (a script, the REP, the T-Deck's
+console) `HostNSProfileStart()`, `HostNSProfileStop()`,
+`HostNSProfileReset()` and `HostNSProfileReport(path)` (nil: stdout).
+
+**Inputs:** the report, or a log holding one (the last report between
+`### NewtonScript profile` and `### end` is read); with `--romsrc
+romsrc`, `romsrc/layout.tsv`.
+
+**Output:** a table, sorted by exclusive time (`--sort incl|calls`), the
+first `--top N` lines (40; 0 for all).  Functions the host could not name
+but which are the ROM's are named by their romsrc paths (marked
+`(romsrc)`).  `--expect NAME[=CALLS]` checks that a function is in the
+report (with that many calls) - exit status 1 if one fails (ctest
+`host.NewtonScriptProfileReport`).
+
+    NEWTON_NS_PROFILE=tmp/run.prof build/host/host/newton --headless 60 --script src/host/demo/nsprofile.ns
+    python tools/host/nsprofile.py tmp/run.prof --romsrc romsrc --top 30
+
+Standard library only.
+
 ## httpserve.py - a web server for a host Newton to browse
 
 A host Newton browsing the web (NetHopper over the Newton Internet Enabler,

@@ -2423,3 +2423,24 @@ from that parameter, not from the item: `protoFrameFormat`'s `TextScript`
 documentation invites, every Note answers "No Text available for this
 item". The host's text message transport (`comms/host/HostText.ns`) passes
 the item's body, resolved.
+
+## A profiler's hooks with no profiler, and a bug only a profiler could hit
+
+The ROM calls a NewtonScript function profiler at every call, send,
+return, exception unwind and collection (`gFramesFunctionProfiler`,
+0x0c105360) - but has no profiler to put there: a developer's tool was to
+install one through the jump table (`InstallFramesFunctionProfiler`,
+0x002d424c, which hands back the old one as a struct in memory).  "On" is
+not a flag but the word `'ffpe'` in `gFramesFunctionProfilingEnabled`.
+While a profiler is in, the fast bytecode loop is switched off, because it
+returns from a function without going through `Return`, where the
+profiler hears of it.
+
+Nobody shipped a profiler, so nobody met the bug in
+`TInterpreter::HandleException` (0x002f5de8): when an exception goes
+unhandled, the profiling code pops the states one by one down to Run's
+caller, and then the ordinary code - written for the stack as it was -
+pops one more.  With a profiler installed, every unhandled exception lost
+its caller's call.  The host installs a profiler of its own, so the bug is
+fixed beside the ROM's code (`docs/frames/README.md`, "Profiling
+NewtonScript").

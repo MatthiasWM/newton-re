@@ -848,8 +848,90 @@ not the locale's separators; a store's own sort table (`GetSortID` of a
 store answers nil, as the ROM's does for want of one); and the aggregate
 and pointer types of `UnmarshalValue` beyond `'struct`.  Reachable only
 from a developer's settings or tools: the task's stack limits for the
-debugger (`GetTaskStackInfo`; a host task's stack is a thread's) and the
-frames function profiler's hooks in `GC`.
+debugger (`GetTaskStackInfo`; a host task's stack is a thread's).
+
+## Profiling NewtonScript
+
+The ROM has the hooks of a NewtonScript function profiler but no profiler
+(`hasFramesFunctionProfiling` in `ConfigFrames.h`; a developer's tool would
+install one through the jump table).  The hooks are reconstructed
+(`frames/Interpreter.h`, "The frames function profiler's hooks"):
+
+| ROM | What |
+|---|---|
+| `EnableFramesFunctionProfiling` 0x002d41f4 | `gFramesFunctionProfilingEnabled` (0x0c10535c) set to `'ffpe'` or 0, the fast loop flag set again; answers whether it was on |
+| `InstallFramesFunctionProfiler` 0x002d424c | `gFramesFunctionProfiler`/`Data` (0x0c105360/4) set; the old pair returned in memory |
+| `SetFastLoopFlag` 0x002f1cec | no fast loop while profiling is on and a profiler installed (the fast loop returns without `Return`) |
+| `TopLevelCall` 0x002f4328, `Call` 0x002f443c | kind 0 on entry; a binary native's return (2) in `Call` |
+| `Send` 0x002f477c | kind 1 on entry; a binary native's return (2) |
+| `CallPlainCFunction` 0x002f4f8c | a native's return (2), after the caller's state is back |
+| `Return` 0x002f52c8 | its kind (SlowRun's return bytecode passes 2), after `PrevState`, before `PopHandlers` |
+| `HandleException` 0x002f5de8 | kind 3 for each state an exception unwinds, popped one at a time - to the handler's state, or (nothing handles it) to Run's caller |
+| `TObjectHeap::GC` 0x002e3af4 | kind 4 with depth 0 at the start and 1 after `DeclawRefsInRegisteredRanges` |
+
+Every hook is the ROM's two tests (`FramesProfiling()`: enabled and a
+profiler installed), so with profiling off a call costs a load and a
+compare.  The profiler is called `(caller, fn, depth, generation, kind,
+data)`: the function of the state on top (the caller's), the function
+called or left, the control stack's position - the same at a call and its
+return - and `gCurrentStackPos >> 16`.  The kinds' values were read off the
+disassembly at each call site (the names are ours); the GC calls pass null
+references for the functions, which the host passes as refs to nil
+(DEVIATION).  `xrefs.py` on the three globals lists every site.
+
+**ROM BUG (fixed).**  When nothing handles an exception, the profiling
+loop in `HandleException` already pops the state Run started with; the
+`ResetStack` that follows never raises the stack, and the `PrevState` meant
+to pop that state then pops Run's caller's too - with a profiler installed
+an unhandled exception left the interpreter a call short.  The fix takes the
+caller's state the loop left on top (`test_Profiler` pins both behaviours).
+
+**The host's profiler** (`frames/FunctionProfiler.h`, not ROM code) is what
+gets installed: per function (a NewtonScript function by its instructions,
+so every closure of it is one entry; a native by its object) the calls, the
+inclusive and exclusive time on the host's monotonic clock
+(`HostMonotonicNanoseconds`, `hal/host/Host.h`) and, apart, the collector's
+time (taken out of the exclusive time of the function it interrupted).  Each
+interpreter has a shadow stack matched to the returns by depth; recursion is
+counted once in the inclusive time; the time is wall-clock, so a task
+waiting while another runs is charged with the wait.  Memory is allocated
+once and bounded (8192 functions and 1024-deep stacks on a desktop, 1024
+and 256 on the ESP32 - further functions are "(other functions)"); its refs
+are kept current and alive through the collector's DIY hooks.  Names are
+found only when the report is written: `functions.Foo`/`vars.foo`, else the
+slot of the implementor it ran in (`vars.myApp.Step`,
+`calculator.viewSetupFormScript`, `viewroot._Open`), else a ROM constant
+frame's slot, else its address - with the ROM address of a ROM object (in
+the ROM's own layout even when romsrc moved it: `ROMSourceRef`) for
+`tools/host/nsprofile.py --romsrc romsrc` to name by its romsrc path.
+
+To profile:
+
+```sh
+# the whole run, written when it ends
+NEWTON_NS_PROFILE=tmp/run.prof build/host/host/newton --headless 60 --script src/host/demo/nsprofile.ns
+python tools/host/nsprofile.py tmp/run.prof --romsrc romsrc --top 30
+# or from a script, the REP or the T-Deck's console
+HostNSProfileStart(); ...; HostNSProfileStop(); HostNSProfileReport(nil)   // nil: stdout
+```
+
+`HostNSProfileReset()` clears the counts, `HostNSProfileRunning()` says
+whether it is on; `newtonscript` takes `NEWTON_NS_PROFILE` too.  A report
+(an excerpt of the demo's):
+
+```
+### NewtonScript profile: 0.632 s profiled, 4675 calls of 394 functions, 8 collections taking 0.003 s
+#    excl.ms      incl.ms      calls  excl%  kind   rom        code        function
+       2.998        2.998          8   0.47  gc     -          -           (garbage collection)
+     103.323      104.752          4  16.35  native 0x00448BED -           viewroot._Open
+       0.974        1.877        190   0.15  ns     0x004A8C1D 0x004A8B91  functions.RegDataView
+       0.412        0.549        465   0.07  ns     -          -           vars.npFib
+```
+
+Ctests `frames.Profiler` (the hooks' events, the bug both ways, the host
+profiler's counts and report), `host.NewtonScriptProfile` (the demo's
+report on stdout) and `host.NewtonScriptProfileFile`/`...Report` (the
+whole run's file, checked by `nsprofile.py --expect`).
 
 Tracing is here: `vars.trace` - `'functions` (calls and results), `'full`
 (and every variable, objects printed whole), any other true value (the
