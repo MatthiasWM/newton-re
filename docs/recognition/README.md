@@ -948,13 +948,33 @@ its Handle holds no bytes of its own, which is what the kind byte's
 Three things, and each of them is wanted by something that is itself not
 reconstructed:
 
-* **the sixteen-bit walkers** — `AE16_Verify` (0x0002b2cc),
+* **the sixteen-bit walkers** (now done) — `AE16_Verify` (0x0002b2cc),
   `AE16_NextSet9`, `AE16_NextSetCB`, the two-byte-character mirrors of
-  the AE8 ones. Reading the kind byte of all 129 lexicons built into
-  this ROM gives kinds 1 and 7 only, so **no dictionary in the MP2x00 US
-  ROM is sixteen-bit**; they are there for a localisation that needs
-  them. `AEnum_Verify` answers "no match" for a sixteen-bit dictionary
-  until they are written.
+  the AE8 ones, and the lexicon's `AL16_NextSet`/`AL16_NextSet9`/
+  `AL16_NextSetCB`/`AL16_Shell`. Reading the kind byte of all 129
+  lexicons built into this ROM gives kinds 1 and 7 only, so **no
+  dictionary in the MP2x00 US ROM is sixteen-bit**; they are there for a
+  localisation that needs them, and a dictionary made of kind 5
+  (`NewDictionary`, a script's `AirusNew(5, ...)`) reaches them. A
+  sixteen-bit node is an eight-bit one with its character two bytes long,
+  high first, so its flags are at +2 - and the ROM's walkers, copied from
+  the eight-bit ones, still read the two small size classes' sibling
+  offsets from `p[size]`, a byte short (ROM BUG, fixed): every sibling a
+  small dictionary has is misread, so a sixteen-bit dictionary cannot be
+  walked past the first node of a row. `AE16_NextSet9`'s loop for a
+  dictionary without attributes also reads the next node's flags at +1
+  (ROM BUG, fixed), and `AL16_NextSet9` follows a leaf's first-child
+  offset, which a leaf does not have (ROM BUG, fixed). The character
+  `AE16_NextSet9` hands its callback is the node's two bytes taken low
+  first - byte-swapped - which `AE16_NextSetCB` undoes by writing it low
+  byte first (ROM QUIRK). On the way, two host mis-ports were found and
+  put right: `CopyBufferHack` did not copy a sixteen-bit word into the
+  adder's buffer (the ROM's `Ashortstrcpy`s it), so a word could not be
+  added to a sixteen-bit dictionary; and `AE8_NextSet9` cleared the
+  attribute for each node where the ROM keeps one register for the row -
+  0x80 to begin with in a plain enumerated dictionary - which a node with
+  no attribute is handed as it stands (ROM QUIRK). Tests: `recognition.Airus`
+  (`TestAE16`, `TestAL16NextSet`).
 * **the completions walk** — `AEnum_FirstLast` (0x0002a1f4) and
   `AEnum_NextPrevious` (0x0002a244), selectors 5 and 6, which step
   through a dictionary a word at a time *without* a cursor object; the

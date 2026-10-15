@@ -244,12 +244,23 @@ void	AL_NextSetCB(void* context, ULong set, ULong node, ULong attribute);	// ROM
 void	AEnum_NextSet9(AirusAParmBlock* parms);				// ROM 0x0002af18 AEnum_NextSet9__FP15AirusAParmBlock
 void	AL_Verify(AirusAParmBlock* parms);					// ROM 0x0002bf78 AL_Verify__FP15AirusAParmBlock
 void	AL16_Verify(AirusAParmBlock* parms);				// ROM 0x0002b918 AL16_Verify__FP15AirusAParmBlock
+long	AL16_NextSet9(AirusAParmBlock* parms);				// ROM 0x0002bbe4 AL16_NextSet9__FP15AirusAParmBlock - AL_NextSet9 over sixteen-bit character sets
+void	AL16_NextSet(AirusAParmBlock* parms);				// ROM 0x0002bba4 AL16_NextSet__FP15AirusAParmBlock - selector 8: the sets run together (UniChars), terminated
+void	AL16_NextSetCB(void* context, ULong set, ULong node, ULong attribute);	// ROM 0x0002bb54 AL16_NextSetCB__FUlN31
+long	AL16_Shell(long selector, AirusAParmBlock* parms);	// ROM 0x0002b774 AL16_Shell__FiP15AirusAParmBlock - AirusAL16; ==> the block's result
 // A string with its repeated characters taken out.
 void	AL_FilterString(char* str);							// ROM 0x0002c170 AL_FilterString__FPc
 
 // What may come next: one row of the trie.
 void	AE8_NextSet9(AirusAParmBlock* parms);				// ROM 0x0002a9f4 AE8_NextSet9__FP15AirusAParmBlock
 void	AE8_NextSetCB(void* context, ULong character, ULong node, ULong attribute);	// ROM 0x0002af38 AE8_NextSetCB__FUlN31
+// ... and over two-byte characters.  The character AE16_NextSet9 hands
+// its callback is the node's two bytes taken low one first - the
+// character byte-swapped - which AE16_NextSetCB undoes by writing it out
+// low byte first.
+void	AE16_Verify(AirusAParmBlock* parms);				// ROM 0x0002b2cc AE16_Verify__FP15AirusAParmBlock
+void	AE16_NextSet9(AirusAParmBlock* parms);				// ROM 0x0002ac78 AE16_NextSet9__FP15AirusAParmBlock
+void	AE16_NextSetCB(void* context, ULong character, ULong node, ULong attribute);	// ROM 0x0002af48 AE16_NextSetCB__FUlN31
 // The characters that may follow the block's node, written into its word
 // buffer and terminated.
 void	AEnum_NextSet(AirusAParmBlock* parms);				// ROM 0x0002afd0 AEnum_NextSet__FP15AirusAParmBlock
