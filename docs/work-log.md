@@ -9,6 +9,85 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-15: The T-Deck Pro port, done
+
+The owner judged the T-Deck Pro port done (pretty much), so its three
+sections were moved here from `docs/next-steps.md` as they stood; what
+each still names as "Next" or "Not yet" stays in its own page
+(`docs/host-tdeck-pro.md`, `docs/host-tdeck-pro-phone.md`,
+`docs/host-tdeck-pro-mesh.md`), to be taken up only if asked for.
+
+### MeshCore on the T-Deck Pro (branch `tdeck-meshcore`, 2026-10-13)
+
+`docs/host-tdeck-pro-mesh.md`.  Done: MeshCore and RadioLib vendored
+(`src/thirdparty/meshcore`); the mesh engine (`hal/host/HostMesh.h`,
+ported from lilyphone1) with a desktop's pretend air (`newton --mesh-air`,
+`meshpeer`, ctest `hal.MeshPeers`); the natives and the Mesh application
+(`comms/host/HostMesh.ns`, ctests `host.NewtonMesh.<size>`); the board's
+SX1262 (`tdeck_lora.cpp`); the radio's settings as values, MeshCore's
+community presets filling them in (`tools/mesh/meshpresets.py`), in the
+Mesh application's Prefs (its "i" button) with the radio's power.  On the board: up,
+announcing, switched off and on; hearing since its antenna switch is
+turned to receive; contacts as Names cards, channels, location in adverts
+(`docs/work-log.md`, 2026-10-14).  Next: a message exchanged with a real
+node on the board (the owner's other MeshCore devices); then the WiFi
+companion (MeshCore's companion protocol on TCP 5000) if wanted; the rest
+is the doc's "Not yet".
+
+### A small device: the T-Deck Pro (branch `tdeck-pro-investigation`, 2026-10-10)
+
+`docs/host-tdeck-pro.md`.  Done: the investigation; 32-bit builds
+(`src/cmake/zig-x86-linux.cmake`, `zig-arm-linux.cmake`); a device spike
+on the owner's board (`tools/tdeck/spike`: the panel, touch, keyboard,
+memory speed); the tree compiled for the ESP32-S3 (674 of 678 files);
+a device-sized run (2 MB kernel heap, 512 KB NewtonScript heap, 32 KB
+stacks: both walkthroughs pass); the baked object image (`newton
+--bake-objects`, mapped read-only); **NewtonScript on the board**
+(`src/host/esp32`, milestone A: the baked objects mapped from flash, the
+REP on USB; 100-500x the desktop's time, the allocating code worst);
+**the OS booted on the board** (milestone B: the kernel's tasks on
+FreeRTOS, the newt world at 240x320, a NewtonScript prompt evaluated in
+it; up in 62 s); **the panel, touch screen and keyboard** (the
+Newton on the e-paper, partial refreshes over what changed; set-up found
+with a webcam on the board, `tools/tdeck/camshot.py`/`panelprobe.py`).
+**The store on the board's flash** (the `store` partition, kept between
+starts); **a 3 s start** (from a minute: C++ exception tables sorted, two
+quadratic lookups made hashed - tools/tdeck/profile.py); **a 32-bit build
+in the tests** (`tools/host/wsl32.sh`: the x86 build under WSL, all 425
+pass).  **WiFi**,
+set up in Internet Setup's Host network setup (scan, remember, join any
+remembered network in range; not yet tried on a real network); the panel
+following the Newton turned to landscape; the clock set from the network
+(SNTP) once joined, or by hand (`!time`); **the store's writes batched** (a driver's run of words in one flash write: soup adds and removes ~1.7x faster); the battery read from its gauge; a network printer found and a test page printed (`docs/work-log.md`, 2026-10-14).  Next: NewtonScript's speed (the
+object heap in PSRAM); the built-in packages' frames baked; the applications at 240x320 (some ask to rotate); later the
+panel's own waveforms for speed and grays (docs/host-tdeck-pro.md, "Order
+of work").
+
+### The T-Deck Pro as a phone (branch `tdeck-cellular`, 2026-10-12)
+
+`docs/host-tdeck-pro-phone.md`.  Done, step 1: the 4G module (an A7682E)
+driven by a portable AT engine (`hal/host/HostCellular.h`, ported from the
+owner's lilyphone1) with NewtonScript natives, a fake module for the
+desktop (`tools/modem/fakecell.py`, ctest `host.NewtonCellular`), and the
+board's driver (`tdeck_modem.cpp`): on the owner's board it registers,
+reads the network's time and answers `HostCellCommand` (it needs the
+battery fitted - its supply runs from it).  Step 2: the module a
+telephone provider for the ROM's own Phone transport (the 'cell comm
+tool, `comms/host/HostCellTool.h`; ctest `host.NewtonPhoneCall`): the
+Names card's Call and the Calls log make and take calls; on the board the
+transport listens from the start.  Not yet tried: a real call each way.
+Step 3: text messages, a transport of the In/Out Box
+(`comms/host/HostText.ns`, ctest `host.NewtonTextMessage`): sent from
+anything with a text format.  A Messages application
+(`comms/host/HostMessages.ns`, ctests `host.NewtonMessages.*` at four
+screen sizes): conversations, replies, new messages; received texts go to
+it, not the In Box.  Not yet: the Action picker on a message, scroll
+arrows, an alert with Reply/Show, messages longer than one SMS.  The store's flash writes are batched (2026-10-13, docs/host-tdeck-pro.md
+"Batched store writes").  Step 4,
+fax - the module has no fax
+class (`+FCLASS: 8`), so an internet fax service or nothing.  Not yet
+tried on the board: a real text each way.
+
 ## 2026-10-15: The protocol glue
 
 The owner asked for the "protocol glue" category of
