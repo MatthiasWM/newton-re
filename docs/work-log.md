@@ -9,6 +9,38 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-15: The unreferenced functions
+
+The owner asked for the 28 functions nothing in the ROM refers to (and
+not public) too; the category is empty: coverage 19312 citations, 13336
+of 16671 functions (80.0%), 88.8% of the code; 490 ctests.  Each was
+checked again for callers (`callgraph.py --callers` and a scan of
+`rom.bin` for a word or branch aimed at it) and is called by its area's
+test.
+
+- frames: `TRefStackReleaseProc`/`TRefStructStackReleaseProc`,
+  `UnsafeArrayLength`, `IsRichCString` (and `GetCStringFormat`, from
+  "other"), `CToPString`/`MakeStringPtr`/`MakeStringHandle`,
+  `ShutDownUnicode`.
+- stores and packages: `DeleteLargeObject`, `AdjustSoupsSignatures`
+  (empty), `CMPExportListSourceComparer::TestItem` (no vtable refers to
+  it).
+- qd: `InverseScale`, `SetScreenSize` (empty); comms: `TDocker::WriteString`
+  (DEVIATION: big-endian characters, as `WriteNewtonName`).
+- views: `GetLastClipper`, `HitsOldHilitedInk`, `TEditView::HandleInk` and
+  `BoundsOverlapsGraphics`, and the paragraph view's older layout helpers
+  (`WordFitsAtEndOfLine`, `CountTabStops`, `FindLineContainingRect`,
+  `ValidateCaretPoint`, `IsBullet`, `FindEndOfWord`, `ContainsTabsOrCRs`;
+  empty: `SimpleOffset`, `PlaceAndAddWord`, `RegisterIdler`) -
+  `docs/views/README.md`, "What nothing calls".
+- ROM bugs (fixed): `HitsOldHilitedInk` compares the ink lookup with 0
+  rather than nil and drops `PtInRect`'s answer, so it says yes for any
+  selected polygon view wherever the point is; `ShutDownUnicode` leaves
+  the converters installed over the maps it frees, with `gUnicodeInited`
+  still set.  The US ROM's `gUnicode` (0x0c107790) is two tables of five
+  {map, converter} pairs and a count at +0x50 (`docs/frames/README.md`
+  corrected; the host keeps its one-table struct).
+
 ## 2026-10-15: The T-Deck Pro port, done
 
 The owner judged the T-Deck Pro port done (pretty much), so its three
