@@ -34,9 +34,9 @@ public:
 	static TCompressor*	New(const char* implementation);
 	void			Delete();
 
-	VIRTUAL NewtonErr	Init(void* refCon) ENDVIRTUAL;
-	VIRTUAL NewtonErr	Compress(ULong* outSize, void* dst, ULong dstSize, void* src, ULong srcSize) ENDVIRTUAL;
-	VIRTUAL ULong		EstimatedCompressedSize(void* src, ULong srcSize) ENDVIRTUAL;
+	VIRTUAL NewtonErr	Init(void* refCon) ENDVIRTUAL;	// ROM 0x003895a4 Init__11TCompressorFPv
+	VIRTUAL NewtonErr	Compress(ULong* outSize, void* dst, ULong dstSize, void* src, ULong srcSize) ENDVIRTUAL;	// ROM 0x003895b0 Compress__11TCompressorFPUlPvUlT2T3
+	VIRTUAL ULong		EstimatedCompressedSize(void* src, ULong srcSize) ENDVIRTUAL;	// ROM 0x003895bc EstimatedCompressedSize__11TCompressorFPvUl
 
 	// the interface's own helpers: a Handle's contents, replaced in place
 	NewtonErr		Compress(Handle h);
@@ -50,8 +50,8 @@ public:
 	static TDecompressor*	New(const char* implementation);
 	void			Delete();
 
-	VIRTUAL NewtonErr	Init(void* refCon) ENDVIRTUAL;
-	VIRTUAL NewtonErr	Decompress(ULong* outSize, void* dst, ULong dstSize, void* src, ULong srcSize) ENDVIRTUAL;
+	VIRTUAL NewtonErr	Init(void* refCon) ENDVIRTUAL;	// ROM 0x003896bc Init__13TDecompressorFPv
+	VIRTUAL NewtonErr	Decompress(ULong* outSize, void* dst, ULong dstSize, void* src, ULong srcSize) ENDVIRTUAL;	// ROM 0x003896c8 Decompress__13TDecompressorFPUlPvUlT2T3
 };
 
 
@@ -64,10 +64,10 @@ public:
 	static TCallbackCompressor*	New(const char* implementation);
 	void			Delete();
 
-	VIRTUAL NewtonErr	Init(void* refCon) ENDVIRTUAL;
-	VIRTUAL NewtonErr	Reset() ENDVIRTUAL;
-	VIRTUAL NewtonErr	WriteChunk(void* data, long size) ENDVIRTUAL;
-	VIRTUAL NewtonErr	Flush() ENDVIRTUAL;
+	VIRTUAL NewtonErr	Init(void* refCon) ENDVIRTUAL;	// ROM 0x0038962c Init__19TCallbackCompressorFPv
+	VIRTUAL NewtonErr	Reset() ENDVIRTUAL;	// ROM 0x00389638 Reset__19TCallbackCompressorFv
+	VIRTUAL NewtonErr	WriteChunk(void* data, long size) ENDVIRTUAL;	// ROM 0x00389644 WriteChunk__19TCallbackCompressorFPvl
+	VIRTUAL NewtonErr	Flush() ENDVIRTUAL;	// ROM 0x00389650 Flush__19TCallbackCompressorFv
 
 	// set by the client after New (the ROM's callers write them directly)
 	CompressorWriteProcPtr	fWriteProc;		// +0x10
@@ -84,9 +84,9 @@ public:
 	static TCallbackDecompressor*	New(const char* implementation);
 	void			Delete();
 
-	VIRTUAL NewtonErr	Init(void* refCon) ENDVIRTUAL;
-	VIRTUAL NewtonErr	Reset() ENDVIRTUAL;
-	VIRTUAL NewtonErr	ReadChunk(void* into, long* size, Boolean* underflow) ENDVIRTUAL;
+	VIRTUAL NewtonErr	Init(void* refCon) ENDVIRTUAL;	// ROM 0x0038973c Init__21TCallbackDecompressorFPv
+	VIRTUAL NewtonErr	Reset() ENDVIRTUAL;	// ROM 0x00389748 Reset__21TCallbackDecompressorFv
+	VIRTUAL NewtonErr	ReadChunk(void* into, long* size, Boolean* underflow) ENDVIRTUAL;	// ROM 0x00389754 ReadChunk__21TCallbackDecompressorFPvPlPUc
 
 	DecompressorReadProcPtr	fReadProc;		// +0x10
 	void*			fRefCon;				// +0x14

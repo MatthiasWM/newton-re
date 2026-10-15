@@ -45,6 +45,7 @@ InitEvents(void)
 	TEventCollector
 ------------------------------------------------------------------------------*/
 
+// ROM 0x00389c54 New__15TEventCollectorSFPc
 TEventCollector*
 TEventCollector::New(const char* implementation)
 {
@@ -53,6 +54,7 @@ TEventCollector::New(const char* implementation)
 }
 
 
+// ROM 0x00389c80 Delete__15TEventCollectorFv
 void
 TEventCollector::Delete()
 {
@@ -109,7 +111,7 @@ TEventCollector::AddTime()
 	THistoryCollector
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(THistoryCollector)
+PROTOCOL_IMPL_SOURCE_MACRO(THistoryCollector)	// ROM 0x002dc410 Sizeof__17THistoryCollectorSFv
 PROTOCOL_CLASSINFO(THistoryCollector, "TEventCollector", "", 0, 0, nil)	// ROM 0x00389d2c ClassInfo__17THistoryCollectorSFv
 
 // ROM 0x002dc418 New__17THistoryCollectorFv

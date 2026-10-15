@@ -9,6 +9,46 @@ have been done (a newer entry, or the subsystem's own page under
 work; this log is how and in what order they came to be, with the host
 bugs and ROM bugs found on the way.
 
+## 2026-10-15: The protocol glue
+
+The owner asked for the "protocol glue" category of
+`uncited-categories.tsv` (368 functions, 9 KB) to be done; it is empty:
+coverage 19283 citations, 13307 of 16671 functions (79.8%), 88.7% of the
+code; 490 ctests.
+
+- **Interface stubs, `Sizeof`, `ClassInfo` (152 + 2)**: every one the
+  three-instruction dispatch through the implementation's table (the
+  bodies that looked real - `IsPending`, `WakeUp`, `BufferCompleted`,
+  `Translate`, ... - are the same stub with class-info data after it),
+  cited at the interface's declaration with its slot checked against the
+  declaration order (`docs/protocols/README.md`, "Citing the glue");
+  `Sizeof` at the implementation's `PROTOCOL_IMPL_SOURCE_MACRO`.
+  `SoundCodec.h`'s address-only notes had pointed at data and were never
+  checked; they now name the stubs.
+- **`TQDLibraryDriver`** (`qd/QDLibrary.h`): QuickDraw as a protocol, 196
+  methods - and every one calls itself: each member's unqualified call to
+  the QuickDraw function of its name finds the member (`CopyBits` keeps
+  `this` in r0 and `bl`s itself; the short ones are `b .`), so all but
+  `New`/`Delete` spin or run out of stack.  Nothing in the ROM registers
+  it.  ROM BUG (fixed): the host's passes each call on (`NEWTON_ROM_BUGS=1`
+  calls itself); ctest `qd.QDLibrary`.  `classinfo.py` reads dispatch
+  tables past 128 slots now (this one has 200).
+- **`TPinPad`** (`alert/PinPad.h`): the ROM's TDrawInterface - a box drawn
+  straight on the screen, the alert font's strikes, the pen polled
+  directly; registered by `RegisterPinPad()` after the alert manager
+  (DEVIATION: the ROM's `InitGraf` does it).  ROM BUG (fixed): `Delete`
+  leaves the style's ref handle.  ctest `alert.PinPad`.
+- **`TStoreDriver`** (`stores/flash/FlashStoreParts.cpp`): a RAM store's
+  memory, the persistent part read down the byte lanes (offset o is lane
+  `3^(o>>17)` of word `o&0x1ffff`), with a resumable `PersistentCopy`;
+  `TFlashStore::Init` still refuses RAM stores, so nothing reaches it yet
+  (`stores.FlashStore`'s `TestStoreDriver`).
+- `host.NewtonMonthOverview` failed from 18:00 in Australia on the 15th:
+  the Newton's today is its home city's (Cupertino's), Dates selects today
+  and the month view inverts the selected day's box, so the meetings'
+  bars on the 15th came out white.  The demo uses the 16th when today is
+  the 15th.
+
 ## 2026-10-15: The public API the ROM does not call, and the dead code
 
 The owner asked for every public API function, even those the ROM never

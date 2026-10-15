@@ -1381,8 +1381,18 @@ Erase finished); `NEWTON_ROM_BUGS=1` gives the ROM's behaviour.
 `TFlashStore` (`stores/flash/FlashStore.h`; `FlashStore.cpp`, `FlashStoreObjects.cpp`,
 `FlashBlock.cpp`, `FlashIterator.cpp`, `FlashStoreParts.cpp`) is the ROM's
 store on flash, reconstructed whole for the internal flash; a card's and a
-RAM store's parts (`TStoreDriver`, the compaction in place, the power and
-write-protect alerts) are NOT YET, and `Init` refuses those stores.
+RAM store's parts (the compaction in place, the power and write-protect
+alerts) are NOT YET, and `Init` refuses those stores. A RAM store's memory,
+`TStoreDriver` (0x001faf08-0x001fb504), is reconstructed: one run of
+offsets, a persistent part first - addressed down the byte lanes, offset
+`o` in lane `3 ^ (o >> 17)` of word `o & 0x1ffff`, so consecutive offsets
+are four bytes apart - then plain memory; `Read`, `Write`, `Set` and `Copy`
+go a byte at a time with a stride of four in the persistent part (`Copy`
+from the end when it overlaps upwards; a copy across the two parts strided
+on its persistent side), and `PersistentCopy` keeps where it has got so
+that `ContinuePersistentCopy` can carry it on after it was cut short
+(nothing clears its `fCopying`). Ctest `stores.FlashStore`
+(`TestStoreDriver`).
 
 **The format.** A store is *blocks*, each one erase region of the flash
 (on the MP2x00 128 KB, 30 of them, one always kept spare). A block starts

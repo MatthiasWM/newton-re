@@ -537,8 +537,10 @@ DoTextArrow(TextObjectRef text, Fixed hScale, Fixed vScale)
 // Where an arrow key takes the caret from the offset: the question asked
 // of the port's text proc (operation 0x2000), so that a printer or a
 // recording picture would see it too.  Nothing in the ROM asks it but the
-// QuickDraw library's protocol (TQDLibraryDriver::TextArrowOffset), whose
-// caller is a package's code.  (Host: the answer starts at nought - the
+// QuickDraw library's protocol (TQDLibraryDriver::TextArrowOffset,
+// QDLibrary.h), which nothing in the ROM registers and whose method
+// calls itself rather than this (ROM BUG) - so in the ROM nothing reaches
+// it at all.  (Host: the answer starts at nought - the
 // ROM's is the stack's word - for a text proc that does not answer.)
 long
 TextArrowOffset(TextObjectRef text, long offset, Boolean forward)
@@ -700,39 +702,6 @@ SetTextObjField(TextObjectRef text, TextObjectField field, void* value)
 	}
 	InvalCachedTextInfo(text);
 	return true;
-}
-
-
-// ROM 0x00195cb0 GetTextObjField__16TQDLibraryDriverFliPv
-void
-TQDLibraryDriver::GetTextObjField(TextObjectRef text, int field, void* result)
-{
-	::GetTextObjField(text, (TextObjectField) field, result);
-}
-
-
-// ROM 0x00195cbc CharToPoint__16TQDLibraryDriverFlT1P6FPoint
-void
-TQDLibraryDriver::CharToPoint(TextObjectRef text, long offset, FPoint* point)
-{
-	::CharToPoint(text, offset, point);
-}
-
-
-// ROM 0x00195cc0 PointToChar__16TQDLibraryDriverFl6FPoint
-long
-TQDLibraryDriver::PointToChar(TextObjectRef text, FPoint point)
-{
-	return ::PointToChar(text, point);
-}
-
-
-// ROM 0x00195cc4 TextArrowOffset__16TQDLibraryDriverFlT1Uc
-// (the direction narrowed to a byte, as the ROM's does)
-long
-TQDLibraryDriver::TextArrowOffset(TextObjectRef text, long offset, Boolean forward)
-{
-	return ::TextArrowOffset(text, offset, (UChar) forward);
 }
 
 

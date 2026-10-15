@@ -1710,7 +1710,7 @@ TSharpIRTool::SetSerialChipSelect(TCMOSerialHardware* opt)
 	TIRService ('slir')
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(TIRService)
+PROTOCOL_IMPL_SOURCE_MACRO(TIRService)	// ROM 0x000e8f20 Sizeof__10TIRServiceSFv
 PROTOCOL_CLASSINFO(TIRService, "TCMService", "serv\0slir\0\0", 0x20000, 0, nil)	// ROM 0x00382e74 ClassInfo__10TIRServiceSFv
 
 // ROM 0x000e8f28 New__10TIRServiceFv

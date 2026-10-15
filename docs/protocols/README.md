@@ -128,6 +128,33 @@ through the registry: lookup by names, version and capability, `NewByName`
 and calls through the interface, instance counting, enumeration with the
 seed, deregistration, and the registry monitor about itself.
 
+## Citing the glue
+
+Every interface method in the ROM is a twelve-byte stub, `ldr r0,[r0,#4];
+ldr r12,[r0,#8]; add pc,r12,#slot*4`, named after the interface
+(`IsPending__9TEndpointFUl`, slot 40); the host's virtual call stands in
+for it, so the stub is cited at the method's declaration in the
+interface's header, after `ENDVIRTUAL` (`comms/Endpoint.h`,
+`sound/SoundCodec.h`, `recognition/WRecDomain.h`, ...). Declarations are
+in slot order, overloads included (`TEndpoint`'s `Snd`/`Rcv` pairs), and
+the stubs' slot numbers were checked against them. An interface declared
+in a generated DDK header (`TCMService`, `src/ddk/CMService.h`) has its
+stubs cited in a comment beside its `New`/`Delete` glue instead
+(`comms/CommManager.cpp`). `New(char*)` and `Delete()` are cited where they
+are defined.
+
+An implementation's `Sizeof` is `mov r0,#size; mov pc,lr`, cited on its
+`PROTOCOL_IMPL_SOURCE_MACRO` line; its `ClassInfo` (`sub r0,pc,#n; mov
+pc,lr`, the symbol's extent taking in the table after it) on its
+`PROTOCOL_CLASSINFO` line, whose interface, signature, version and flags
+are those `classinfo.py --name` decodes. The ROM's byte count includes the
+16 bytes of `TProtocol`, so a comm service implementation's 0x10
+(`TAsyncService`, `TMNPService`, `TIrDAService`, ...) says the instance has
+no fields of its own: the service only starts its tool. On the host
+`Sizeof` answers `sizeof`, which also counts the vtable pointer and
+pointer-sized fields; the class info both sizes and constructs the
+instance, so the ROM's byte count is never used for a host object.
+
 ## From a script (`system/SystemNatives.cpp`)
 
 A NewtonScript program reaches the same registry through five functions.
@@ -159,7 +186,8 @@ registry, an instance made and destroyed.
 
 ## Not yet
 
-`InitStdIO`, `RegisterROMDomainManager` and `InitializePackageManager`,
-the other kernel services `InitialKSRVTask` starts, remain
-`NOT YET RECONSTRUCTED`; no ROM implementation other than the registry's
-own is reconstructed yet (`classinfos.md` is the list to work from).
+`InitStdIO` and `RegisterROMDomainManager`, two of the other kernel
+services `InitialKSRVTask` starts, remain `NOT YET RECONSTRUCTED`
+(`InitializePackageManager` is in `packages/PackageManager.cpp`). `classinfos.md` lists every ROM implementation;
+the ones still to do are those whose class has uncited code
+(`coverage.py --by-class`).

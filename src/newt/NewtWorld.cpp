@@ -12,6 +12,7 @@
 #include "Inker.h"
 #include "StorageCards.h"
 #include "AlertManager.h"
+#include "PinPad.h"
 #include "NewtCardEvents.h"
 #include "SoundCodec.h"
 #include "SystemNatives.h"
@@ -283,6 +284,7 @@ TNewtWorld::MainConstructor()
 	// DEVIATION: the alert manager likewise (TLoader::TheMain starts it
 	// before the card server, which looks for it)
 	InitAlertManager();
+	RegisterPinPad();			// DEVIATION: the ROM's InitGraf registers TPinPad (alert/PinPad.h)
 	// DEVIATION: the power manager likewise (TLoader::TheMain starts it),
 	// with the host's battery driver registered first where a machine's own
 	// would be (power/host/HostBatteryDriver.h)

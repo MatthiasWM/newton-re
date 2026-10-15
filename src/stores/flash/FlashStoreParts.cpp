@@ -196,8 +196,13 @@ SCompactState::InProgress(void)
 
 /*------------------------------------------------------------------------------
 	T S t o r e D r i v e r
-	NOT YET but for Init: only a RAM store reaches one, and TFlashStore::Init
-	refuses those.
+	A RAM store's memory, seen as one run of offsets: the persistent part
+	first (offsets below fPersistentSize), then the ordinary part.  The
+	persistent part is memory that only one byte of each word holds: four
+	planes of 128K, byte offset & 0x1ffff of plane offset >> 17 in byte
+	lane 3 - plane of word offset & 0x1ffff, so consecutive offsets are
+	four bytes apart; the ordinary part is plain memory.  (Only a RAM
+	store reaches one, and TFlashStore::Init still refuses those.)
 ------------------------------------------------------------------------------*/
 
 // ROM 0x001faf08 Init__12TStoreDriverFPcUlT1T2
@@ -211,18 +216,256 @@ TStoreDriver::Init(char* base, ULong size, char* persistentBase, ULong persisten
 	fTotalSize = size + persistentSize;
 }
 
-static void
-StoreDriverNotYet(void)
+
+// ROM 0x001faf1c AddressOf__12TStoreDriverFUlPUc
+// Where an offset's byte is, and (when asked) whether the bytes from it
+// on are plain memory (linear) or a byte a word.
+char*
+TStoreDriver::AddressOf(ULong offset, UChar* isLinear)
 {
-	DebugStr("TStoreDriver: the RAM stores are NOT YET");
+	char* at;
+	if (fPersistentSize > offset)
+	{
+		at = fPersistentBase + (offset & 0x1ffff) * 4 + (3 ^ (offset >> 17));
+		if (isLinear != nil)
+			*isLinear = false;
+	}
+	else
+	{
+		at = fBase + (offset - fPersistentSize);
+		if (isLinear != nil)
+			*isLinear = true;
+	}
+	return at;
 }
 
-void	TStoreDriver::Read(char*, ULong, ULong)			{ StoreDriverNotYet(); }
-void	TStoreDriver::Write(char*, ULong, ULong)		{ StoreDriverNotYet(); }
-void	TStoreDriver::Set(ULong, ULong, ULong)			{ StoreDriverNotYet(); }
-void	TStoreDriver::Copy(ULong, ULong, ULong)			{ StoreDriverNotYet(); }
-void	TStoreDriver::PersistentCopy(ULong, ULong, ULong)	{ StoreDriverNotYet(); }
-void	TStoreDriver::ContinuePersistentCopy(void)		{ StoreDriverNotYet(); }
+
+// ROM 0x001faf74 AddressOfAligned__12TStoreDriverFUlPUc
+// The same, but for the persistent part the word that holds the byte.
+char*
+TStoreDriver::AddressOfAligned(ULong offset, UChar* isLinear)
+{
+	char* at;
+	if (fPersistentSize > offset)
+	{
+		at = fPersistentBase + (offset & 0x1ffff) * 4;
+		if (isLinear != nil)
+			*isLinear = false;
+	}
+	else
+	{
+		at = fBase + (offset - fPersistentSize);
+		if (isLinear != nil)
+			*isLinear = true;
+	}
+	return at;
+}
+
+
+// ROM 0x001fafc0 PersistentCopy__12TStoreDriverFUlN21
+// A copy that can be carried on with after it was cut short: where it is
+// from and to and how far it has got are kept in the driver, and it is
+// started.  In plain memory it goes a word at a time (the count in words),
+// in the persistent part a byte at a time; when the two overlap it goes
+// the way that does not tread on what it has still to copy, from the end
+// when it copies upwards.
+void
+TStoreDriver::PersistentCopy(ULong from, ULong to, ULong size)
+{
+	fCopyFrom = from;
+	fCopyTo = to;
+	UChar isLinear;
+	AddressOf(from, &isLinear);
+	fCopyCount = isLinear ? size >> 2 : size;
+	fCopyIndex = 0;
+	ULong distance = (from <= to) ? to - from : from - to;
+	if (distance < size)
+	{
+		fOverlapping = true;
+		if (fCopyFrom < fCopyTo)
+			fCopyIndex = fCopyCount - 1;
+	}
+	else
+		fOverlapping = false;
+	fCopying = true;
+	DoPersistentCopy(fCopyFrom, fCopyTo);
+}
+
+
+// ROM 0x001fb064 ContinuePersistentCopy__12TStoreDriverFv
+// The copy under way, carried on (from the start when the two do not
+// overlap: copying again what was copied does no harm).  Nothing here
+// says the copy is over - fCopying stays set.
+void
+TStoreDriver::ContinuePersistentCopy(void)
+{
+	if (fCopying)
+		DoPersistentCopy(fCopyFrom, fCopyTo);
+}
+
+
+// ROM 0x001fb07c DoPersistentCopy__12TStoreDriverFUlT1
+// An overlapping copy keeps how far it has got in fCopyIndex before each
+// word or byte, so ContinuePersistentCopy picks it up there.
+void
+TStoreDriver::DoPersistentCopy(ULong from, ULong to)
+{
+	if (fOverlapping)
+	{
+		if (fPersistentSize > from)
+		{
+			char* src = AddressOf(from, nil);
+			char* dst = AddressOf(to, nil);
+			long i = fCopyIndex;
+			if (fCopyFrom < fCopyTo)
+			{
+				for ( ; i >= 0; i--)
+				{
+					fCopyIndex = i;
+					dst[i * 4] = src[i * 4];
+				}
+			}
+			else
+			{
+				for ( ; (long) fCopyCount > i; i++)
+				{
+					fCopyIndex = i;
+					dst[i * 4] = src[i * 4];
+				}
+			}
+		}
+		else
+		{
+			ULong32* src = (ULong32*) AddressOfAligned(from, nil);
+			ULong32* dst = (ULong32*) AddressOfAligned(to, nil);
+			long i = fCopyIndex;
+			if (fCopyFrom < fCopyTo)
+			{
+				for ( ; i >= 0; i--)
+				{
+					fCopyIndex = i;
+					dst[i] = src[i];
+				}
+			}
+			else
+			{
+				for ( ; (long) fCopyCount > i; i++)
+				{
+					fCopyIndex = i;
+					dst[i] = src[i];
+				}
+			}
+		}
+	}
+	else if (fPersistentSize > from)
+	{
+		char* src = AddressOf(from, nil);
+		char* dst = AddressOf(to, nil);
+		for (ULong i = 0; i < fCopyCount; i++)
+			dst[i * 4] = src[i * 4];
+	}
+	else
+	{
+		char* dst = AddressOfAligned(to, nil);
+		char* src = AddressOfAligned(from, nil);
+		BlockMove(src, dst, fCopyCount * 4);
+	}
+}
+
+
+// ROM 0x001fb244 Copy__12TStoreDriverFUlN21
+// Bytes copied within the store, from the end when the two overlap and the
+// copy goes upwards.  An overlapping copy goes by the kind of memory it
+// starts from; a copy from one part to the other a byte a word on its
+// persistent side.  (A run that crosses from one part to the other is not
+// looked for.)
+void
+TStoreDriver::Copy(ULong from, ULong to, ULong size)
+{
+	UChar srcLinear, dstLinear;
+	char* src = AddressOf(from, &srcLinear);
+	char* dst = AddressOf(to, &dstLinear);
+	ULong distance = (from <= to) ? to - from : from - to;
+	if (distance < size)
+	{
+		if (from < to)
+		{
+			if (!srcLinear)
+				for (long i = size - 1; i >= 0; i--)
+					dst[i * 4] = src[i * 4];
+			else
+				for (long i = size - 1; i >= 0; i--)
+					dst[i] = src[i];
+		}
+		else
+		{
+			if (!srcLinear)
+				for (long i = 0; i < (long) size; i++)
+					dst[i * 4] = src[i * 4];
+			else
+				for (long i = 0; i < (long) size; i++)
+					dst[i] = src[i];
+		}
+	}
+	else if (srcLinear == dstLinear)
+	{
+		if (!srcLinear)
+			for (ULong i = 0; i < size; i++)
+				dst[i * 4] = src[i * 4];
+		else
+			BlockMove(src, dst, size);
+	}
+	else if (!srcLinear)
+		for (long i = 0; i < (long) size; i++)
+			dst[i] = src[i * 4];
+	else
+		for (long i = 0; i < (long) size; i++)
+			dst[i * 4] = src[i];
+}
+
+
+// ROM 0x001fb3d4 Set__12TStoreDriverFUlN21
+// Bytes set to the low byte of value.
+void
+TStoreDriver::Set(ULong offset, ULong size, ULong value)
+{
+	UChar isLinear;
+	char* at = AddressOf(offset, &isLinear);
+	UChar byte = (UChar) value;
+	if (isLinear)
+		FillBytes(at, size, byte);
+	else
+		for (long i = 0; i < (long) size; i++)
+			at[i * 4] = byte;
+}
+
+
+// ROM 0x001fb430 Read__12TStoreDriverFPcUlT2
+void
+TStoreDriver::Read(char* buffer, ULong offset, ULong size)
+{
+	UChar isLinear;
+	char* at = AddressOf(offset, &isLinear);
+	if (isLinear)
+		BlockMove(at, buffer, size);
+	else
+		for (long i = 0; i < (long) size; i++)
+			buffer[i] = at[i * 4];
+}
+
+
+// ROM 0x001fb49c Write__12TStoreDriverFPcUlT2
+void
+TStoreDriver::Write(char* buffer, ULong offset, ULong size)
+{
+	UChar isLinear;
+	char* at = AddressOf(offset, &isLinear);
+	if (isLinear)
+		BlockMove(buffer, at, size);
+	else
+		for (long i = 0; i < (long) size; i++)
+			at[i * 4] = buffer[i];
+}
 
 
 /*------------------------------------------------------------------------------

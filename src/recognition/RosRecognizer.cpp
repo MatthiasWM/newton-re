@@ -67,7 +67,7 @@ public:
 	TStrokeUnit*	fInkStrokes[kRosMaxInkStrokes];	// +0x24
 };									// 0x164 bytes
 
-PROTOCOL_IMPL_SOURCE_MACRO(TRosRecognizer)
+PROTOCOL_IMPL_SOURCE_MACRO(TRosRecognizer)	// ROM 0x001b5bac Sizeof__14TRosRecognizerSFv
 PROTOCOL_CLASSINFO(TRosRecognizer, "TWRecognizer", "", 0, 0, nil)	// ROM 0x00388d14 ClassInfo__14TRosRecognizerSFv
 
 

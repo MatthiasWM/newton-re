@@ -40,6 +40,13 @@ target_compile_definitions(test_TextObject PRIVATE "NEWTON_OBJECTS=\"${NEWTON_OB
 add_test(NAME qd.TextObject COMMAND test_TextObject)
 set_tests_properties(qd.TextObject PROPERTIES TIMEOUT 120)
 
+# the QuickDraw library protocol (qd/QDLibrary.h), its ROM bug fixed
+add_executable(test_QDLibrary test_QDLibrary.cpp)
+target_link_libraries(test_QDLibrary PRIVATE qd)
+target_compile_definitions(test_QDLibrary PRIVATE "NEWTON_OBJECTS=\"${NEWTON_OBJECTS_FILE}\"")
+add_test(NAME qd.QDLibrary COMMAND test_QDLibrary)
+set_tests_properties(qd.QDLibrary PROPERTIES TIMEOUT 60)
+
 add_executable(test_ScrollRect test_ScrollRect.cpp)
 target_link_libraries(test_ScrollRect PRIVATE qd)
 add_test(NAME qd.ScrollRect COMMAND test_ScrollRect)

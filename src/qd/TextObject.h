@@ -141,16 +141,6 @@ void			DoPointToChar(TextObjectRef text, Fixed hScale, Fixed vScale);	// ROM 0x0
 long			TextArrowOffset(TextObjectRef text, long offset, Boolean forward);	// ROM 0x00359f70 TextArrowOffset__FlT1Uc - where the right (forward) or left arrow takes the caret
 void			DoTextArrow(TextObjectRef text, Fixed hScale, Fixed vScale);	// ROM 0x00359fb8 DoTextArrow__FlN21
 
-// The QuickDraw library's protocol face of them (the TQDLibraryDriver
-// dispatch; the ROM's forward to the functions above).
-class TQDLibraryDriver
-{
-public:
-	static void		GetTextObjField(TextObjectRef text, int field, void* result);	// ROM 0x00195cb0 GetTextObjField__16TQDLibraryDriverFliPv
-	static void		CharToPoint(TextObjectRef text, long offset, FPoint* point);	// ROM 0x00195cbc CharToPoint__16TQDLibraryDriverFlT1P6FPoint
-	static long		PointToChar(TextObjectRef text, FPoint point);			// ROM 0x00195cc0 PointToChar__16TQDLibraryDriverFl6FPoint
-	static long		TextArrowOffset(TextObjectRef text, long offset, Boolean forward);	// ROM 0x00195cc4 TextArrowOffset__16TQDLibraryDriverFlT1Uc
-};
 void			DoPutText(TextObjectRef text, Fixed hScale, Fixed vScale);	// (PicRecord.cpp) the recording
 
 #endif /* __TEXTOBJECT_H */

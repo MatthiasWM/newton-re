@@ -1489,7 +1489,7 @@ TAsyncSerTool::SerialEvents(ULong events)
 	TAsyncService
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(TAsyncService)
+PROTOCOL_IMPL_SOURCE_MACRO(TAsyncService)	// ROM 0x0003b0c4 Sizeof__13TAsyncServiceSFv
 PROTOCOL_CLASSINFO(TAsyncService, "TCMService", "serv\0aser\0\0", 0x20000, 0, nil)	// ROM 0x00382c4c ClassInfo__13TAsyncServiceSFv
 
 // ROM 0x0003b0cc New__13TAsyncServiceFv

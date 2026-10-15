@@ -124,7 +124,7 @@ GetDataForm(RefArg form, FormUser user)
 	PScriptDataOut
 ------------------------------------------------------------------------------- */
 
-PROTOCOL_IMPL_SOURCE_MACRO(PScriptDataOut)
+PROTOCOL_IMPL_SOURCE_MACRO(PScriptDataOut)	// ROM 0x001cd85c Sizeof__14PScriptDataOutSFv
 PROTOCOL_CLASSINFO(PScriptDataOut, "PFrameSink", "", 0, 0, nil)	// ROM 0x0038a2f0 ClassInfo__14PScriptDataOutSFv
 
 // ROM 0x001cd864 New__14PScriptDataOutFv
@@ -340,7 +340,7 @@ PScriptDataOut::ParseOutput(RefArg value, FormType form, long encoding, long* le
 	PScriptDataIn
 ------------------------------------------------------------------------------- */
 
-PROTOCOL_IMPL_SOURCE_MACRO(PScriptDataIn)
+PROTOCOL_IMPL_SOURCE_MACRO(PScriptDataIn)	// ROM 0x001cd534 Sizeof__13PScriptDataInSFv
 PROTOCOL_CLASSINFO(PScriptDataIn, "PFrameSource", "", 0, 0, nil)	// ROM 0x0038a36c ClassInfo__13PScriptDataInSFv
 
 // ROM 0x001cd53c New__13PScriptDataInFv
@@ -469,7 +469,7 @@ PScriptDataIn::ParseInput(FormType form, long encoding, long length, UByte* data
 	POptionDataOut
 ------------------------------------------------------------------------------- */
 
-PROTOCOL_IMPL_SOURCE_MACRO(POptionDataOut)
+PROTOCOL_IMPL_SOURCE_MACRO(POptionDataOut)	// ROM 0x0014be88 Sizeof__14POptionDataOutSFv
 PROTOCOL_CLASSINFO(POptionDataOut, "PFrameSink", "", 0, 0, nil)	// ROM 0x0038a3e8 ClassInfo__14POptionDataOutSFv
 
 // ROM 0x0014be90 New__14POptionDataOutFv
@@ -687,7 +687,7 @@ POptionDataOut::ParseOutput(PFrameSink* sink, RefArg data, FormType form, long* 
 	POptionDataIn
 ------------------------------------------------------------------------------- */
 
-PROTOCOL_IMPL_SOURCE_MACRO(POptionDataIn)
+PROTOCOL_IMPL_SOURCE_MACRO(POptionDataIn)	// ROM 0x0014b9f4 Sizeof__13POptionDataInSFv
 PROTOCOL_CLASSINFO(POptionDataIn, "PFrameSource", "", 0, 0, nil)	// ROM 0x0038a464 ClassInfo__13POptionDataInSFv
 
 // ROM 0x0014b9fc New__13POptionDataInFv
@@ -846,7 +846,7 @@ POptionDataIn::ParseInput(PFrameSource* source, FormType form, long length, UByt
 	The flatteners
 ------------------------------------------------------------------------------- */
 
-PROTOCOL_IMPL_SOURCE_MACRO(PFlattenPtr)
+PROTOCOL_IMPL_SOURCE_MACRO(PFlattenPtr)	// ROM 0x000caf00 Sizeof__11PFlattenPtrSFv
 PROTOCOL_CLASSINFO(PFlattenPtr, "PFrameSink", "", 0, 0, nil)	// ROM 0x0038a010 ClassInfo__11PFlattenPtrSFv
 
 // ROM 0x000caf08 New__11PFlattenPtrFv
@@ -914,7 +914,7 @@ PFlattenPtr::Translate(void* context, PipeCallBack* callback)
 }
 
 
-PROTOCOL_IMPL_SOURCE_MACRO(PUnFlattenPtr)
+PROTOCOL_IMPL_SOURCE_MACRO(PUnFlattenPtr)	// ROM 0x00256908 Sizeof__13PUnFlattenPtrSFv
 PROTOCOL_CLASSINFO(PUnFlattenPtr, "PFrameSource", "", 0, 0, nil)	// ROM 0x0038a088 ClassInfo__13PUnFlattenPtrSFv
 
 // ROM 0x00256910 New__13PUnFlattenPtrFv
@@ -941,7 +941,7 @@ PUnFlattenPtr::Translate(void* context, PipeCallBack* callback)
 }
 
 
-PROTOCOL_IMPL_SOURCE_MACRO(PFlattenRef)
+PROTOCOL_IMPL_SOURCE_MACRO(PFlattenRef)	// ROM 0x000cb0cc Sizeof__11PFlattenRefSFv
 PROTOCOL_CLASSINFO(PFlattenRef, "PFrameSink", "", 0, 0, nil)	// ROM 0x0038a104 ClassInfo__11PFlattenRefSFv
 
 // ROM 0x000cb0d4 New__11PFlattenRefFv
@@ -971,7 +971,7 @@ PFlattenRef::Translate(void* context, PipeCallBack* callback)
 }
 
 
-PROTOCOL_IMPL_SOURCE_MACRO(PUnFlattenRef)
+PROTOCOL_IMPL_SOURCE_MACRO(PUnFlattenRef)	// ROM 0x002569bc Sizeof__13PUnFlattenRefSFv
 PROTOCOL_CLASSINFO(PUnFlattenRef, "PFrameSource", "", 0, 0, nil)	// ROM 0x0038a17c ClassInfo__13PUnFlattenRefSFv
 
 // ROM 0x002569c4 New__13PUnFlattenRefFv
@@ -1000,7 +1000,7 @@ PUnFlattenRef::Translate(void* context, PipeCallBack* callback)
 }
 
 
-PROTOCOL_IMPL_SOURCE_MACRO(PStreamInRef)
+PROTOCOL_IMPL_SOURCE_MACRO(PStreamInRef)	// ROM 0x001fc4c0 Sizeof__12PStreamInRefSFv
 PROTOCOL_CLASSINFO(PStreamInRef, "PFrameSource", "", 0, 0, nil)	// ROM 0x0038a274 ClassInfo__12PStreamInRefSFv
 
 // ROM 0x001fc4c8 New__12PStreamInRefFv
@@ -1027,7 +1027,7 @@ PStreamInRef::Translate(void* context, PipeCallBack* callback)
 }
 
 
-PROTOCOL_IMPL_SOURCE_MACRO(PStreamOutRef)
+PROTOCOL_IMPL_SOURCE_MACRO(PStreamOutRef)	// ROM 0x001fc5d0 Sizeof__13PStreamOutRefSFv
 PROTOCOL_CLASSINFO(PStreamOutRef, "PFrameSink", "", 0, 0, nil)	// ROM 0x0038a1f8 ClassInfo__13PStreamOutRefSFv
 
 // ROM 0x001fc5d8 New__13PStreamOutRefFv

@@ -78,13 +78,13 @@ public:
 	void			Delete();
 
 	VIRTUAL void	Init(size_t entrySizeInBytes, char* printableFormat, char* collectionName,
-						 int number = kDefaultNumberOfEntries, int residence = eNormalBuffer) ENDVIRTUAL;
-	VIRTUAL Boolean	AddDescriptions(EventTraceCauseDesc* list, int count) ENDVIRTUAL;
-	VIRTUAL void	Add(unsigned char byteEventValue) ENDVIRTUAL;
-	VIRTUAL void	Add(unsigned long longEventValue) ENDVIRTUAL;
-	VIRTUAL void	Add(const void* event) ENDVIRTUAL;
-	VIRTUAL void	AddAddress(void) ENDVIRTUAL;
-	VIRTUAL void	CollectionControl(int control) ENDVIRTUAL;
+						 int number = kDefaultNumberOfEntries, int residence = eNormalBuffer) ENDVIRTUAL;	// ROM 0x00389c9c Init__15TEventCollectorFUiPcT2iT4
+	VIRTUAL Boolean	AddDescriptions(EventTraceCauseDesc* list, int count) ENDVIRTUAL;	// ROM 0x00389ca8 AddDescriptions__15TEventCollectorFP19EventTraceCauseDesci
+	VIRTUAL void	Add(unsigned char byteEventValue) ENDVIRTUAL;	// ROM 0x00389cb4 Add__15TEventCollectorFUc
+	VIRTUAL void	Add(unsigned long longEventValue) ENDVIRTUAL;	// ROM 0x00389cc0 Add__15TEventCollectorFUl
+	VIRTUAL void	Add(const void* event) ENDVIRTUAL;	// ROM 0x00389ccc Add__15TEventCollectorFPCv
+	VIRTUAL void	AddAddress(void) ENDVIRTUAL;	// ROM 0x00389cd8 AddAddress__15TEventCollectorFv
+	VIRTUAL void	CollectionControl(int control) ENDVIRTUAL;	// ROM 0x00389ce4 CollectionControl__15TEventCollectorFi
 
 protected:
 	void			Register();				// ROM 0x002dc360 Register__15TEventCollectorFv

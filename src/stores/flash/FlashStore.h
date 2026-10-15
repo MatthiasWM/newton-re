@@ -253,20 +253,24 @@ public:
 
 /*------------------------------------------------------------------------------
 	T S t o r e D r i v e r
-	A RAM store's memory.  NOT YET: TFlashStore reaches one only in a RAM
-	store, which Init refuses.
+	A RAM store's memory: a persistent part held a byte a word, then plain
+	memory (FlashStoreParts.cpp).  TFlashStore reaches one only in a RAM
+	store, which its Init still refuses (NOT YET).
 ------------------------------------------------------------------------------*/
 
 class TStoreDriver
 {
 public:
 	void		Init(char* base, ULong size, char* persistentBase, ULong persistentSize);	// ROM 0x001faf08 Init__12TStoreDriverFPcUlT1T2
-	void		Read(char* buffer, ULong offset, ULong size);	// NOT YET
-	void		Write(char* buffer, ULong offset, ULong size);	// NOT YET
-	void		Set(ULong offset, ULong size, ULong value);	// NOT YET
-	void		Copy(ULong from, ULong to, ULong size);	// NOT YET
-	void		PersistentCopy(ULong from, ULong to, ULong size);	// NOT YET
-	void		ContinuePersistentCopy(void);	// NOT YET
+	char*		AddressOf(ULong offset, UChar* isLinear);		// ROM 0x001faf1c AddressOf__12TStoreDriverFUlPUc
+	char*		AddressOfAligned(ULong offset, UChar* isLinear);	// ROM 0x001faf74 AddressOfAligned__12TStoreDriverFUlPUc
+	void		Read(char* buffer, ULong offset, ULong size);	// ROM 0x001fb430 Read__12TStoreDriverFPcUlT2
+	void		Write(char* buffer, ULong offset, ULong size);	// ROM 0x001fb49c Write__12TStoreDriverFPcUlT2
+	void		Set(ULong offset, ULong size, ULong value);	// ROM 0x001fb3d4 Set__12TStoreDriverFUlN21
+	void		Copy(ULong from, ULong to, ULong size);	// ROM 0x001fb244 Copy__12TStoreDriverFUlN21
+	void		PersistentCopy(ULong from, ULong to, ULong size);	// ROM 0x001fafc0 PersistentCopy__12TStoreDriverFUlN21
+	void		ContinuePersistentCopy(void);	// ROM 0x001fb064 ContinuePersistentCopy__12TStoreDriverFv
+	void		DoPersistentCopy(ULong from, ULong to);	// ROM 0x001fb07c DoPersistentCopy__12TStoreDriverFUlT1
 
 	char*		fBase;					// +0x00
 	ULong		fSize;					// +0x04

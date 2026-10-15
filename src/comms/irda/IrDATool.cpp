@@ -946,7 +946,7 @@ TIrDATool::ProcessOptionStart(TOption* theOption, ULong label, ULong opcode)
 	TIrDAService ('irda')
 ------------------------------------------------------------------------------*/
 
-PROTOCOL_IMPL_SOURCE_MACRO(TIrDAService)
+PROTOCOL_IMPL_SOURCE_MACRO(TIrDAService)	// ROM 0x000edde0 Sizeof__12TIrDAServiceSFv
 PROTOCOL_CLASSINFO(TIrDAService, "TCMService", "serv\0irda\0\0", 0x20000, 0, nil)	// ROM 0x00382dec ClassInfo__12TIrDAServiceSFv
 
 // ROM 0x000edde8 New__12TIrDAServiceFv

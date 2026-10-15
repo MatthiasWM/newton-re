@@ -1,7 +1,9 @@
 // The Dates app's month overview (views/MonthView.h, DrawMonthOverView):
-// two meetings on the 15th of this month - 9 to 10 am and 1 to 3 pm - and
+// two meetings on the 15th of this month (the 16th when the Newton's today
+// is the 15th: the selected day's box is drawn inverted, and Dates selects
+// today - in the Newton's home city's time, Cupertino's unless set) - 9 to 10 am and 1 to 3 pm - and
 // Dates shown by the month.  Each day is a gray-framed box with its number
-// in the corner, and the 15th has a black bar for each meeting, as far
+// in the corner, and their day has a black bar for each meeting, as far
 // down the box as its time is through the day.
 //
 //   build/host/host/newton --display 320x480 --script src/host/demo/monthoverview.ns --headless 90
@@ -21,6 +23,9 @@ moDay := func(date, hour) begin
 	TotalMinutes({year: d.year, month: d.month, date: date, hour: hour, minute: 0});
 end;
 
+// the day the meetings are on: the 15th, unless that is the selected day
+moDate := if Date(Time()).Date = 15 then 16 else 15;
+
 moCheck := func(what, ok, why) Print("monthoverview: " & what & (if ok then ": ok" else ": FAILED " & why));
 
 // the month view whose boxes are big enough for bars (the Dates app has a
@@ -28,8 +33,8 @@ moCheck := func(what, ok, why) Print("monthoverview: " & what & (if ok then ": o
 moGrid := func() call findView with (GetRoot(), func(v) BAnd(v.viewClass, 0xFFFF) = 80 and v:GlobalBox().bottom - v:GlobalBox().top > 200);
 
 call walkSetup with ([2, 0, 45, 34, 14, 37], func() begin		// (the Setup assistant first: "Daniel")
-	GetRoot().calendar:AddAppointment("standup", call moDay with (15, 9), 60, nil, nil);
-	GetRoot().calendar:AddAppointment("review", call moDay with (15, 13), 120, nil, nil);
+	GetRoot().calendar:AddAppointment("standup", call moDay with (moDate, 9), 60, nil, nil);
+	GetRoot().calendar:AddAppointment("review", call moDay with (moDate, 13), 120, nil, nil);
 	call tapAt with (140, 460);						// Dates
 	call waitFor with ("monthoverview: Dates", func() GetRoot().calendar.viewCObject, func() begin
 		call tapAt with (153, 424);					// Show
@@ -40,12 +45,12 @@ call walkSetup with ([2, 0, 45, 34, 14, 37], func() begin		// (the Setup assista
 				local grid := call moGrid with ();
 				local g := grid:GlobalBox();
 				// the grid is under nine pixels of weekday letters, in 7
-				// columns and 5 or 6 rows; the 15th's cell from the first of
-				// the month's weekday
+				// columns and 5 or 6 rows; the meetings' day's cell from the
+				// first of the month's weekday
 				local first := Date(call moDay with (1, 0));
 				local d := Date(Time());
-				local col := (first.dayOfWeek + 14) mod 7;
-				local row := (first.dayOfWeek + 14) div 7;
+				local col := (first.dayOfWeek + moDate - 1) mod 7;
+				local row := (first.dayOfWeek + moDate - 1) div 7;
 				local rows := if (first.dayOfWeek + (if d.month = 2 then 28 else 31)) > 35 then 6 else 5;
 				local cellW := (g.right - g.left) div 7;
 				local cellH := (g.bottom - (g.top + 10)) div rows;

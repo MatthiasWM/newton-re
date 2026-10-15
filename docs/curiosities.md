@@ -2520,3 +2520,55 @@ callback each character as its two bytes taken low one first -
 byte-swapped - which its only callback, `AE16_NextSetCB`, puts right by
 writing it out low byte first: two mistakes that cancel, or a convention
 nobody else was meant to see.
+
+## Services with nothing in them, and a string read through pc
+
+Every comm service implementation in the ROM - `TAsyncService`,
+`TMNPService`, `TIrDAService`, `TModemService`, `TFaxService`, the IR
+probe and sniffer - answers 0x10 from its `Sizeof`: exactly the four words
+of `TProtocol`, not a byte of its own. A service is a class info, a name
+the comm manager looks up and a `Start` that spawns the tool; everything
+with state lives in the tool's task. The same is true of the
+endpoint-side translators (`PFlattenPtr`, `PScriptDataIn`, ...): their
+whole state is the context they are handed on each call.
+
+And each interface's `New(char*)` glue finds its own name without a
+literal pool: `bl` to a two-instruction routine `mov r0,pc; mov pc,lr`
+whose next words are the interface's name. On the ARM, `pc` reads as the
+instruction's address plus eight, which is just past the `mov pc,lr` - so
+`r0` comes back pointing at the string, and the glue passes it to
+`AllocInstanceByName`. (`docs/protocols/README.md`, "Citing the glue".)
+## A QuickDraw library whose every call calls itself
+
+`TQDLibraryDriver` (`qd/QDLibrary.h`) is QuickDraw offered as a protocol to
+code outside the ROM: 196 methods, `InitGraf` to `PutGrayTable`, each meant
+to pass the call on to the QuickDraw function of the same name. Each was
+written as that function's name and its arguments - and inside the class
+the plain name is the method itself. So `SetPortBits` is one instruction,
+`b` to its own address; `OpenPicture` narrows its Boolean and then
+branches to itself; `CopyBits`, whose six arguments do not fit in
+registers, pushes the three on the stack and `bl`s itself, and so on until
+the stack runs out. Not one method does what it says. Nobody noticed
+because nobody could: nothing in the ROM registers the implementation
+(`InitGraf` registers its neighbours `TPinPad` and `TGrayShrink`, not this
+one), so `NewByName("TQDLibrary", ...)` would not even find it. And since
+it is the only thing that asks a text object where an arrow key takes the
+caret, that operation (`TextArrowOffset`, `DoTextArrow`) is reached by
+nothing at all. Fixed by default: the methods pass the calls on (ctest
+`qd.QDLibrary`).
+
+## The persistent memory is read down its byte lanes
+
+A RAM store's `TStoreDriver` (`stores/flash/FlashStore.h`) sees its memory
+as one run of offsets, a *persistent* part first and plain memory after.
+The persistent part is addressed down the byte lanes: offset `o` is byte
+lane `3 ^ (o >> 17)` of word `o & 0x1ffff` - four 128K planes, each in
+one lane of the same words, so consecutive offsets are four bytes apart,
+and every read, write, fill and copy in it goes a byte at a time with a
+stride of four (presumably memory that is reliable, or only wired, a byte
+lane at a time).
+The driver's `PersistentCopy` is built to survive being cut short: it keeps
+where it is from and to and, for a copy that overlaps itself, how far it
+has got before each byte or word, so `ContinuePersistentCopy` can pick it
+up again after a power failure - but nothing in it ever says the copy is
+over (ctest `stores.FlashStore`).
