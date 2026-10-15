@@ -25,9 +25,10 @@ Every path ends in `RGBtoGray(r, g, b, depthIn, depthOut)` 0x002bf044 -
 luminance weighted 0.299/0.587/0.114, inverted (the Newton's grays run 0
 white to all ones black) - at the depth `GetGrafInfo(kGrafInfoDepth)`
 reports, with `GrayToRGB` 0x002bf0ac the other way.  Both, with the
-pattern makers, are also exported as `TQDLibraryDriver` methods through
-the patchable jump table (0x00195d40...): the place a system update for
-other display hardware would have hooked.
+pattern makers, are also offered as methods of the QuickDraw library
+protocol (`TQDLibraryDriver`, 0x00195d40...: `qd/QDLibrary.h`), the place
+a driver for other display hardware would have reached them - had the
+protocol been registered, and had its methods not called themselves.
 
 The ROM's own data holds no colour: its `'colordata` slots (280 of them,
 `romsrc/layout.tsv`) are icons in several *depths* - a one-bit and a

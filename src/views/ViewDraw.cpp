@@ -57,16 +57,6 @@ SetPattern(long index)
 }
 
 
-// ROM 0x00328e6c DisposeFgPattern__Fv
-// The pen pattern disposed and black put back.
-void
-DisposeFgPattern(void)
-{
-	DisposePattern(GetFgPattern());
-	GetCurrentPort()->fgPat = GetStdPattern(blackPat);
-}
-
-
 // ROM 0x00197d2c GetPattern__FRC6RefVarPUcPPP8PixelMapUc
 // A pattern from its NewtonScript form: an integer is a standard pattern
 // (1-5), or with bit 28 set a packed RGB colour made a gray; a

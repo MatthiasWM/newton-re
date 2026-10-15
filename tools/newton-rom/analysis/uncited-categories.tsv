@@ -59,8 +59,9 @@ unreferenced	SimpleOffset__14TParagraphView|ValidateCaretPoint|WordFitsAtEndOfLi
 # implementation's dispatch table, which the host's virtual call stands in
 # for; they are cited at the interface's declaration (an implementation's
 # Sizeof and ClassInfo at its PROTOCOL_IMPL_SOURCE_MACRO and
-# PROTOCOL_CLASSINFO) - these are not yet
-protocol glue	TQDLibraryDriver|\d+TStoreDriver|\d+TPinPad
+# PROTOCOL_CLASSINFO).  Empty since 2026-10-15: every one is cited (the
+# rule is kept so that a new implementation's are sorted here)
+protocol glue	Sizeof__\d+\w+SFv|ClassInfo__\d+\w+SFv
 
 # --- the compiler's and the C library's runtime ----------------------------
 # the C++ runtime the compiler calls (__nw_v, __dl_v, __vc__, __pvfn__,

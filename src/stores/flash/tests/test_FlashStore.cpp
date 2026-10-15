@@ -277,6 +277,74 @@ TestLookupCache(void)
 }
 
 
+// A RAM store's memory (TStoreDriver): 0x40 persistent offsets held a byte
+// a word in lane 3 (of plane 0), then 0x40 of plain memory.
+static void
+TestStoreDriver(void)
+{
+	alignas(4) static char persistent[0x40 * 4];
+	alignas(4) static char plain[0x40];
+	memset(persistent, 0, sizeof(persistent));
+	memset(plain, 0, sizeof(plain));
+	TStoreDriver driver;
+	memset(&driver, 0, sizeof(driver));
+	driver.Init(plain, sizeof(plain), persistent, 0x40);
+	EXPECT(driver.fTotalSize == 0x80);
+	UChar linear = 2;
+	EXPECT(driver.AddressOf(5, &linear) == persistent + 5 * 4 + 3 && !linear);
+	EXPECT(driver.AddressOfAligned(5, &linear) == persistent + 5 * 4 && !linear);
+	EXPECT(driver.AddressOf(0x45, &linear) == plain + 5 && linear);
+	TStoreDriver planes;
+	planes.Init(plain, sizeof(plain), persistent, 0x80000);
+	EXPECT(planes.AddressOf(0x20005, nil) == persistent + 5 * 4 + 2);	// plane 1: lane 2
+
+	// read and write either part
+	driver.Write((char*) "hello", 2, 5);
+	EXPECT(persistent[2 * 4 + 3] == 'h' && persistent[6 * 4 + 3] == 'o' && persistent[2 * 4] == 0);
+	char buffer[8] = { 0 };
+	driver.Read(buffer, 2, 5);
+	EXPECT(memcmp(buffer, "hello", 5) == 0);
+	driver.Write((char*) "world", 0x42, 5);
+	EXPECT(memcmp(plain + 2, "world", 5) == 0);
+	driver.Set(0x50, 3, 0x1AB);
+	EXPECT((UChar) plain[0x10] == 0xAB && (UChar) plain[0x12] == 0xAB && plain[0x13] == 0);
+	driver.Set(0x10, 2, 0x7F);
+	EXPECT(persistent[0x10 * 4 + 3] == 0x7F && persistent[0x11 * 4 + 3] == 0x7F && persistent[0x12 * 4 + 3] == 0);
+
+	// copies: overlapping upwards and downwards, within and across the parts
+	driver.Copy(2, 3, 5);
+	driver.Read(buffer, 2, 6);
+	EXPECT(memcmp(buffer, "hhello", 6) == 0);
+	driver.Copy(3, 2, 5);
+	driver.Read(buffer, 2, 5);
+	EXPECT(memcmp(buffer, "hello", 5) == 0);
+	driver.Copy(0x42, 0x44, 5);
+	EXPECT(memcmp(plain + 2, "wowor", 5) == 0 && plain[7] == 'l' && plain[8] == 'd');
+	driver.Copy(2, 0x60, 5);						// persistent to plain
+	EXPECT(memcmp(plain + 0x20, "hello", 5) == 0);
+	driver.Copy(0x60, 0x30, 5);						// plain to persistent
+	driver.Read(buffer, 0x30, 5);
+	EXPECT(memcmp(buffer, "hello", 5) == 0);
+
+	// a persistent copy, in words in plain memory and kept going by Continue
+	memcpy(plain + 0x20, "ABCDEFGH", 8);
+	driver.PersistentCopy(0x60, 0x64, 8);			// upwards, overlapping: from the end
+	EXPECT(driver.fOverlapping && driver.fCopying && driver.fCopyCount == 2 && driver.fCopyIndex == 0);
+	EXPECT(memcmp(plain + 0x20, "ABCDABCDEFGH", 12) == 0);
+	driver.PersistentCopy(2, 0x20, 5);				// persistent, apart: bytes
+	EXPECT(!driver.fOverlapping && driver.fCopyCount == 5);
+	driver.Read(buffer, 0x20, 5);
+	EXPECT(memcmp(buffer, "hello", 5) == 0);
+	driver.Write((char*) "HELLO", 2, 5);
+	driver.ContinuePersistentCopy();				// done again from the start
+	driver.Read(buffer, 0x20, 5);
+	EXPECT(memcmp(buffer, "HELLO", 5) == 0);
+	driver.PersistentCopy(3, 2, 4);					// downwards, overlapping
+	driver.Read(buffer, 2, 5);
+	EXPECT(memcmp(buffer, "ELLOO", 5) == 0 && driver.fCopyIndex == 3);
+}
+
+
 // A flash kept by a backing (hal/host/HostFlash.h: the ESP32-S3 host's
 // partition, read in place): its bytes change only through the backing's
 // write and erase, as a flash read through a memory mapping does
@@ -347,6 +415,7 @@ FlashStoreScenario(void)
 	TMuxStore::ClassInfo()->Register();
 	TMuxStoreMonitor::ClassInfo()->Register();
 	TestLookupCache();
+	TestStoreDriver();
 	Scenario();
 	// the same on a backing's flash
 	static HostFlashBacking backing;

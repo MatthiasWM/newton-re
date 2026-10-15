@@ -4,6 +4,9 @@
 add_library(alert STATIC
     AlertDialog.cpp
     AlertManager.cpp
+    PinPad.cpp
 )
 target_link_libraries(alert PUBLIC newton_config qd frames recognition utility os600_user)
 target_include_directories(alert PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_subdirectory(tests)

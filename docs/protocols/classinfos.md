@@ -76,7 +76,7 @@
 | `TVoyagerPlatform` | `TPlatformDriver` | 260 | 0 | 0x0 | 18 |  | 0x00387d18 |
 | `TDotPrinter` | `TPrinter` | 460 | 131072 | 0x0 | 9 |  | 0x00387fc0 |
 | `TPSPrinter` | `TPrinter` | 496 | 131072 | 0x0 | 9 |  | 0x00388108 |
-| `TQDLibraryDriver` | `TQDLibrary` | 16 | 0 | 0x0 | 124 |  | 0x0038878c |
+| `TQDLibraryDriver` | `TQDLibrary` | 16 | 0 | 0x0 | 196 |  | 0x0038878c |
 | `TSerialChip16450` | `TSerialChip` | 92 | 196608 | 0x0 | 44 | `v2.0` | 0x00384894 |
 | `TSerialChipVoyager` | `TSerialChip` | 160 | 196608 | 0x0 | 44 | `v2.0` | 0x003849c4 |
 | `TAsyncDebugLink` | `TSerialDebugLink` | 32 | 0 | 0x0 | 9 |  | 0x00384f00 |

@@ -43,6 +43,7 @@ add_library(qd STATIC
     LocalToGlobal.cpp
     RectNatives.cpp
     ZoomRect.cpp
+    QDLibrary.cpp
 )
 target_link_libraries(qd PUBLIC newton_config memory toolbox frames protocols stores)
 target_include_directories(qd PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

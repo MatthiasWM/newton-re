@@ -5,7 +5,7 @@ QuickDraw rewritten in C for the ARM: the same data structures (Point,
 Rect, Region, PixelMap, GrafPort - `headers/QD/NewtQD.h`, now `src/ddk/`)
 and the same call names (`SetRect`, `UnionRgn`, `FrameRect`, ...), with
 the port's `QDProcs` bottlenecks (`StdRect`, `StdRgn`, ...) and a
-`TQDLibraryDriver` protocol that exports the library to drivers.  The
+`TQDLibrary` protocol meant to export the library to drivers.  The
 ROM's QuickDraw lives at 0x0030f000-0x00318000 (regions, rectangles,
 polygons, pictures, the standard procs) with the blitting and text below.
 Reconstructed source: `src/qd/`.  How each fact was established is
@@ -667,9 +667,9 @@ for each question, `TextLayout.h`).  `TextArrow` (0x2000:
 `TextArrowOffset` 0x00359f70 asks, `DoTextArrow` 0x00359fb8 answers) is
 where an arrow key takes the caret - one character on or back, held
 within the text; nothing in the ROM asks it but the QuickDraw library's
-protocol (`TQDLibraryDriver::TextArrowOffset` 0x00195cc4), whose callers
-are packages' code, so it is dead in the U.S. ROM itself (ctest
-`qd.TextObject`).
+protocol (`TQDLibraryDriver::TextArrowOffset` 0x00195cc4), which nothing
+registers and which calls itself rather than this (below), so nothing in
+the U.S. ROM reaches it at all (ctest `qd.TextObject`).
 The DDK's `TextObjProc` takes the object as a `long`; a sync patch makes
 it `Long`, the ARM's word, pointer-sized on a host.
 
@@ -1150,11 +1150,51 @@ which is the ROM's behaviour and is kept: Names (`kGetAppSize`: 240 wide,
 and the Setup assistant's artwork, laid out for the MessagePad's two
 shapes.
 
+## The QuickDraw library protocol (`qd/QDLibrary.h`)
+
+`TQDLibrary` is QuickDraw as a protocol, for code outside the ROM (a
+driver in a package): 196 methods after `New` and `Delete`, `InitGraf` to
+`PutGrayTable`, in the order of the ROM's dispatch table (`classinfo.py
+--name TQDLibraryDriver`; there is no DDK header and no interface glue in
+the ROM). `TQDLibraryDriver` (0x00195818-0x00196018, class info
+0x0038878c, 0x10 bytes: nothing but the `TProtocol`) is the ROM's
+implementation, each method meant to pass the call on to the QuickDraw
+function of the same name.
+
+**ROM BUG (fixed): every method calls itself.** The disassembly shows it:
+`SetPortBits` 0x0019581c is `b 0x0019581c`; `OpenPicture` is `and
+r2,r2,#0xff` and a `b` back to its own start; `CopyBits` 0x00195864 keeps
+`r0` - the `this` - and pushes its three stack arguments and `bl`s itself;
+`MakeSimpleStyle` 0x00195a04 calls itself for a temporary `StyleRecord`
+and would then copy it into the caller's (a new one when given none). A
+call to the global function would have moved each argument down a
+register, dropping `this`; these pass the same registers on unchanged. In
+the source the method body was the call by its plain name, which inside
+the class is the method. Every method but `New` and `Delete` (both `mov
+pc,lr`) does this; nothing in the ROM registers the implementation
+(`ClassInfo__16TQDLibraryDriverSFv` has no caller - `InitGraf` registers
+`TPinPad` and `TGrayShrink`), so the ROM never meets it. Fixed, the methods
+pass the calls on; `NEWTON_ROM_BUGS=1` brings back the recursion, which on
+the host runs until the stack does (the suite does not run it). Three
+methods have no function to pass on to (`InitQD`, `LCDEnterIdleMode`,
+`LCDExitIdleMode`: not in the ROM) and do nothing; `InitScreen` passes the
+screen's own driver (the host's `InitScreen` takes one); `CopyStyle`
+makes the ROM's copy itself (the host's `CopyStyle` answers nothing); the
+three text-walker methods are NOT YET (the host walks a text object's
+characters with `TTextObjectChars`), `ScanNextChunk` answering what a
+walker with nothing left does. Ctest `qd.QDLibrary` makes one from its
+class info and calls through the interface.
+
+(`DisposeFgPattern` 0x00328e6c, one of the methods' functions, moved from
+`views/ViewDraw.cpp` to `qd/Ports.cpp`, where its address puts it.)
+
 ## Not yet
 
 `ZoomRect`, the screen update task and the alert screen
 info, the per-task globals, `TGrayShrink`, the font cache, the
-`TQDLibraryDriver` protocol.
+text walker (`InitTextWalker` 0x0035c41c, `ScanNextChunk` 0x0035c2b4,
+`ReleaseTextWalker` 0x0035c4a0: the host's text code reads the characters
+whole).
 
 ## Transforms (`qd/Transform.h`)
 

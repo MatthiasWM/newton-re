@@ -223,5 +223,4 @@ Tests: ctest `print.HostDNSSD` (an injected list, canned mDNS answers - every re
 
 - `TLaserWriterLSDriver` and the StyleWriter group, by the owner's decision; AppleTalk itself (PAP, NBP, ADSP).
 - `TPrDriverPart`, the 'prnt part handler for printer-driver packages.
-- `TQDLibraryDriver`, the QuickDraw library offered to drivers.
 - A PCL printer's problems (`ThpPCL` has no status over IPP).

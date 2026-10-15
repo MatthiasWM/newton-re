@@ -614,6 +614,16 @@ GetBgPattern(void)
 }
 
 
+// ROM 0x00328e6c DisposeFgPattern__Fv
+// The pen pattern disposed and black put back.
+void
+DisposeFgPattern(void)
+{
+	DisposePattern(GetFgPattern());
+	GetCurrentPort()->fgPat = GetStdPattern(blackPat);
+}
+
+
 // ROM 0x00328d48 SetFgPattern__FPP8PixelMap
 void
 SetFgPattern(PatternHandle pattern)
@@ -898,9 +908,11 @@ Rand(long n)
 
 // The library started: the globals cleared, the standard patterns and
 // the wide-open region made, the default port opened on the screen.
-// TGrayShrink is registered (RegisterGrayShrink).  NOT YET RECONSTRUCTED:
-// InitScreen (the display driver's PixelMap: the screen is empty here
-// until one is set), the other QD protocols (TPinPad, TQDLibraryDriver).
+// TGrayShrink is registered (RegisterGrayShrink); TPinPad, which the
+// ROM's registers here too, is registered by the boot (RegisterPinPad,
+// alert/PinPad.h: the alert library is above this one).  NOT YET
+// RECONSTRUCTED: InitScreen (the display driver's PixelMap: the screen is
+// empty here until one is set).
 void
 InitGraf(void)
 {
