@@ -56,7 +56,11 @@ TDomain::IDomain(TController* controller, ULong type, char* name)
 
 // ROM 0x0020cfc4 VUnitInClass__7TDomainSFUlT1
 // Whether a unit type belongs to a class of types: the word class ('WORD')
-// takes in the three word recognisers' types.
+// takes in the three word recognisers' types: ParaGraph's 'XRWR', a
+// Kanji recogniser's 'KANJ' (none in this ROM) and Rosetta's 'WREC'.
+// (The host once had 'WRXR' and 'JANK' here - two misread literals - so a
+// cursive area's recognition case counted no words: found by the replay
+// metrics, whose cursive lines came out as case 1.)
 //
 // DEVIATION (host): and the host's own engines' (WordEngines.h), whose
 // units are words as much as Rosetta's are.
@@ -64,7 +68,7 @@ ULong
 TDomain::VUnitInClass(ULong type, ULong classType)
 {
 	if (classType == kWordUnit)
-		return type == 'WRXR' || type == 'JANK' || type == 'WREC' || IsHostWordEngineType(type);
+		return type == 'XRWR' || type == 'KANJ' || type == 'WREC' || IsHostWordEngineType(type);
 	return 0;
 }
 
