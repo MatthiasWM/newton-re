@@ -2773,7 +2773,8 @@ set_tests_properties(host.NewtonWalkthrough2.restart PROPERTIES TIMEOUT 180
                      FAIL_REGULAR_EXPRESSION "FAILED|waited in vain")
 
 # the Dates app's month overview (demo/monthoverview.ns): two meetings on
-# the 15th drawn as bars where the ROM's arithmetic puts them, pixel-checked
+# the 15th (the 16th when that is the Newton's today, drawn inverted) drawn as
+# bars where the ROM's arithmetic puts them, pixel-checked
 add_test(NAME host.NewtonMonthOverview
          COMMAND newton --display 320x480 --headless 120
                  --script ${CMAKE_CURRENT_SOURCE_DIR}/demo/monthoverview.ns
