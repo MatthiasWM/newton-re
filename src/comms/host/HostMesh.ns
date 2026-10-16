@@ -609,7 +609,7 @@
 				 viewBounds: {left: 10, top: 54, right: -10, bottom: 74}, viewJustify: 48,
 				 label: "Key", labelFont: 1058816, entryFont: 9216, indent: 46},
 				{_proto: @226,					// protoTextButton
-				 viewBounds: {left: -60, top: -28, right: -30, bottom: -10}, viewJustify: 160,
+				 viewBounds: {left: -60, top: -28, right: -30, bottom: -10}, viewJustify: 8388774,
 				 text: "Add",
 				 buttonClickScript: func() theSlip:Add()}
 			]
@@ -739,7 +739,7 @@
 				 viewBounds: {left: 10, top: 78, right: -10, bottom: 94}, viewJustify: 48,
 				 text: "None for #name: it comes from the name", viewFont: 9216},
 				{_proto: @226,					// protoTextButton
-				 viewBounds: {left: -60, top: -28, right: -30, bottom: -10}, viewJustify: 160,
+				 viewBounds: {left: -60, top: -28, right: -30, bottom: -10}, viewJustify: 8388774,
 				 text: "Join",
 				 buttonClickScript: func() theSlip:Join()}
 			]
@@ -1938,7 +1938,7 @@
 				inherited:?viewSetupFormScript();
 			 end},
 			{_proto: @226,					// protoTextButton
-			 viewBounds: {left: -76, top: -28, right: -32, bottom: -10}, viewJustify: 160,
+			 viewBounds: {left: -76, top: -28, right: -32, bottom: -10}, viewJustify: 8388774,
 			 text: "Show",
 			 buttonClickScript: func() GetGlobalVar('|HostMesh:host|):ShowAlerted()},
 			{_proto: @166}					// protoClosebox (closing: AlertClosed)

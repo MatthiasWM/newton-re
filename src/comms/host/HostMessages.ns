@@ -995,7 +995,7 @@
 				inherited:?viewSetupFormScript();
 			 end},
 			{_proto: @226,					// protoTextButton
-			 viewBounds: {left: -76, top: -28, right: -32, bottom: -10}, viewJustify: 160,
+			 viewBounds: {left: -76, top: -28, right: -32, bottom: -10}, viewJustify: 8388774,
 			 text: "Show",
 			 buttonClickScript: func() GetGlobalVar('|HostMessages:host|):ShowAlerted()},
 			{_proto: @166}					// protoClosebox (closing: AlertClosed)
