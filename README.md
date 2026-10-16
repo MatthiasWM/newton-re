@@ -132,6 +132,45 @@ On the owner's board:
   the modem and the GPS can each be switched off in the Host preferences
   to save the battery.
 
+#### Using it on the board
+
+What the T-Deck Pro has that a desktop newton does not:
+
+* **The quick sheet**: a finger pulled down from the screen's top edge
+  opens a sheet across the top with **Lock screen** and a checkbox each
+  for the 4G module, the GPS and the LoRa radio (only those the board
+  has); pulled again, it closes.  A tap at the very top still reaches the
+  Newton - only a pull 40 px down is the sheet's.
+* **The lock screen** covers everything with the time, the date and a
+  slider: drag its knob from the left end all the way to the right to
+  unlock (a tap, or a knob let go short of the end, does nothing).  While
+  locked the keyboard is ignored and its light is off.
+* **The keyboard**: Shift is the Newton's Shift; **Sym** held gives the
+  digits and punctuation; **Alt** held gives Esc (Q), End (E), Up (U),
+  Page Up (P), Home (A) and Down (D), and with any other key is the
+  Newton's Command key (Alt-C copy, Alt-V paste ...).
+* **Prefs, Host page** (Extras → Prefs → Host) has the board's settings:
+  the 4G module and the GPS switched on or off (kept across restarts),
+  the e-paper panel's refreshes - *A new page drawn in full*, *Clean up*
+  after so many quick updates, *... and when still*, *... once* so much
+  has changed, *Small changes cleaned up* - and **Clear ghosts**, one full
+  redraw of the panel ([docs/host-settings.md](docs/host-settings.md)).
+  The LoRa radio's power, its settings and MeshCore's regional presets
+  are the Mesh application's own Prefs (its "i" button).
+* **Messages** and **Mesh** appear in Extras only on hardware that has
+  the modem and the radio; a message arriving while its application is
+  closed puts up a slip with **Show** to open the conversation.
+* **The serial console** (the board's USB port, any serial terminal) is a NewtonScript
+  prompt once the OS is up, plus the board's own commands: `!shot` (what
+  the panel shows, for `tools/tdeck/panelshot.py`), `!tap x y`,
+  `!time <seconds since 1970>`, `!prof`, `!reset`; and
+  `DevicePanelSet(name, value)` for the panel's finer settings
+  ([src/host/esp32/README.md](src/host/esp32/README.md)).
+
+On a desktop the quick sheet and the lock screen can be tried with
+`newton --quick-sheet`, opened from a script with
+`GetGlobalVar('|QuickSheet:host|):Pulled()` (`src/host/demo/quicksheet.ns`).
+
 The board found bugs of the reconstruction that x86 had hidden (a glue
 function dropping its result, a one-byte overrun, an unwinder that cannot
 leave a task's first frame), all fixed in the tree.  Still open: a real
